@@ -1,0 +1,205 @@
+/* comfy table */
+.comfy-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.comfy-table .table-head tr {
+    background-color: var(--tr-even-bg-color);
+}
+
+/* comfy tabs */
+.comfy-tabs {
+    color: #fff;
+}
+
+.comfy-tabs-head {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #6a6a6a;
+}
+
+.comfy-tabs-head .head-item {
+    padding: 8px 12px;
+    border: 1px solid #6a6a6a;
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    cursor: pointer;
+    margin-bottom: -1px;
+}
+
+.comfy-tabs-head .head-item.active {
+    background-color: #2e2e2e;
+    cursor: default;
+    position: relative;
+    z-index: 1;
+}
+
+.comfy-tabs-body {
+    background-color: #2e2e2e;
+    border: 1px solid #6a6a6a;
+    border-top: none;
+    padding: 16px 0px;
+}
+
+/* comfy grid */
+.comfy-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.comfy-grid .item {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+}
+
+.comfy-grid .item img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.comfy-grid .item p {
+    position: absolute;
+    bottom: 0px;
+    background-color: #000a;
+    width: 100%;
+    margin: 0;
+    padding: 9px 0px;
+}
+
+/* comfy radio group */
+.comfy-radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.comfy-radio {
+    display: flex;
+    gap: 4px;
+    padding: 4px 8px;
+    color: var(--input-text);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--comfy-input-bg);
+    font-size: 18px;
+}
+
+/* model manager */
+.model-manager {
+    box-sizing: border-box;
+    width: 100%;
+    height: 100%;
+    max-width: unset;
+    max-height: unset;
+    padding: 10px;
+    color: #fff;
+}
+
+.model-manager .comfy-modal-content {
+    width: 100%;
+    gap: 16px;
+}
+
+/* model manager common */
+.model-manager button,
+.model-manager select,
+.model-manager input {
+    padding: 4px 8px;
+    margin: 0;
+}
+
+.model-manager button:disabled,
+.model-manager select:disabled,
+.model-manager input:disabled {
+    background-color: #6a6a6a;
+    filter: brightness(1.2);
+    cursor: not-allowed;
+}
+
+.model-manager button.block {
+    width: 100%;
+}
+
+.comfy-table a {
+    color: #007acc;
+    text-decoration: none;
+}
+
+.model-manager ::-webkit-scrollbar {
+    width: 6px;
+}
+
+.model-manager ::-webkit-scrollbar-track {
+    background-color: #353535;
+    border-right: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.model-manager ::-webkit-scrollbar-thumb {
+    background-color: #a1a1a1;
+    border-radius: 3px;
+}
+
+/* model manager row */
+.model-manager .row {
+    display: flex;
+    gap: 8px;
+}
+
+/* comfy tabs */
+.model-manager .comfy-tabs {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.model-manager .comfy-tabs-body {
+    flex: 1;
+    overflow: hidden;
+}
+
+.model-manager .comfy-tabs-body > div {
+    position: relative;
+    max-height: 100%;
+    padding: 0 16px;
+    overflow-x: hidden;
+}
+
+/* model manager special */
+.model-manager .close {
+    position: absolute;
+    padding: 1px 6px;
+    top: 10px;
+    right: 10px;
+}
+
+.model-manager .row {
+    position: sticky;
+    padding-top: 2px;
+    margin-top: -2px;
+    padding-bottom: 18px;
+    margin-bottom: -2px;
+    top: 0px;
+    background-color: #2e2e2e;
+    z-index: 1;
+}
+
+.model-manager .table-head {
+    position: sticky;
+    top: 52px;
+    z-index: 1;
+}
+
+.model-manager div[data-name="Model List"] .row {
+    align-items: flex-start;
+}
