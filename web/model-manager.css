@@ -102,6 +102,7 @@
     max-height: unset;
     padding: 10px;
     color: #fff;
+    z-index: 2000;
 }
 
 .model-manager .comfy-modal-content {
