@@ -185,10 +185,12 @@ class Grid {
                 this.element,
                 this.#dataSource.map((item) => {
                     const uri = item.post ?? "no-post";
-                    const imgUrl = `/model-manager/imgPreview?uri=${uri}`;
+                    const imgUrl = `/model-manager/image-preview?uri=${uri}`;
                     return $el("div.item", {}, [
                         $el("img", { src: imgUrl }),
-                        $el("p", [item.name]),
+                        $el("div", {}, [
+                            $el("p", [item.name])
+                        ]),
                     ]);
                 })
             );
@@ -247,16 +249,16 @@ class ModelManager extends ComfyDialog {
 
     #el = {
         loadSourceBtn: null,
-        loadSourceFromSelect: null,
         loadSourceFromInput: null,
         sourceInstalledFilter: null,
         sourceContentFilter: null,
         sourceFilterBtn: null,
         modelTypeSelect: null,
+        modelContentFilter: null,
     };
 
     #data = {
-        sourceList: [],
+        sources: [],
         models: {},
     };
 
@@ -270,14 +272,14 @@ class ModelManager extends ComfyDialog {
             { parent: document.body },
             [
                 $el("div.comfy-modal-content", [
-                    $el("button.close", {
-                        textContent: "X",
+                    $el("button.close.icon-button", {
+                        textContent: "✕",
                         onclick: () => this.close(),
                     }),
                     $tabs([
-                        $tab("Source Install", this.#createSourceInstall()),
-                        $tab("Customer Install", []),
-                        $tab("Model List", this.#createModelList()),
+                        $tab("Install", this.#createSourceInstall()),
+                        $tab("Models", this.#createModelList()),
+                        $tab("Settings", []),
                     ]),
                 ]),
             ]
@@ -295,58 +297,44 @@ class ModelManager extends ComfyDialog {
         this.#createSourceList();
 
         return [
-            $el("div.row", [
-                $el("button", {
-                    type: "button",
-                    textContent: "Load From",
-                    $: (el) => (this.#el.loadSourceBtn = el),
-                    onclick: () => this.#refreshSourceList(),
-                }),
-                $el(
-                    "select",
-                    {
-                        $: (el) => (this.#el.loadSourceFromSelect = el),
-                        onchange: (e) => {
-                            const val = e.target.val;
-                            this.#el.loadSourceFromInput.disabled =
-                                val === "Local Source";
+            $el("div.row.tab-header", [
+                $el("div.row.tab-header-flex-block", [
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "⟳",
+                        $: (el) => (this.#el.loadSourceBtn = el),
+                        onclick: () => this.#refreshSourceList(),
+                    }),
+                    $el("input.source-text-area", {
+                        $: (el) => (this.#el.loadSourceFromInput = el),
+                        placeholder: "https://ComfyUI-Model-Manager/index.json",
+                    }),
+                ]),
+                $el("div.row.tab-header-flex-block", [
+                    $el("input.search-text-area", {
+                        $: (el) => (this.#el.sourceContentFilter = el),
+                        placeholder: "example: \"sd_xl\" -vae",
+                        onkeyup: (e) => e.key === "Enter" && this.#filterSourceList(),
+                    }),
+                    $el(
+                        "select",
+                        {
+                            $: (el) => (this.#el.sourceInstalledFilter = el),
+                            style: { width: 0 },
+                            onchange: () => this.#filterSourceList(),
                         },
-                    },
-                    [
-                        $el("option", ["Local Source"]),
-                        $el("option", ["Web Source"]),
-                    ]
-                ),
-                $el("input", {
-                    $: (el) => (this.#el.loadSourceFromInput = el),
-                    value: "https://github.com/hayden-fr/ComfyUI-Model-Manager/blob/main/index.json",
-                    style: { flex: 1 },
-                    disabled: true,
-                }),
-                $el("div", { style: { width: "50px" } }),
-                $el(
-                    "select",
-                    {
-                        $: (el) => (this.#el.sourceInstalledFilter = el),
-                        onchange: () => this.#filterSourceList(),
-                    },
-                    [
-                        $el("option", ["Filter: All"]),
-                        $el("option", ["Installed"]),
-                        $el("option", ["Non-Installed"]),
-                    ]
-                ),
-                $el("input", {
-                    $: (el) => (this.#el.sourceContentFilter = el),
-                    placeholder: "Input search keyword",
-                    onkeyup: (e) =>
-                        e.code === "Enter" && this.#filterSourceList(),
-                }),
-                $el("button", {
-                    type: "button",
-                    textContent: "Search",
-                    onclick: () => this.#filterSourceList(),
-                }),
+                        [
+                            $el("option", ["Filter: All"]),
+                            $el("option", ["Downloaded"]),
+                            $el("option", ["Not Downloaded"]),
+                        ]
+                    ),
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "🔍︎",
+                        onclick: () => this.#filterSourceList(),
+                    }),
+                ]),
             ]),
             this.#sourceList.element,
         ];
@@ -387,7 +375,7 @@ class ModelManager extends ComfyDialog {
                     return $el("button.block", {
                         type: "button",
                         disabled: installed,
-                        textContent: installed ? "Installed" : "Install",
+                        textContent: installed ? "✓︎" : "📥︎",
                         onclick: async (e) => {
                             e.disabled = true;
                             const response = await this.#request(
@@ -397,7 +385,6 @@ class ModelManager extends ComfyDialog {
                                     body: JSON.stringify(record),
                                 }
                             );
-                            console.log(response);
                             e.disabled = false;
                         },
                     });
@@ -410,40 +397,58 @@ class ModelManager extends ComfyDialog {
 
     async #refreshSourceList() {
         this.#el.loadSourceBtn.disabled = true;
-        this.#el.loadSourceFromSelect.disabled = true;
 
-        const sourceType = this.#el.loadSourceFromSelect.value;
-        const webSource = this.#el.loadSourceFromInput.value;
-        const uri = sourceType === "Local Source" ? "local" : webSource;
+        const source = this.#el.loadSourceFromInput.value;
+        const uri = (source === "https://ComfyUI-Model-Manager/index.json") || (source === "") ? "local" : source;
         const dataSource = await this.#request(
             `/model-manager/source?uri=${uri}`
         ).catch(() => []);
-        this.#data.sourceList = dataSource;
+        this.#data.sources = dataSource;
         this.#sourceList.setData(dataSource);
         this.#el.sourceInstalledFilter.value = "Filter: All";
         this.#el.sourceContentFilter.value = "";
 
         this.#el.loadSourceBtn.disabled = false;
-        this.#el.loadSourceFromSelect.disabled = false;
     }
 
-    #filterSourceList() {
-        const installedType = this.#el.sourceInstalledFilter.value;
-        /** @type {Array<string>} */
-        const content = this.#el.sourceContentFilter.value
-            .split(" ")
-            .map((item) => item.toLowerCase())
-            .filter(Boolean);
+#filterSourceList() {
+    /** @type {Array<string>} */
+    const content = this.#el.sourceContentFilter.value
+        .replace("*", " ")
+        .split(/(-?".*?"|[^\s"]+)+/g)
+        .map((item) => item
+            .trim()
+            .replace(/(?:'|")+/g, "")
+            .toLowerCase() // TODO: Quotes should be exact?
+        )
+        .filter(Boolean);
 
-        const newDataSource = this.#data.sourceList.filter((row) => {
-            const filterField = ["type", "name", "base", "description"];
-            const rowContent = filterField
-                .reduce((memo, field) => memo + " " + row[field], "")
-                .toLowerCase();
-            return content.reduce((memo, target) => {
-                return memo && rowContent.includes(target);
-            }, true);
-        });
+    const installedType = this.#el.sourceInstalledFilter.value;
+    const newDataSource = this.#data.sources.filter((row) => {
+        if (installedType !== "Filter: All") {
+            if ((installedType === "Downloaded" && !row["installed"]) || 
+                (installedType === "Not Downloaded" && row["installed"])) {
+                return false;
+            }
+        }
+
+        let filterField = ["type", "name", "base", "description"];
+        const rowText = filterField
+            .reduce((memo, field) => memo + " " + row[field], "")
+            .toLowerCase();
+        return content.reduce((memo, target) => {
+            const excludeTarget = target[0] === "-";
+            if (excludeTarget && target.length === 1) { return memo; }
+            const filteredTarget = excludeTarget ? target.slice(1) : target;
+            const regexSHA256 = /^[a-f0-9]{64}$/gi;
+            if (row["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
+                return memo && excludeTarget !== (filteredTarget === row["SHA256"]);
+            }
+            else {
+                return memo && excludeTarget !== rowText.includes(filteredTarget);
+            }
+        }, true);
+    });
 
         this.#sourceList.setData(newDataSource);
     }
@@ -456,34 +461,51 @@ class ModelManager extends ComfyDialog {
         this.#modelList = gridInstance;
 
         return [
-            $el("div.row", [
-                $radioGroup({
-                    $: (el) => (this.#el.modelTypeSelect = el),
-                    name: "model-type",
-                    onchange: () => this.#updateModelList(),
-                    options: [
-                        { value: "checkpoints" },
-                        { value: "clip" },
-                        { value: "clip_vision" },
-                        { value: "controlnet" },
-                        { value: "diffusers" },
-                        { value: "embeddings" },
-                        { value: "gligen" },
-                        { value: "hypernetworks" },
-                        { value: "loras" },
-                        { value: "style_models" },
-                        { value: "unet" },
-                        { value: "upscale_models" },
-                        { value: "vae" },
-                        { value: "vae_approx" },
-                    ],
-                }),
-                $el("button", {
-                    type: "button",
-                    textContent: "Refresh",
-                    style: { marginLeft: "auto" },
-                    onclick: () => this.#refreshModelList(),
-                }),
+            $el("div.row.tab-header", [
+                $el("div.row.tab-header-flex-block",
+                    [
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "⟳",
+                        onclick: () => this.#refreshModelList(),
+                    }),
+                    $el("select.model-type-dropdown",
+                        {
+                            $: (el) => (this.#el.modelTypeSelect = el),
+                            name: "model-type",
+                            onchange: () => this.#filterModelList(),
+                        },
+                        [
+                            $el("option", ["checkpoints"]),
+                            $el("option", ["clip"]),
+                            $el("option", ["clip_vision"]),
+                            $el("option", ["controlnet"]),
+                            $el("option", ["diffusers"]),
+                            $el("option", ["embeddings"]),
+                            $el("option", ["gligen"]),
+                            $el("option", ["hypernetworks"]),
+                            $el("option", ["loras"]),
+                            $el("option", ["style_models"]),
+                            $el("option", ["unet"]),
+                            $el("option", ["upscale_models"]),
+                            $el("option", ["vae"]),
+                            $el("option", ["vae_approx"]),
+                        ]
+                    ),
+                    ]
+                ),
+                $el("div.row.tab-header-flex-block", [
+                    $el("input.search-text-area", {
+                        $: (el) => (this.#el.modelContentFilter = el),
+                        placeholder: "example: 1.5/styles -.pt",
+                        onkeyup: (e) => e.key === "Enter" && this.#filterModelList(),
+                    }),
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "🔍︎",
+                        onclick: () => this.#filterModelList(),
+                    }),
+                ]),
             ]),
             gridInstance.element,
         ];
@@ -492,13 +514,42 @@ class ModelManager extends ComfyDialog {
     async #refreshModelList() {
         const dataSource = await this.#request("/model-manager/models");
         this.#data.models = dataSource;
-        this.#updateModelList();
+        this.#filterModelList();
     }
 
-    #updateModelList() {
-        const type = this.#el.modelTypeSelect.value;
-        const list = this.#data.models[type];
-        this.#modelList.setData(list);
+    #filterModelList() {
+        /** @type {Array<string>} */
+        const content = this.#el.modelContentFilter.value
+            .replace("*", " ")
+            .split(/(-?".*?"|[^\s"]+)+/g)
+            .map((item) => item
+                .trim()
+                .replace(/(?:'|")+/g, "")
+                .toLowerCase() // TODO: Quotes should be exact?
+            )
+            .filter(Boolean);
+
+        const modelType = this.#el.modelTypeSelect.value;
+
+        const newDataSource = this.#data.models[modelType].filter((modelInfo) => {
+            const filterField = ["name", "path"];
+            const modelText = filterField
+                .reduce((memo, field) => memo + " " + modelInfo[field], "")
+                .toLowerCase();
+            return content.reduce((memo, target) => {
+                const excludeTarget = target[0] === "-";
+                if (excludeTarget && target.length === 1) { return memo; }
+                const filteredTarget = excludeTarget ? target.slice(1) : target;
+                const regexSHA256 = /^[a-f0-9]{64}$/gi;
+                if (modelInfo["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
+                    return memo && excludeTarget !== (filteredTarget === modelInfo["SHA256"]);
+                }
+                else {
+                    return memo && excludeTarget !== modelText.includes(filteredTarget);
+                }
+            }, true);
+        });
+        this.#modelList.setData(newDataSource);
     }
 }
 
@@ -516,7 +567,8 @@ function getInstance() {
 
 app.registerExtension({
     name: "Comfy.ModelManager",
-
+    init() {
+    },
     async setup() {
         $el("link", {
             parent: document.head,
@@ -524,13 +576,13 @@ app.registerExtension({
             href: "./extensions/ComfyUI-Model-Manager/model-manager.css",
         });
 
-        $el("button", {
-            parent: document.querySelector(".comfy-menu"),
-            textContent: "Models",
-            style: { order: 1 },
-            onclick: () => {
-                getInstance().show();
-            },
-        });
+        app.ui.menuContainer.appendChild(
+            $el("button", {
+                id: "comfyui-model-manager-button",
+                parent: document.querySelector(".comfy-menu"),
+                textContent: "Models",
+                onclick: () => { getInstance().show(); },
+            })
+        );
     },
 });

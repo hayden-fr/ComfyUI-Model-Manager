@@ -5,7 +5,9 @@
         "name": "sd_xl_base_1.0.safetensors",
         "page": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0",
         "download": "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
-        "description": "Stable Diffusion XL base model"
+        "description": "Stable Diffusion XL base model",
+		"size": "6938078334",
+		"SHA256": "31e35c80fc4829d14f90153f4c74cd59c90b779f6afe05a74cd6120b893f7e5b"
     },
     {
         "type": "checkpoint",
@@ -13,7 +15,9 @@
         "name": "sd_xl_refiner_1.0.safetensors",
         "page": "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0",
         "download": "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors",
-        "description": "Stable Diffusion XL refiner model"
+        "description": "Stable Diffusion XL refiner model",
+		"size": "6075981930",
+		"SHA256": "7440042bbdc8a24813002c09b6b69b64dc90fded4472613437b7f55f9b7d9c5f"
     },
     {
         "type": "vae",
@@ -21,104 +25,153 @@
         "name": "sdxl_vae.safetensors",
         "page": "https://huggingface.co/stabilityai/sdxl-vae",
         "download": "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors",
-        "description": "Stable Diffusion XL VAE"
+        "description": "Stable Diffusion XL VAE",
+		"size": "334641164",
+		"SHA256": "63aeecb90ff7bc1c115395962d3e803571385b61938377bc7089b36e81e92e2e"
     },
-
     {
         "type": "checkpoint",
         "base": "sd-1.5",
         "name": "anything_v5.safetensors",
         "page": "https://huggingface.co/stablediffusionapi/anything-v5",
-        "download": "https://huggingface.co/stablediffusionapi/anything-v5/resolve/main/unet/diffusion_pytorch_model.safetensors"
+        "download": "https://huggingface.co/stablediffusionapi/anything-v5/resolve/main/unet/diffusion_pytorch_model.safetensors",
+		"size": "3438167536",
+		"SHA256": "04e883b18718d9ae9548303a4a8416a843dd9496fdd38e6f3bf36971a78d81b7"
     },
     {
         "type": "vae",
         "name": "anything_v5.vae.safetensors",
-        "download": "https://huggingface.co/stablediffusionapi/anything-v5/resolve/main/vae/diffusion_pytorch_model.safetensors"
+		"page": "https://huggingface.co/stablediffusionapi/anything-v5",
+        "download": "https://huggingface.co/stablediffusionapi/anything-v5/resolve/main/vae/diffusion_pytorch_model.safetensors",
+		"size": "334643276",
+		"SHA256": "63df757ecf5f5ee8bd4c88fd4cd00fceb44e1ad30a3e44d952ce346b78f34f91"
     },
     {
         "type": "checkpoint",
         "name": "Counterfeit-V3.0.safetensors",
-        "download": "https://huggingface.co/gsdf/Counterfeit-V3.0/resolve/main/Counterfeit-V3.0.safetensors"
+		"page": "https://huggingface.co/gsdf/Counterfeit-V3.0",
+        "download": "https://huggingface.co/gsdf/Counterfeit-V3.0/resolve/main/Counterfeit-V3.0.safetensors",
+		"size": "9399621844",
+		"SHA256": "db6cd0a62d4844d8c9683129b222aa32998c24c69291711ea03fee3f81f96edd"
     },
     {
         "type": "embeddings",
         "name": "EasyNegative.safetensors",
-        "download": "https://huggingface.co/datasets/gsdf/EasyNegative/resolve/main/EasyNegative.safetensors"
+		"page": "https://huggingface.co/datasets/gsdf/EasyNegative",
+        "download": "https://huggingface.co/datasets/gsdf/EasyNegative/resolve/main/EasyNegative.safetensors",
+		"size": "24655",
+		"SHA256": "c74b4e810b030f6b75fde959e2db678c268d07115b85356d3c0138ba5eb42340"
     },
     {
         "type": "checkpoint",
         "name": "CounterfeitXL_%CE%B2.safetensors",
-        "download": "https://huggingface.co/gsdf/CounterfeitXL/resolve/main/CounterfeitXL_%CE%B2.safetensors"
+		"page": "https://huggingface.co/gsdf/CounterfeitXL",
+        "download": "https://huggingface.co/gsdf/CounterfeitXL/resolve/main/CounterfeitXL_%CE%B2.safetensors",
+		"size": "6938040682",
+		"SHA256": "79f6514507c050e7d6e725c96dd44fa74a0a011f44efd8183167c80c7ab22c1b"
     },
     {
         "type": "checkpoint",
         "name": "AOM3A1B_orangemixs.safetensors",
-        "download": "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors"
+		"page": "https://huggingface.co/WarriorMama777/OrangeMixs",
+        "download": "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/Models/AbyssOrangeMix3/AOM3A1B_orangemixs.safetensors",
+		"size": "2132626071",
+		"SHA256": "5493a0ec491f5961dbdc1c861404088a6ae9bd4007f6a3a7c5dee8789cdc1361"
     },
     {
         "type": "vae",
         "name": "orangemix.vae.pt",
-        "download": "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/VAEs/orangemix.vae.pt"
+		"page": "https://huggingface.co/WarriorMama777/OrangeMixs",
+        "download": "https://huggingface.co/WarriorMama777/OrangeMixs/resolve/main/VAEs/orangemix.vae.pt",
+		"size": "822802803",
+		"SHA256": "f921fb3f29891d2a77a6571e56b8b5052420d2884129517a333c60b1b4816cdf"
     },
     {
         "type": "checkpoint",
-        "name": "Deliberate.safetensors",
-        "download": "https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate.safetensors"
+        "name": "Deliberate_v3.safetensors",
+		"page": "https://huggingface.co/XpucT/Deliberate",
+        "download": "https://huggingface.co/XpucT/Deliberate/resolve/main/Deliberate_v3.safetensors",
+		"size": "2132626832",
+		"SHA256": "aadddd3d7579de79db91f4ac03f2fbad4e9b71216bbebb50c338cae74b77cb27"
     },
     {
         "type": "checkpoint",
         "name": "Realistic_Vision_V5.1.safetensors",
-        "download": "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1.safetensors"
+		"page": "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE",
+        "download": "https://huggingface.co/SG161222/Realistic_Vision_V5.1_noVAE/resolve/main/Realistic_Vision_V5.1.safetensors",
+		"size": "4265097044",
+		"SHA256": "00445494c80979e173c267644ea2d7c67a37fe3c50c9f4d5a161d8ecdd96cb2f"
     },
     {
         "type": "vae",
         "name": "sd_vae.safetensors",
-        "download": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors"
+		"page": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original",
+        "download": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors",
+		"size": "334641190",
+		"SHA256": "735e4c3a447a3255760d7f86845f09f937809baa529c17370d83e4c3758f3c75"
     },
     {
         "type": "checkpoint",
         "name": "LOFI_V3.safetensors",
-        "download": "https://huggingface.co/lenML/LOFI-v3/resolve/main/LOFI_V3.safetensors"
+		"page": "https://huggingface.co/lenML/LOFI-v3",
+        "download": "https://huggingface.co/lenML/LOFI-v3/resolve/main/LOFI_V3.safetensors",
+		"size": "5838302756",
+		"SHA256": "02f68485a143121214d7a0f563c35a271c6f6394dcd986c161d27945ba713bc2"
     },
     {
         "type": "checkpoint",
         "name": "NeverendingDream_noVae.safetensors",
-        "download": "https://huggingface.co/Lykon/NeverEnding-Dream/resolve/main/NeverendingDream_noVae.safetensors"
-    },
-    {
-        "type": "vae",
-        "name": "sd_vae.safetensors",
-        "download": "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors"
+		"page": "https://huggingface.co/Lykon/NeverEnding-Dream",
+        "download": "https://huggingface.co/Lykon/NeverEnding-Dream/resolve/main/NeverendingDream_noVae.safetensors",
+		"size": "4265096720",
+		"SHA256": "3fa172acd68289ec92a687ce074d62b963fca7d833a3e6507668fee827cee902"
     },
     {
         "type": "checkpoint",
         "name": "ProtoGen_X5.8.safetensors",
-        "download": "https://huggingface.co/darkstorm2150/Protogen_x5.8_Official_Release/resolve/main/ProtoGen_X5.8.safetensors"
+		"page": "https://huggingface.co/darkstorm2150/Protogen_x5.8_Official_Release",
+        "download": "https://huggingface.co/darkstorm2150/Protogen_x5.8_Official_Release/resolve/main/ProtoGen_X5.8.safetensors",
+		"size": "7703274889",
+		"SHA256": "6a21b428a3fb7286f024f958c761ea1a36a5061c3d3c1eb6a815c88af0e97cb0"
     },
     {
         "type": "checkpoint",
         "name": "GuoFeng3.4.safetensors",
-        "download": "https://huggingface.co/xiaolxl/GuoFeng3/resolve/main/GuoFeng3.4.safetensors"
+		"page": "https://huggingface.co/xiaolxl/GuoFeng3",
+        "download": "https://huggingface.co/xiaolxl/GuoFeng3/resolve/main/GuoFeng3.4.safetensors",
+		"size": "2299933688",
+		"SHA256": "a83e25fe5b70bad595fe4dd6733ee35f0e3ddf8ed4041ab360f9573556e8b3e6"
     },
     {
         "type": "lora",
         "name": "Xiaorenshu_v15.safetensors",
-        "download": "https://huggingface.co/datamonet/xiaorenshu/resolve/main/Xiaorenshu_v15.safetensors"
+		"page": "https://huggingface.co/datamonet/xiaorenshu",
+        "download": "https://huggingface.co/datamonet/xiaorenshu/resolve/main/Xiaorenshu_v15.safetensors",
+		"size": "151111013",
+		"SHA256": "dd9ead4035c17d3169fbb4a34a720b4909d54a5c367eaab5ae4b9e91eaebea3c"
     },
     {
         "type": "lora",
         "name": "Colorwater_v4.safetensors",
-        "download": "https://huggingface.co/niitokikei/Colorwater/resolve/main/Colorwater_v4.safetensors"
+		"page": "https://huggingface.co/niitokikei/Colorwater",
+        "download": "https://huggingface.co/niitokikei/Colorwater/resolve/main/Colorwater_v4.safetensors",
+		"size": "151111114",
+		"SHA256": "1b175706ff313111f5c5c750e18f13056868801ccde0e75f73f327a8e4f57a05"
     },
     {
         "type": "lora",
         "name": "huyefo-v1.0.safetensors",
-        "download": "https://civitai.com/api/download/models/104426"
+		"page": "https://civitai.com/models/104426",
+        "download": "https://civitai.com/api/download/models/104426",
+		"size": "18991304",
+		"SHA256": "F4057E9C1422A84D1CDAF661E85DB26A7F76B980712DFE7E7601908728DC4175"
     },
     {
         "type": "upscale_models",
         "name": "RealESRGAN_x2plus.pth",
-        "download": "https://huggingface.co/Rainy-hh/Real-ESRGAN/resolve/main/RealESRGAN_x2plus.pth"
+		"page": "https://huggingface.co/Rainy-hh/Real-ESRGAN",
+        "download": "https://huggingface.co/Rainy-hh/Real-ESRGAN/resolve/main/RealESRGAN_x2plus.pth",
+		"size": "67061725",
+		"SHA256": "49fafd45f8fd7aa8d31ab2a22d14d91b536c34494a5cfe31eb5d89c2fa266abb"
     }
 ]
