@@ -497,7 +497,7 @@ class ModelManager extends ComfyDialog {
                 $el("div.row.tab-header-flex-block", [
                     $el("input.search-text-area", {
                         $: (el) => (this.#el.modelContentFilter = el),
-                        placeholder: "example: 1.5/styles -.pt",
+                        placeholder: "example: styles/clothing -.pt",
                         onkeyup: (e) => e.key === "Enter" && this.#filterModelList(),
                     }),
                     $el("button.icon-button", {

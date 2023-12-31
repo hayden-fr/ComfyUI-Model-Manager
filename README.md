@@ -8,11 +8,13 @@ Browse models in ComfyUI. (Downloading and deleting are WIP.)
 
 I made this fork because the original repo was inactive and missing many things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
 
+Currently it is still missing some features it should have.
+
 ## Fork Improvements
 
 - Search models in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
-- Search `/`subdirectories of base model directories based on your file structure (for example, `/1.5/styles`).
+- Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
