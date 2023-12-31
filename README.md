@@ -6,7 +6,7 @@ Browse models in ComfyUI. (Downloading and deleting are WIP.)
 
 ## About this branch
 
-I made this branch because the original repo was inactive and missing things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet without asking for permission.
+I made this branch because the original repo was inactive and missing things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
 
 ## Branch Improvements
 
