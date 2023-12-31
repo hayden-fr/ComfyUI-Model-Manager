@@ -4,33 +4,33 @@ Browse models in ComfyUI. (Downloading and deleting are WIP.)
 
 ![Model Manager Demo Screenshot](model-manager-demo-screenshot.png)
 
-## About this branch
+## About this fork
 
-I made this branch because the original repo was inactive and missing things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
+I made this fork because the original repo was inactive and missing many things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
 
-## Branch Improvements
+## Fork Improvements
 
 - Search models in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
-- Search `/`subdirectories of main directory based on your file structure (for example, `/1.5/styles`).
-- Include models listed in `extra_model_paths.yaml`.
+- Search `/`subdirectories of base model directories based on your file structure (for example, `/1.5/styles`).
+- Include models listed in ComfyUI's `extra_model_paths.yaml`.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
 - Simplified UI.
 
-## TODO
+## TODO:
 
 ### One-click to add a model/node to workspace
 
-- &#9744; Copy icon `📋` or plus icon `+`?
+- &#9744; Add icon `+`? (Copy icon `⎘`?)
 - &#9744; Sidebar mode
-  - &#9744; Drag to add?
+  - &#9744; Drag to add to workspace?
 
 ### Downloading tab
 
 - &#9744; Replace Install tab with Downloading tab (more practical IMO).
 - &#9744; Download a model from a url.
-- &#9744; Choose save path in browser.
+- &#9744; Choose save path to download within browser.
 
 ### Search filtering and sort
 
@@ -43,7 +43,7 @@ I made this branch because the original repo was inactive and missing things I n
   - &#9744; Date created (ascending/decending)
   - &#9744; Recently used (ascending/decending)
   - &#9744; Frequently used (ascending/decending)
-- &#9744; `or` vs `and` search keywords (currently `and`)
+- &#9744; `or` vs `and` type of keyword search (currently `and`)
 
 ### Settings
 
@@ -54,13 +54,13 @@ I made this branch because the original repo was inactive and missing things I n
 
 ### Model info window/panel (server load/send on demand)
 
-- &#9744; Info icon `ⓘ`
-- &#9744; Optional (re)download `📥︎`model info from the internet and cache the text file locally. (requires checksum enabled)
+- &#9744; Info icon `ⓘ` button to view.
+- &#9744; Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
 - &#9744; Delete model with warning popup.
 
 ### Image preview
 
-- &#9744; Support multiple preview images (swipe?).
+- &#9744; Support multiple preview images. (swipe?)
 - &#9744; Show preview images for videos.
   - &#9744; If ffmpeg or cv2 available, extract the first frame of the video and use as image preview.
   - &#9744; Play preview video?
