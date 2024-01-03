@@ -55,10 +55,8 @@
 
 .comfy-grid .item {
     position: relative;
-    aspect-ratio: 2/3;
-    max-width: 230px;
-    /*width: 230px;*/
-    /*height: 345px;*/
+    width: 230px;
+    height: 345px;
     text-align: center;
     overflow: hidden;
 	border-radius: 8px;
@@ -70,7 +68,7 @@
     object-fit: cover;
 }
 
-.comfy-grid .item div {
+.comfy-grid .model-label {
 	background-color: #000a;
 	width: 100%;
 	height: 2.2rem;
@@ -80,7 +78,7 @@
 	line-height: 2.2rem;
 }
 
-.comfy-grid .item div > p {
+.comfy-grid .model-label > p {
 	width: calc(100% - 2rem);
 	overflow-x: scroll;
 	white-space: nowrap;
@@ -89,17 +87,18 @@
 	margin: 0;
 }
 
-.comfy-grid .item div {
+.comfy-grid .model-label {
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
 
-.comfy-grid .item div ::-webkit-scrollbar { 
+.comfy-grid .model-label ::-webkit-scrollbar { 
     width: 0;
     height: 0;
 }
 
 .comfy-grid .item .model-preview-overlay {
+    position: absolute;
     top: 0;
     left: 0;
     height: 100%;
@@ -107,23 +106,29 @@
     background-color: rgba(0, 0, 0, 0);
 }
 
-.comfy-grid .copy-model-button {
+.comfy-grid .model-preview-top-right {
     position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     top: 8px;
     right: 8px;
+}
+
+.comfy-grid .model-button {
     opacity: 0.65;
 }
 
-.comfy-grid .copy-model-button:hover {
+.comfy-grid .model-button:hover {
     opacity: 1;
 }
 
-button.icon-button.copy-model-button.copy-alert-success {
+.comfy-grid .model-button.copy-alert-success {
     color: green;
     border-color: green;
 }
 
-button.icon-button.copy-model-button.copy-alert-fail {
+.comfy-grid .model-button.copy-alert-fail {
     color: darkred;
     border-color: darkred;
 }

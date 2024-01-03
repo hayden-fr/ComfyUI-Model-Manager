@@ -17,6 +17,7 @@ Currently it is still missing some features it should have.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
 - Button to copy a model to the ComfyUI clipboard. (Embedding cannot be copied to the system clipboard with an http connection.)
+- Button to add model to ComfyUI graph. (For small screens/low resolution.)
 - Right, left and bottom toggleable sidebar modes.
 - Drag model to graph to add or existing node to set model.
 - Drag embedding to textarea to append.
@@ -51,10 +52,11 @@ Currently it is still missing some features it should have.
 - &#9744; Exclude hidden folders with a `.` prefix.
 - &#9744; Include a optional string to always add to searches.
 - &#9744; Enable optional checksum to detect if a model is already downloaded.
-- &#9744; Change copy icon to an add icon `✚`.
+- &#9744; Enable/Disable add and copy buttons.
 - &#9744; Allow user to drag width of sidebar or height of bottom bar and remember it.
 - &#9744; Hide/Show model extension.
 - &#9744; Optionally remove embedding extension.
+- &#9744; Strict model drag on node widget textbox.
 
 ### Model info window/panel (server load/send on demand)
 
@@ -68,3 +70,7 @@ Currently it is still missing some features it should have.
 - &#9744; Show preview images for videos.
   - &#9744; If ffmpeg or cv2 available, extract the first frame of the video and use as image preview.
   - &#9744; Play preview video?
+
+### Accessibility
+
+- &#9744; Proper naming and labeling.

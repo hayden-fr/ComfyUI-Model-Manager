@@ -274,15 +274,61 @@ class ModelGrid {
             }, true);
         });
     }
-
+    
+    
     static #addModel(event, modelType, path) {
+        if (modelType !== "embeddings") {
+            const nodeType = modelNodeType(modelType);
+            const widgetIndex = modelWidgetIndex(nodeType);
+            let node = LiteGraph.createNode(nodeType, null, []);
+            if (node) {
+                node.widgets[widgetIndex].value = path;
+                const selectedNodes = app.canvas.selected_nodes;
+                let isSelectedNode = false;
+                for (var i in selectedNodes) {
+                    const selectedNode = selectedNodes[i];
+                    // TODO: settings.model_add_offset
+                    node.pos[0] = selectedNode.pos[0] + 25;
+                    node.pos[1] = selectedNode.pos[1] + 25;
+                    isSelectedNode = true;
+                    break;
+                }
+                if (!isSelectedNode) {
+                    const graphMouse = app.canvas.graph_mouse;
+                    node.pos[0] = graphMouse[0];
+                    node.pos[1] = graphMouse[1];
+                }
+                app.graph.add(node, {doProcessChange: true});
+                app.canvas.selectNode(node);
+            }
+            event.stopPropagation();
+        }
+        else if (modelType === "embeddings") {
+            const text = pathToEmbeddingString(path);
+            const selectedNodes = app.canvas.selected_nodes;
+            for (var i in selectedNodes) {
+                const selectedNode = selectedNodes[i];
+                const nodeType = modelNodeType(modelType);
+                const widgetIndex = modelWidgetIndex(nodeType);
+                const target = selectedNode.widgets[widgetIndex].element;
+                if (target.type === "textarea") {
+                    const currentText = target.value;
+                    const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
+                    target.value = currentText + sep + text;
+                }
+            }
+            event.stopPropagation();
+        }
+    }
+
+    static #dragAddModel(event, modelType, path) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
             const nodeType = modelNodeType(modelType);
             const widgetIndex = modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
-            //if (nodeAtPos && nodeAtPos.type === nodeType && app.canvas.processNodeWidgets(nodeAtPos, pos, event) !== nodeAtPos.widgets[widgetIndex]) {
+            //if (nodeAtPos && nodeAtPos.type === nodeType && app.canvas.processNodeWidgets(nodeAtPos, pos, event) !== nodeAtPos.widgets[widgetIndex]) { // TODO: settings.strict_model_drag
             if (nodeAtPos && nodeAtPos.type === nodeType) {
                 let node = nodeAtPos;
                 node.widgets[widgetIndex].value = path;
@@ -319,7 +365,7 @@ class ModelGrid {
                 successful = true;
             }
             else {
-                console.warn("Cannot copy embedding to the system clipboard; Try dragging the element instead.");
+                console.warn("Cannot copy the embedding to the system clipboard; Try dragging it instead.");
             }
         }
         else if (nodeType) {
@@ -345,11 +391,14 @@ class ModelGrid {
 
     static generateInnerHtml(models, modelType) {
         if (models.length > 0) {
+            // TODO: settings.show_model_add_button
+            // TODO: settings.show_model_copy_button
             return models.map((item) => {
                 const uri = item.post ?? "no-post";
                 const imgUrl = `/model-manager/image-preview?uri=${uri}`;
-                const addModel = (e) => ModelGrid.#addModel(e, modelType, item.path);
-                const copy = (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path);
+                const dragAdd = (e) => ModelGrid.#dragAddModel(e, modelType, item.path);
+                const clickCopy = (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path);
+                const clickAdd = (e) => ModelGrid.#addModel(e, modelType, item.path);
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
                         src: imgUrl,
@@ -357,17 +406,28 @@ class ModelGrid {
                     }),
                     $el("div.model-preview-overlay", {
                         src: imgUrl,
-                        ondragend: (e) => addModel(e),
+                        ondragend: (e) => dragAdd(e),
                         draggable: true,
                     }),
-                    $el("button.icon-button.copy-model-button", {
-                        type: "button",
-                        textContent: "⧉︎",
-                        onclick: (e) => copy(e),
+                    $el("div.model-preview-top-right", {
                         draggable: false,
-                    }),
+                    },
+                    [
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "⧉︎",
+                            onclick: (e) => clickCopy(e),
+                            draggable: false,
+                        }),
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "✚",
+                            onclick: (e) => clickAdd(e),
+                            draggable: false,
+                        }),
+                    ]),
                     $el("div.model-label", {
-                        ondragend: (e) => addModel(e),
+                        ondragend: (e) => dragAdd(e),
                         draggable: true,
                     }, [
                         $el("p", [item.name])
