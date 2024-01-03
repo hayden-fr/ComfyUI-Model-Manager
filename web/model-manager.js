@@ -43,12 +43,18 @@ function modelWidgetIndex(nodeType) {
     return 0;
 }
 
-function pathToEmbeddingString(path, removeExtension = false) {
+function pathToFileString(path) {
     const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
+    return path.slice(i);
+}
+
+function insertEmbeddingIntoText(currentText, embeddingFile, removeExtension = false) {
     if (removeExtension) {
         // TODO: setting.remove_extension_embedding
     }
-    return "(embedding:" + path.slice(i) + ":1.0)";
+    // TODO: don't add if it is already in the text?
+    const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
+    return currentText + sep + "(embedding:" +  embeddingFile  + ":1.0)";
 }
 
 class Tabs {
@@ -275,8 +281,21 @@ class ModelGrid {
         });
     }
     
+    static #buttonAlert(event, successful, innerHTML) {
+        const element = event.target;
+        const name = successful ? "model-button-success" : "model-button-failure";
+        element.classList.add(name);
+        element.innerHTML = successful ? "✔" : "✖";
+        // TODO: debounce would be nice to get working...
+        window.setTimeout((element, name) => {
+            element.classList.remove(name);
+            element.innerHTML = innerHTML;
+        }, 500, element, name);
+    }
+    
     
     static #addModel(event, modelType, path) {
+        let successful = false;
         if (modelType !== "embeddings") {
             const nodeType = modelNodeType(modelType);
             const widgetIndex = modelWidgetIndex(nodeType);
@@ -300,25 +319,29 @@ class ModelGrid {
                 }
                 app.graph.add(node, {doProcessChange: true});
                 app.canvas.selectNode(node);
+                successful = true;
             }
             event.stopPropagation();
         }
         else if (modelType === "embeddings") {
-            const text = pathToEmbeddingString(path);
+            const embeddingFile = pathToFileString(path);
             const selectedNodes = app.canvas.selected_nodes;
             for (var i in selectedNodes) {
                 const selectedNode = selectedNodes[i];
                 const nodeType = modelNodeType(modelType);
                 const widgetIndex = modelWidgetIndex(nodeType);
                 const target = selectedNode.widgets[widgetIndex].element;
-                if (target.type === "textarea") {
-                    const currentText = target.value;
-                    const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
-                    target.value = currentText + sep + text;
+                if (target && target.type === "textarea") {
+                    target.value = insertEmbeddingIntoText(target.value, embeddingFile);
+                    successful = true;
                 }
+            }
+            if (!successful) {
+                console.warn("Try selecting a node before adding the embedding.");
             }
             event.stopPropagation();
         }
+        this.#buttonAlert(event, successful, "✚");
     }
 
     static #dragAddModel(event, modelType, path) {
@@ -347,11 +370,14 @@ class ModelGrid {
             event.stopPropagation();
         }
         else if (modelType === "embeddings" && target.type === "textarea") {
-            const text = pathToEmbeddingString(path);
-            const currentText = target.value;
-            const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
-            target.value = currentText + sep + text;
-            event.stopPropagation();
+            const pos = app.canvas.convertEventToCanvasOffset(event);
+            const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
+            if (nodeAtPos) {
+                app.canvas.selectNode(nodeAtPos);
+                const embeddingFile = pathToFileString(path);
+                target.value = insertEmbeddingIntoText(target.value, embeddingFile);
+                event.stopPropagation();
+            }
         }
     }
 
@@ -360,8 +386,8 @@ class ModelGrid {
         let successful = false;
         if (nodeType === "Embedding") {
             if (navigator.clipboard){
-                const text = pathToEmbeddingString(path);
-                navigator.clipboard.writeText(text);
+                const embeddingText = pathToFileString(path);
+                navigator.clipboard.writeText(embeddingText);
                 successful = true;
             }
             else {
@@ -378,15 +404,7 @@ class ModelGrid {
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
         }
-
-        const element = event.target;
-        const name = successful ? "copy-alert-success" : "copy-alert-fail";
-        element.classList.add(name);
-        element.innerHTML = successful ? "✔" : "✖";
-        window.setTimeout((element, name) => {
-            element.classList.remove(name);
-            element.innerHTML = "⧉︎";
-        }, 500, element, name);
+        this.#buttonAlert(event, successful, "⧉︎");
     }
 
     static generateInnerHtml(models, modelType) {
@@ -744,6 +762,7 @@ class ModelManager extends ComfyDialog {
     };
 
     #setSidebar(event) {
+        // TODO: use checkboxes with 0 or 1 values set at once?
         // TODO: settings.sidebar_side_width
         // TODO: settings.sidebar_bottom_height
         // TODO: draggable resize?

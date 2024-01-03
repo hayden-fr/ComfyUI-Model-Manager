@@ -123,12 +123,12 @@
     opacity: 1;
 }
 
-.comfy-grid .model-button.copy-alert-success {
+.comfy-grid .model-button.model-button-success {
     color: green;
     border-color: green;
 }
 
-.comfy-grid .model-button.copy-alert-fail {
+.comfy-grid .model-button.model-button-failure {
     color: darkred;
     border-color: darkred;
 }
