@@ -16,8 +16,8 @@ Currently it is still missing some features it should have.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
-- Button to copy a model to the ComfyUI clipboard. (Embedding cannot be copied to the system clipboard with an http connection.)
-- Button to add model to ComfyUI graph. (For small screens/low resolution.)
+- Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
+- Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left and bottom toggleable sidebar modes.
 - Drag model to graph to add or existing node to set model.
 - Drag embedding to textarea to append.
@@ -74,3 +74,4 @@ Currently it is still missing some features it should have.
 ### Accessibility
 
 - &#9744; Proper naming and labeling.
+- &#9744; Tool tips?
