@@ -2,14 +2,53 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 
-function debounce(func, delay) {
-    let timer;
-    return function () {
-        clearTimeout(timer);
-        timer = setTimeout(() => {
-            func.apply(this, arguments);
+function debounce(callback, delay) {
+    let timeoutId = null;
+    return (...args) => {
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+            callback(...args);
         }, delay);
     };
+}
+
+function request(url, options) {
+    return new Promise((resolve, reject) => {
+        api.fetchApi(url, options)
+            .then((response) => response.json())
+            .then(resolve)
+            .catch(reject);
+    });
+}
+
+function modelNodeType(modelType) {
+    if (modelType === "checkpoints") return "CheckpointLoaderSimple";
+    else if (modelType === "clip") return "CLIPLoader";
+    else if (modelType === "clip_vision") return "CLIPVisionLoader";
+    else if (modelType === "controlnet") return "ControlNetLoader";
+    else if (modelType === "diffusers") return "DiffusersLoader";
+    else if (modelType === "embeddings") return "Embedding";
+    else if (modelType === "gligen") return "GLIGENLoader";
+    else if (modelType === "hypernetworks") return "HypernetworkLoader";
+    else if (modelType === "loras") return "LoraLoader";
+    else if (modelType === "style_models") return "StyleModelLoader";
+    else if (modelType === "unet") return "UNETLoader";
+    else if (modelType === "upscale_models") return "UpscaleModelLoader";
+    else if (modelType === "vae") return "VAELoader";
+    else if (modelType === "vae_approx") return undefined;
+    else { console.warn(`ModelType ${modelType} unrecognized.`); return undefined; }
+}
+
+function modelWidgetIndex(nodeType) {
+    return 0;
+}
+
+function pathToEmbeddingString(path, removeExtension = false) {
+    const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
+    if (removeExtension) {
+        // TODO: setting.remove_extension_embedding
+    }
+    return "(embedding:" + path.slice(i) + ":1.0)";
 }
 
 class Tabs {
@@ -87,7 +126,7 @@ function $tab(name, el) {
     return $el("div", { dataset: { name } }, el);
 }
 
-class List {
+class SourceList {
     /**
      * @typedef Column
      * @prop {string} title
@@ -163,39 +202,180 @@ class List {
             })
         );
     }
+
+    filterList(list, searchString, installedType) {
+        /** @type {Array<string>} */
+        const keywords = searchString
+            .replace("*", " ")
+            .split(/(-?".*?"|[^\s"]+)+/g)
+            .map((item) => item
+                .trim()
+                .replace(/(?:'|")+/g, "")
+                .toLowerCase())
+            .filter(Boolean);
+
+        let fields = ["type", "name", "base", "description"];
+        const regexSHA256 = /^[a-f0-9]{64}$/gi;
+        const newList = list.filter((element) => {
+            if (installedType !== "Filter: All") {
+                if ((installedType === "Downloaded" && !element["installed"]) || 
+                    (installedType === "Not Downloaded" && element["installed"])) {
+                    return false;
+                }
+            }
+            const text = fields
+                .reduce((memo, field) => memo + " " + element[field], "")
+                .toLowerCase();
+            return keywords.reduce((memo, target) => {
+                const excludeTarget = target[0] === "-";
+                if (excludeTarget && target.length === 1) { return memo; }
+                const filteredTarget = excludeTarget ? target.slice(1) : target;
+                if (element["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
+                    return memo && excludeTarget !== (filteredTarget === element["SHA256"]);
+                }
+                else {
+                    return memo && excludeTarget !== text.includes(filteredTarget);
+                }
+            }, true);
+        });
+
+        this.setData(newList);
+    }
 }
 
-class Grid {
-    constructor() {
-        this.element = $el("div.comfy-grid");
+class ModelGrid {
+    static filter(list, searchString) {
+        /** @type {Array<string>} */
+        const keywords = searchString
+            .replace("*", " ")
+            .split(/(-?".*?"|[^\s"]+)+/g)
+            .map((item) => item
+                .trim()
+                .replace(/(?:'|")+/g, "")
+                .toLowerCase())
+            .filter(Boolean);
+
+        const regexSHA256 = /^[a-f0-9]{64}$/gi;
+        const fields = ["name", "search-path"]; // TODO: Remove "search-path" hack.
+        return list.filter((element) => {
+            const text = fields
+                .reduce((memo, field) => memo + " " + element[field], "")
+                .toLowerCase();
+            return keywords.reduce((memo, target) => {
+                const excludeTarget = target[0] === "-";
+                if (excludeTarget && target.length === 1) { return memo; }
+                const filteredTarget = excludeTarget ? target.slice(1) : target;
+                if (element["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
+                    return memo && excludeTarget !== (filteredTarget === element["SHA256"]);
+                }
+                else {
+                    return memo && excludeTarget !== text.includes(filteredTarget);
+                }
+            }, true);
+        });
     }
 
-    #dataSource = [];
-
-    setData(dataSource) {
-        this.#dataSource = dataSource;
-        this.element.innerHTML = [];
-        this.#updateList();
+    static #addModel(event, modelType, path) {
+        const target = document.elementFromPoint(event.x, event.y);
+        if (modelType !== "embeddings" && target.id === "graph-canvas") {
+            const nodeType = modelNodeType(modelType);
+            const widgetIndex = modelWidgetIndex(nodeType);
+            const pos = app.canvas.convertEventToCanvasOffset(event);
+            const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
+            //if (nodeAtPos && nodeAtPos.type === nodeType && app.canvas.processNodeWidgets(nodeAtPos, pos, event) !== nodeAtPos.widgets[widgetIndex]) {
+            if (nodeAtPos && nodeAtPos.type === nodeType) {
+                let node = nodeAtPos;
+                node.widgets[widgetIndex].value = path;
+                app.canvas.selectNode(node);
+            }
+            else {
+                let node = LiteGraph.createNode(nodeType, null, []);
+                if (node) {
+                    node.pos[0] = pos[0];
+                    node.pos[1] = pos[1];
+                    node.widgets[widgetIndex].value = path;
+                    app.graph.add(node, {doProcessChange: true});
+                    app.canvas.selectNode(node);
+                }
+            }
+            event.stopPropagation();
+        }
+        else if (modelType === "embeddings" && target.type === "textarea") {
+            const text = pathToEmbeddingString(path);
+            const currentText = target.value;
+            const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
+            target.value = currentText + sep + text;
+            event.stopPropagation();
+        }
     }
 
-    #updateList() {
-        this.element.innerHTML = null;
-        if (this.#dataSource.length > 0) {
-            this.element.append.apply(
-                this.element,
-                this.#dataSource.map((item) => {
-                    const uri = item.post ?? "no-post";
-                    const imgUrl = `/model-manager/image-preview?uri=${uri}`;
-                    return $el("div.item", {}, [
-                        $el("img", { src: imgUrl }),
-                        $el("div", {}, [
-                            $el("p", [item.name])
-                        ]),
-                    ]);
-                })
-            );
+    static #copyModelToClipboard(event, modelType, path) {
+        const nodeType = modelNodeType(modelType);
+        let successful = false;
+        if (nodeType === "Embedding") {
+            if (navigator.clipboard){
+                const text = pathToEmbeddingString(path);
+                navigator.clipboard.writeText(text);
+                successful = true;
+            }
+            else {
+                console.warn("Cannot copy embedding to the system clipboard; Try dragging the element instead.");
+            }
+        }
+        else if (nodeType) {
+            const node = LiteGraph.createNode(nodeType, null, []);
+            const widgetIndex = modelWidgetIndex(nodeType);
+            node.widgets[widgetIndex].value = path;
+            app.canvas.copyToClipboard([node]);
+            successful = true;
+        }
+        else {
+            console.warn(`Unable to copy unknown model type '${modelType}.`);
+        }
+
+        const element = event.target;
+        const name = successful ? "copy-alert-success" : "copy-alert-fail";
+        element.classList.add(name);
+        element.innerHTML = successful ? "✔" : "✖";
+        window.setTimeout((element, name) => {
+            element.classList.remove(name);
+            element.innerHTML = "⧉︎";
+        }, 500, element, name);
+    }
+
+    static generateInnerHtml(models, modelType) {
+        if (models.length > 0) {
+            return models.map((item) => {
+                const uri = item.post ?? "no-post";
+                const imgUrl = `/model-manager/image-preview?uri=${uri}`;
+                const addModel = (e) => ModelGrid.#addModel(e, modelType, item.path);
+                const copy = (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path);
+                return $el("div.item", {}, [
+                    $el("img.model-preview", {
+                        src: imgUrl,
+                        draggable: false,
+                    }),
+                    $el("div.model-preview-overlay", {
+                        src: imgUrl,
+                        ondragend: (e) => addModel(e),
+                        draggable: true,
+                    }),
+                    $el("button.icon-button.copy-model-button", {
+                        type: "button",
+                        textContent: "⧉︎",
+                        onclick: (e) => copy(e),
+                        draggable: false,
+                    }),
+                    $el("div.model-label", {
+                        ondragend: (e) => addModel(e),
+                        draggable: true,
+                    }, [
+                        $el("p", [item.name])
+                    ]),
+                ]);
+            });
         } else {
-            this.element.innerHTML = "<h2>No Models</h2>";
+            return [$el("h2", ["No Models"])];
         }
     }
 }
@@ -238,23 +418,16 @@ function $radioGroup(attr) {
 }
 
 class ModelManager extends ComfyDialog {
-    #request(url, options) {
-        return new Promise((resolve, reject) => {
-            api.fetchApi(url, options)
-                .then((response) => response.json())
-                .then(resolve)
-                .catch(reject);
-        });
-    }
-
     #el = {
         loadSourceBtn: null,
         loadSourceFromInput: null,
         sourceInstalledFilter: null,
         sourceContentFilter: null,
         sourceFilterBtn: null,
+        modelGrid: null,
         modelTypeSelect: null,
         modelContentFilter: null,
+        sidebarButtons: null,
     };
 
     #data = {
@@ -262,23 +435,47 @@ class ModelManager extends ComfyDialog {
         models: {},
     };
 
-    /** @type {List} */
+    /** @type {SourceList} */
     #sourceList = null;
 
     constructor() {
         super();
         this.element = $el(
             "div.comfy-modal.model-manager",
-            { parent: document.body },
+            {
+                parent: document.body,
+            },
             [
                 $el("div.comfy-modal-content", [
-                    $el("button.close.icon-button", {
-                        textContent: "✕",
-                        onclick: () => this.close(),
-                    }),
+                    $el("div.topbar-buttons",
+                        [
+                            $el("div.sidebar-buttons",
+                            {
+                                $: (el) => (this.#el.sidebarButtons = el),
+                            },
+                            [
+                                $el("button.icon-button", {
+                                    textContent: "◧",
+                                    onclick: (event) => this.#setSidebar(event),
+                                }),
+                                $el("button.icon-button", {
+                                    textContent: "⬓",
+                                    onclick: (event) => this.#setSidebar(event),
+                                }),
+                                $el("button.icon-button", {
+                                    textContent: "◨",
+                                    onclick: (event) => this.#setSidebar(event),
+                                }),
+                            ]),
+                            $el("button.icon-button", {
+                                textContent: "✖",
+                                onclick: () => this.close(),
+                            }),
+                        ]
+                    ),
                     $tabs([
                         $tab("Install", this.#createSourceInstall()),
-                        $tab("Models", this.#createModelList()),
+                        $tab("Models", this.#createModelTabHtml()),
                         $tab("Settings", []),
                     ]),
                 ]),
@@ -290,12 +487,11 @@ class ModelManager extends ComfyDialog {
 
     #init() {
         this.#refreshSourceList();
-        this.#refreshModelList();
+        this.#modelGridRefresh();
     }
 
     #createSourceInstall() {
         this.#createSourceList();
-
         return [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
@@ -316,8 +512,7 @@ class ModelManager extends ComfyDialog {
                         placeholder: "example: \"sd_xl\" -vae",
                         onkeyup: (e) => e.key === "Enter" && this.#filterSourceList(),
                     }),
-                    $el(
-                        "select",
+                    $el("select",
                         {
                             $: (el) => (this.#el.sourceInstalledFilter = el),
                             style: { width: 0 },
@@ -341,7 +536,7 @@ class ModelManager extends ComfyDialog {
     }
 
     #createSourceList() {
-        const sourceList = new List([
+        const sourceList = new SourceList([
             {
                 title: "Type",
                 dataIndex: "type",
@@ -378,7 +573,7 @@ class ModelManager extends ComfyDialog {
                         textContent: installed ? "✓︎" : "📥︎",
                         onclick: async (e) => {
                             e.disabled = true;
-                            const response = await this.#request(
+                            const response = await request(
                                 "/model-manager/download",
                                 {
                                     method: "POST",
@@ -400,7 +595,7 @@ class ModelManager extends ComfyDialog {
 
         const source = this.#el.loadSourceFromInput.value;
         const uri = (source === "https://ComfyUI-Model-Manager/index.json") || (source === "") ? "local" : source;
-        const dataSource = await this.#request(
+        const dataSource = await request(
             `/model-manager/source?uri=${uri}`
         ).catch(() => []);
         this.#data.sources = dataSource;
@@ -411,69 +606,30 @@ class ModelManager extends ComfyDialog {
         this.#el.loadSourceBtn.disabled = false;
     }
 
-#filterSourceList() {
-    /** @type {Array<string>} */
-    const content = this.#el.sourceContentFilter.value
-        .replace("*", " ")
-        .split(/(-?".*?"|[^\s"]+)+/g)
-        .map((item) => item
-            .trim()
-            .replace(/(?:'|")+/g, "")
-            .toLowerCase() // TODO: Quotes should be exact?
-        )
-        .filter(Boolean);
-
-    const installedType = this.#el.sourceInstalledFilter.value;
-    const newDataSource = this.#data.sources.filter((row) => {
-        if (installedType !== "Filter: All") {
-            if ((installedType === "Downloaded" && !row["installed"]) || 
-                (installedType === "Not Downloaded" && row["installed"])) {
-                return false;
-            }
-        }
-
-        let filterField = ["type", "name", "base", "description"];
-        const rowText = filterField
-            .reduce((memo, field) => memo + " " + row[field], "")
-            .toLowerCase();
-        return content.reduce((memo, target) => {
-            const excludeTarget = target[0] === "-";
-            if (excludeTarget && target.length === 1) { return memo; }
-            const filteredTarget = excludeTarget ? target.slice(1) : target;
-            const regexSHA256 = /^[a-f0-9]{64}$/gi;
-            if (row["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
-                return memo && excludeTarget !== (filteredTarget === row["SHA256"]);
-            }
-            else {
-                return memo && excludeTarget !== rowText.includes(filteredTarget);
-            }
-        }, true);
-    });
-
-        this.#sourceList.setData(newDataSource);
+    #filterSourceList() {
+        this.#sourceList.filterList(
+            this.#data.sources, 
+            this.#el.sourceContentFilter.value, 
+            this.#el.sourceInstalledFilter.value
+        );
     }
 
-    /** @type {Grid} */
-    #modelList = null;
-
-    #createModelList() {
-        const gridInstance = new Grid();
-        this.#modelList = gridInstance;
-
+    #createModelTabHtml() {
+        const modelGrid = $el("div.comfy-grid");
+        this.#el.modelGrid = modelGrid;
         return [
             $el("div.row.tab-header", [
-                $el("div.row.tab-header-flex-block",
-                    [
+                $el("div.row.tab-header-flex-block", [
                     $el("button.icon-button", {
                         type: "button",
                         textContent: "⟳",
-                        onclick: () => this.#refreshModelList(),
+                        onclick: () => this.#modelGridRefresh(),
                     }),
                     $el("select.model-type-dropdown",
                         {
                             $: (el) => (this.#el.modelTypeSelect = el),
                             name: "model-type",
-                            onchange: () => this.#filterModelList(),
+                            onchange: () => this.#modelGridUpdate(),
                         },
                         [
                             $el("option", ["checkpoints"]),
@@ -492,64 +648,69 @@ class ModelManager extends ComfyDialog {
                             $el("option", ["vae_approx"]),
                         ]
                     ),
-                    ]
-                ),
+                ]),
                 $el("div.row.tab-header-flex-block", [
                     $el("input.search-text-area", {
                         $: (el) => (this.#el.modelContentFilter = el),
                         placeholder: "example: styles/clothing -.pt",
-                        onkeyup: (e) => e.key === "Enter" && this.#filterModelList(),
+                        onkeyup: (e) => e.key === "Enter" && this.#modelGridUpdate(),
                     }),
                     $el("button.icon-button", {
                         type: "button",
                         textContent: "🔍︎",
-                        onclick: () => this.#filterModelList(),
+                        onclick: () => this.#modelGridUpdate(),
                     }),
                 ]),
             ]),
-            gridInstance.element,
+            modelGrid,
         ];
     }
 
-    async #refreshModelList() {
-        const dataSource = await this.#request("/model-manager/models");
-        this.#data.models = dataSource;
-        this.#filterModelList();
-    }
-
-    #filterModelList() {
-        /** @type {Array<string>} */
-        const content = this.#el.modelContentFilter.value
-            .replace("*", " ")
-            .split(/(-?".*?"|[^\s"]+)+/g)
-            .map((item) => item
-                .trim()
-                .replace(/(?:'|")+/g, "")
-                .toLowerCase() // TODO: Quotes should be exact?
-            )
-            .filter(Boolean);
-
+    #modelGridUpdate() {
+        const searchText = this.#el.modelContentFilter.value;
         const modelType = this.#el.modelTypeSelect.value;
+        const models = this.#data.models;
+        const modelList = ModelGrid.filter(models[modelType], searchText);
 
-        const newDataSource = this.#data.models[modelType].filter((modelInfo) => {
-            const filterField = ["name", "path"];
-            const modelText = filterField
-                .reduce((memo, field) => memo + " " + modelInfo[field], "")
-                .toLowerCase();
-            return content.reduce((memo, target) => {
-                const excludeTarget = target[0] === "-";
-                if (excludeTarget && target.length === 1) { return memo; }
-                const filteredTarget = excludeTarget ? target.slice(1) : target;
-                const regexSHA256 = /^[a-f0-9]{64}$/gi;
-                if (modelInfo["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
-                    return memo && excludeTarget !== (filteredTarget === modelInfo["SHA256"]);
-                }
-                else {
-                    return memo && excludeTarget !== modelText.includes(filteredTarget);
-                }
-            }, true);
-        });
-        this.#modelList.setData(newDataSource);
+        const modelGrid = this.#el.modelGrid;
+        modelGrid.innerHTML = [];
+        const innerHTML = ModelGrid.generateInnerHtml(modelList, modelType);
+        modelGrid.append.apply(modelGrid, innerHTML);
+    };
+
+    async #modelGridRefresh() {
+        this.#data.models = await request("/model-manager/models");
+        this.#modelGridUpdate();
+    };
+
+    #setSidebar(event) {
+        // TODO: settings.sidebar_side_width
+        // TODO: settings.sidebar_bottom_height
+        // TODO: draggable resize?
+        const button = event.target;
+        const sidebarButtons = this.#el.sidebarButtons.children;
+        let buttonIndex;
+        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
+            if (sidebarButtons[buttonIndex] === button) {
+                break;
+            }
+        }
+
+        const modelManager = this.element;
+        const sidebarStates = ["sidebar-left", "sidebar-bottom", "sidebar-right"];
+        let stateIndex;
+        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
+            const state = sidebarStates[stateIndex];
+            if (modelManager.classList.contains(state)) {
+                modelManager.classList.remove(state);
+                break;
+            }
+        }
+
+        if (stateIndex != buttonIndex) {
+            const newSidebarState = sidebarStates[buttonIndex];
+            modelManager.classList.add(newSidebarState);
+        }
     }
 }
 
@@ -586,3 +747,5 @@ app.registerExtension({
         );
     },
 });
+
+// ◧ ◨ ⬒ ⬓ ⛶ ✚

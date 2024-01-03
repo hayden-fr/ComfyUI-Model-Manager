@@ -16,23 +16,21 @@ Currently it is still missing some features it should have.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
+- Button to copy a model to the ComfyUI clipboard. (Embedding cannot be copied to the system clipboard with an http connection.)
+- Right, left and bottom toggleable sidebar modes.
+- Drag model to graph to add or existing node to set model.
+- Drag embedding to textarea to append.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
 - Simplified UI.
 
 ## TODO:
 
-### One-click to add a model/node to workspace
-
-- &#9744; Add icon `+`? (Copy icon `⎘`?)
-- &#9744; Sidebar mode
-  - &#9744; Drag to add to workspace?
-
 ### Downloading tab
 
 - &#9744; Replace Install tab with Downloading tab (more practical IMO).
 - &#9744; Download a model from a url.
-- &#9744; Choose save path to download within browser.
+- &#9744; Choose save path/directory to download within vaild model directories. (Alert Yes/No if need to create new dirs?)
 
 ### Search filtering and sort
 
@@ -49,10 +47,14 @@ Currently it is still missing some features it should have.
 
 ### Settings
 
+- &#9744; Add `settings.yaml` and add file to `.gitignore`.
 - &#9744; Exclude hidden folders with a `.` prefix.
 - &#9744; Include a optional string to always add to searches.
 - &#9744; Enable optional checksum to detect if a model is already downloaded.
-- &#9744; Add `settings.yaml` and add file to `.gitignore`.
+- &#9744; Change copy icon to an add icon `✚`.
+- &#9744; Allow user to drag width of sidebar or height of bottom bar and remember it.
+- &#9744; Hide/Show model extension.
+- &#9744; Optionally remove embedding extension.
 
 ### Model info window/panel (server load/send on demand)
 

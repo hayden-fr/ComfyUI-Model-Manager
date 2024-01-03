@@ -212,7 +212,8 @@ async def load_download_models(request):
             name, _ = os.path.splitext(model)
             item = {
                 "name": name,
-                "path": os.path.join(model_type, rel_path, model).replace(os.path.sep, "/"),
+                "search-path": os.path.join(model_type, rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
+                "path": os.path.join(rel_path, model),
             }
             if image is not None:
                 raw_post = os.path.join(model_type, str(base_path_index), rel_path, image)

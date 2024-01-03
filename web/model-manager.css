@@ -55,8 +55,10 @@
 
 .comfy-grid .item {
     position: relative;
-    width: 230px;
-    height: 345px;
+    aspect-ratio: 2/3;
+    max-width: 230px;
+    /*width: 230px;*/
+    /*height: 345px;*/
     text-align: center;
     overflow: hidden;
 	border-radius: 8px;
@@ -95,6 +97,39 @@
 .comfy-grid .item div ::-webkit-scrollbar { 
     width: 0;
     height: 0;
+}
+
+.comfy-grid .item .model-preview-overlay {
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+.comfy-grid .copy-model-button {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    opacity: 0.65;
+}
+
+.comfy-grid .copy-model-button:hover {
+    opacity: 1;
+}
+
+button.icon-button.copy-model-button.copy-alert-success {
+    color: green;
+    border-color: green;
+}
+
+button.icon-button.copy-model-button.copy-alert-fail {
+    color: darkred;
+    border-color: darkred;
+}
+
+.comfy-grid .model-label {
+    user-select: text;
 }
 
 /* comfy radio group */
@@ -139,6 +174,21 @@
     padding: 10px;
     color: var(--bg-color);
     z-index: 2000;
+}
+
+.model-manager.sidebar-left {
+    width: 50%;
+    left: 25%;
+}
+
+.model-manager.sidebar-bottom {
+    height: 50%;
+    top: 75%;
+}
+
+.model-manager.sidebar-right {
+    width: 50%;
+    left: 75%;
 }
 
 .model-manager .comfy-modal-content {
@@ -201,7 +251,9 @@
 }
 
 .icon-button {
-	aspect-ratio: 1;
+    height: 40px;
+    width: 40px;
+    line-height: 1.15;
 }
 
 /* model manager row */
@@ -231,11 +283,23 @@
 }
 
 /* model manager special */
-.model-manager .close {
+.model-manager .topbar-buttons {
     position: absolute;
-    padding: 1px 6px;
+    display: flex;
     top: 10px;
     right: 10px;
+}
+
+.model-manager .topbar-buttons button {
+    width: 33px;
+    height: 33px;
+    padding: 1px 6px;
+}
+
+.model-manager .sidebar-buttons {
+    overflow: hidden;
+    padding-right: 10px;
+    color: var(--input-text);
 }
 
 .model-manager .row {
