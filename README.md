@@ -12,15 +12,16 @@ Currently it is still missing some features it should have.
 
 ## Fork Improvements
 
-- Search models in models tab.
+- Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left and bottom toggleable sidebar modes.
-- Drag model to graph to add or existing node to set model.
-- Drag embedding to textarea to append.
+- Drag a model onto the graph to add a new node.
+- Drag a model onto an existing node to set the model field.
+- Drag an embedding onto a text area to add it to the end.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
 - Simplified UI.
