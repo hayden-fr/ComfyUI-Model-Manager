@@ -22,20 +22,20 @@ function request(url, options) {
 }
 
 function modelNodeType(modelType) {
-    if (modelType === "checkpoints") return "CheckpointLoaderSimple";
-    else if (modelType === "clip") return "CLIPLoader";
-    else if (modelType === "clip_vision") return "CLIPVisionLoader";
-    else if (modelType === "controlnet") return "ControlNetLoader";
-    else if (modelType === "diffusers") return "DiffusersLoader";
-    else if (modelType === "embeddings") return "Embedding";
-    else if (modelType === "gligen") return "GLIGENLoader";
-    else if (modelType === "hypernetworks") return "HypernetworkLoader";
-    else if (modelType === "loras") return "LoraLoader";
-    else if (modelType === "style_models") return "StyleModelLoader";
-    else if (modelType === "unet") return "UNETLoader";
-    else if (modelType === "upscale_models") return "UpscaleModelLoader";
-    else if (modelType === "vae") return "VAELoader";
-    else if (modelType === "vae_approx") return undefined;
+    if (modelType === "checkpoints") { return "CheckpointLoaderSimple"; }
+    else if (modelType === "clip") { return "CLIPLoader"; }
+    else if (modelType === "clip_vision") { return "CLIPVisionLoader"; }
+    else if (modelType === "controlnet") { return "ControlNetLoader"; }
+    else if (modelType === "diffusers") { return "DiffusersLoader"; }
+    else if (modelType === "embeddings") { return "Embedding"; }
+    else if (modelType === "gligen") { return "GLIGENLoader"; }
+    else if (modelType === "hypernetworks") { return "HypernetworkLoader"; }
+    else if (modelType === "loras") { return "LoraLoader"; }
+    else if (modelType === "style_models") { return "StyleModelLoader"; }
+    else if (modelType === "unet") { return "UNETLoader"; }
+    else if (modelType === "upscale_models") { return "UpscaleModelLoader"; }
+    else if (modelType === "vae") { return "VAELoader"; }
+    else if (modelType === "vae_approx") { return undefined; }
     else { console.warn(`ModelType ${modelType} unrecognized.`); return undefined; }
 }
 
@@ -48,8 +48,8 @@ function pathToFileString(path) {
     return path.slice(i);
 }
 
-function insertEmbeddingIntoText(currentText, embeddingFile, removeExtension = false) {
-    if (removeExtension) {
+function insertEmbeddingIntoText(currentText, embeddingFile, extensionRegex = null) {
+    if (extensionRegex) {
         // TODO: setting.remove_extension_embedding
     }
     // TODO: don't add if it is already in the text?
@@ -712,7 +712,7 @@ class ModelManager extends ComfyDialog {
                             name: "model-type",
                             onchange: () => this.#modelGridUpdate(),
                         },
-                        [
+                        [ // TODO: generate based on existing model folders
                             $el("option", ["checkpoints"]),
                             $el("option", ["clip"]),
                             $el("option", ["clip_vision"]),
