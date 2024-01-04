@@ -280,7 +280,7 @@ class ModelGrid {
             }, true);
         });
     }
-    
+
     static #buttonAlert(event, successful, innerHTML) {
         const element = event.target;
         const name = successful ? "model-button-success" : "model-button-failure";
@@ -292,8 +292,7 @@ class ModelGrid {
             element.innerHTML = innerHTML;
         }, 500, element, name);
     }
-    
-    
+
     static #addModel(event, modelType, path) {
         let successful = false;
         if (modelType !== "embeddings") {
@@ -524,7 +523,7 @@ class ModelManager extends ComfyDialog {
                 parent: document.body,
             },
             [
-                $el("div.comfy-modal-content", [
+                $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
                     $el("div.topbar-buttons",
                         [
                             $el("div.sidebar-buttons",
@@ -534,6 +533,10 @@ class ModelManager extends ComfyDialog {
                             [
                                 $el("button.icon-button", {
                                     textContent: "◧",
+                                    onclick: (event) => this.#setSidebar(event),
+                                }),
+                                $el("button.icon-button", {
+                                    textContent: "⬒",
                                     onclick: (event) => this.#setSidebar(event),
                                 }),
                                 $el("button.icon-button", {
@@ -746,6 +749,7 @@ class ModelManager extends ComfyDialog {
 
     #modelGridUpdate() {
         const searchText = this.#el.modelContentFilter.value;
+        // TODO: settings.always_append_to_search
         const modelType = this.#el.modelTypeSelect.value;
         const models = this.#data.models;
         const modelList = ModelGrid.filter(models[modelType], searchText);
@@ -776,7 +780,7 @@ class ModelManager extends ComfyDialog {
         }
 
         const modelManager = this.element;
-        const sidebarStates = ["sidebar-left", "sidebar-bottom", "sidebar-right"];
+        const sidebarStates = ["sidebar-left", "sidebar-top", "sidebar-bottom", "sidebar-right"];
         let stateIndex;
         for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
             const state = sidebarStates[stateIndex];
@@ -826,5 +830,3 @@ app.registerExtension({
         );
     },
 });
-
-// ◧ ◨ ⬒ ⬓ ⛶ ✚

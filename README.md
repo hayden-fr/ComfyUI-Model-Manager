@@ -28,11 +28,28 @@ Currently it is still missing some features it should have.
 
 ## TODO:
 
-### Downloading tab
+### Model Copying
 
-- &#9744; Replace Install tab with Downloading tab (more practical IMO).
-- &#9744; Download a model from a url.
-- &#9744; Choose save path/directory to download within vaild model directories. (Alert Yes/No if need to create new dirs?)
+- &#9744; Copy image?
+
+### Model info window/panel (server load/send on demand)
+
+- &#9744; Info icon `ⓘ` button to view.
+- &#9744; Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
+  - &#9744; Radio buttons to swap between downloaded and server view.
+- &#9744; Delete model with warning popup.
+
+### Settings
+
+- &#9744; Add `settings.yaml` and add file to `.gitignore`. (Generate if not there.)
+- &#9744; Exclude hidden folders with a `.` prefix.
+- &#9744; Include a optional string to always add to searches.
+- &#9744; Enable optional checksum to detect if a model is already downloaded.
+- &#9744; Enable/Disable add and copy buttons.
+- &#9744; Allow user to drag width of sidebar or height of bottom bar and remember it.
+- &#9744; Hide/Show model extension.
+- &#9744; Optionally remove embedding extension.
+- &#9744; Strict model drag on node widget textbox.
 
 ### Search filtering and sort
 
@@ -47,24 +64,6 @@ Currently it is still missing some features it should have.
   - &#9744; Frequently used (ascending/decending)
 - &#9744; `or` vs `and` type of keyword search (currently `and`)
 
-### Settings
-
-- &#9744; Add `settings.yaml` and add file to `.gitignore`.
-- &#9744; Exclude hidden folders with a `.` prefix.
-- &#9744; Include a optional string to always add to searches.
-- &#9744; Enable optional checksum to detect if a model is already downloaded.
-- &#9744; Enable/Disable add and copy buttons.
-- &#9744; Allow user to drag width of sidebar or height of bottom bar and remember it.
-- &#9744; Hide/Show model extension.
-- &#9744; Optionally remove embedding extension.
-- &#9744; Strict model drag on node widget textbox.
-
-### Model info window/panel (server load/send on demand)
-
-- &#9744; Info icon `ⓘ` button to view.
-- &#9744; Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
-- &#9744; Delete model with warning popup.
-
 ### Image preview
 
 - &#9744; Support multiple preview images. (swipe?)
@@ -76,3 +75,11 @@ Currently it is still missing some features it should have.
 
 - &#9744; Proper naming and labeling.
 - &#9744; Tool tips?
+
+### Directory Browser and Downloading tab
+
+(NOTE: It is a impossible to put a model automatically in the correct folder if model type information is not given or ambigious. To fully solve this requires making a file browser where files can be moved around.)
+
+- &#9744; Replace Install tab with Downloading tab (more practical IMO).
+- &#9744; Download a model from a url.
+- &#9744; Choose save path/directory to download within vaild model directories. (Alert Yes/No if need to create new dirs?)

@@ -186,6 +186,11 @@
     left: 25%;
 }
 
+.model-manager.sidebar-top {
+    height: 50%;
+    top: 25%;
+}
+
 .model-manager.sidebar-bottom {
     height: 50%;
     top: 75%;
