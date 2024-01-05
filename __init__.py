@@ -1,21 +1,29 @@
 import os
 import sys
 import hashlib
+import importlib
+
 from aiohttp import web
 import server
 import urllib.parse
 import struct
 import json
 import requests
+requests.packages.urllib3.disable_warnings()
+
 import folder_paths
 
-requests.packages.urllib3.disable_warnings()
+config_loader_path = os.path.join(os.path.dirname(__file__), 'config_loader.py')
+config_loader_spec = importlib.util.spec_from_file_location('config_loader', config_loader_path)
+config_loader = importlib.util.module_from_spec(config_loader_spec)
+config_loader_spec.loader.exec_module(config_loader)
 
 comfyui_model_uri = os.path.join(os.getcwd(), "models")
 extension_uri = os.path.join(os.getcwd(), "custom_nodes" + os.path.sep + "ComfyUI-Model-Manager")
 index_uri = os.path.join(extension_uri, "index.json")
 #checksum_cache_uri = os.path.join(extension_uri, "checksum_cache.txt")
 no_preview_image = os.path.join(extension_uri, "no-preview.png")
+ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 
 image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")
 #video_extensions = (".avi", ".mp4", ".webm") # TODO: Requires ffmpeg or cv2. Cache preview frame?
@@ -38,8 +46,7 @@ def folder_paths_get_supported_pt_extensions(folder_name): # Missing API functio
     paths = folder_paths.folder_names_and_paths
     if folder_name in paths:
         return paths[folder_name][1]
-
-    return set(['.ckpt', '.pt', '.bin', '.pth', '.safetensors'])
+    return set([".ckpt", ".pt", ".bin", ".pth", ".safetensors"])
 
 
 def get_safetensor_header(path):
@@ -76,6 +83,49 @@ def model_type_to_dir_name(model_type):
     else: return model_type
 
 
+def ui_rules():
+    Rule = config_loader.Rule
+    return [
+        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
+        Rule("model-search-always-append", "", str),
+        Rule("model-show-label-extensions", False, bool),
+        Rule("model-show-add-button", True, bool),
+        Rule("model-show-copy-button", True, bool),
+        Rule("model-add-embedding-extension", False, bool),
+        Rule("model-add-drag-strict-on-field", False, bool),
+        Rule("model-add-offset", 25, int),
+    ]
+
+
+#def server_rules():
+#    Rule = config_loader.Rule
+#    return [
+#        Rule("model_extension_download_whitelist", [".safetensors"], list),
+#        Rule("civitai_api_key", "", str),
+#    ]
+
+
+@server.PromptServer.instance.routes.get("/model-manager/settings/load")
+async def load_ui_settings(request):
+    rules = ui_rules()
+    settings = config_loader.yaml_load(ui_settings_uri, rules)
+    return web.json_response({ "settings": settings })
+
+
+@server.PromptServer.instance.routes.post("/model-manager/settings/save")
+async def save_ui_settings(request):
+    body = await request.json()
+    settings = body.get("settings")
+    rules = ui_rules()
+    validated_settings = config_loader.validated(rules, settings)
+    success = config_loader.yaml_save(ui_settings_uri, rules, validated_settings)
+    return web.json_response({
+        "success": success,
+        "settings": validated_settings if success else "",
+    })
+
+
 @server.PromptServer.instance.routes.get("/model-manager/image-preview")
 async def img_preview(request):
     uri = request.query.get("uri")
@@ -83,7 +133,7 @@ async def img_preview(request):
     image_path = no_preview_image
     image_extension = "png"
 
-    if (uri != "no-post"):
+    if uri != "no-post":
         rel_image_path = os.path.dirname(uri)
 
         i = uri.find(os.path.sep)
@@ -225,9 +275,9 @@ async def load_download_models(request):
 
         model_items = []
         for model, image, base_path_index, rel_path in file_names:
-            name, _ = os.path.splitext(model)
+            # TODO: Stop sending redundant information
             item = {
-                "name": name,
+                "name": model,
                 "search-path": os.path.join(model_type, rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
                 "path": os.path.join(rel_path, model),
             }
@@ -269,7 +319,7 @@ def download_model_file(url, filename):
 
     with open(dl_filename, "ab") as f:
         for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
+            if chunk is not None:
                 downloaded_size += len(chunk)
                 f.write(chunk)
                 f.flush()

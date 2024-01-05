@@ -18,15 +18,26 @@ Currently it is still missing some features it should have.
 - Include models listed in ComfyUI's `extra_model_paths.yaml`.
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
-- Right, left and bottom toggleable sidebar modes.
+- Right, left, top and bottom toggleable sidebar modes.
 - Drag a model onto the graph to add a new node.
 - Drag a model onto an existing node to set the model field.
 - Drag an embedding onto a text area to add it to the end.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
 - Simplified UI.
+- Settings tab and config file.
+  - Hide/Show 'add' and 'copy-to-clipboard' buttons.
+  - Text to always search.
+  - Show/Hide add embedding extension.
 
 ## TODO:
+
+### Code
+
+- &#9744; Javascript cleanup.
+  - &#9744; Seperate into classes per tab?
+  - &#9744; HTML generation all inside main class?
+  - &#9744; More server driven, HTMX-like HTML generation? (Avoid x2 states)
 
 ### Model Copying
 
@@ -41,15 +52,9 @@ Currently it is still missing some features it should have.
 
 ### Settings
 
-- &#9744; Add `settings.yaml` and add file to `.gitignore`. (Generate if not there.)
 - &#9744; Exclude hidden folders with a `.` prefix.
-- &#9744; Include a optional string to always add to searches.
 - &#9744; Enable optional checksum to detect if a model is already downloaded.
-- &#9744; Enable/Disable add and copy buttons.
-- &#9744; Allow user to drag width of sidebar or height of bottom bar and remember it.
-- &#9744; Hide/Show model extension.
-- &#9744; Optionally remove embedding extension.
-- &#9744; Strict model drag on node widget textbox.
+- &#9744; Sidebar width.
 
 ### Search filtering and sort
 
@@ -75,6 +80,10 @@ Currently it is still missing some features it should have.
 
 - &#9744; Proper naming and labeling.
 - &#9744; Tool tips?
+
+### Sidebar
+
+- &#9744; Drag sidebar width/height dynamically.
 
 ### Directory Browser and Downloading tab
 

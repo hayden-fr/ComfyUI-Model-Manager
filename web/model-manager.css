@@ -123,16 +123,6 @@
     opacity: 1;
 }
 
-.comfy-grid .model-button.model-button-success {
-    color: green;
-    border-color: green;
-}
-
-.comfy-grid .model-button.model-button-failure {
-    color: darkred;
-    border-color: darkred;
-}
-
 .comfy-grid .model-label {
     user-select: text;
 }
@@ -346,4 +336,42 @@
 .model-manager .source-text-area,
 .model-manager .model-type-dropdown {
 	flex: 1;
+}
+
+.model-manager .button-success {
+    color: green;
+    border-color: green;
+}
+
+.model-manager .button-failure {
+    color: darkred;
+    border-color: darkred;
+}
+
+/* model manager settings */
+.model-manager .model-manager-settings > div {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+
+.model-manager .model-manager-settings button {
+    height: 40px;
+    width: 120px;
+}
+
+.model-manager .model-manager-settings input[type="number"] {
+    width: 50px;
+}
+
+.search-settings-text {
+    width: 100%;
+}
+
+.model-manager .model-manager-settings textarea {
+    width: 100%;
+    font-size: 1.2em;
+    border: solid 2px var(--border-color);
+    border-radius: 8px;
 }

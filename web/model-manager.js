@@ -48,13 +48,36 @@ function pathToFileString(path) {
     return path.slice(i);
 }
 
-function insertEmbeddingIntoText(currentText, embeddingFile, extensionRegex = null) {
-    if (extensionRegex) {
-        // TODO: setting.remove_extension_embedding
+function removeModelExtension(file) {
+    // This is a bit sloppy (can assume server sends without)
+    const i = file.lastIndexOf(".");
+    if (i != -1) {
+        return file.substring(0, i);
     }
-    // TODO: don't add if it is already in the text?
-    const sep = currentText.length === 0 || currentText.slice(-1).match(/\s/) ? "" : " ";
-    return currentText + sep + "(embedding:" +  embeddingFile  + ":1.0)";
+}
+
+function insertEmbeddingIntoText(text, file, removeExtension) {
+    let name = file;
+    if (removeExtension) {
+        name = removeModelExtension(name)
+    }
+    const sep = text.length === 0 || text.slice(-1).match(/\s/) ? "" : " ";
+    return text + sep + "(embedding:" +  name  + ":1.0)";
+}
+
+function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
+    const name = success ? "button-success" : "button-failure";
+    element.classList.add(name);
+    if (successText != "" && failureText != "") {
+        element.innerHTML = success ? successText : failureText;
+    }
+    // TODO: debounce would be nice to get working...
+    window.setTimeout((element, name, innerHTML) => {
+        element.classList.remove(name);
+        if (innerHTML != "") {
+            element.innerHTML = innerHTML;
+        }
+    }, 500, element, name, resetText);
 }
 
 class Tabs {
@@ -281,20 +304,8 @@ class ModelGrid {
         });
     }
 
-    static #buttonAlert(event, successful, innerHTML) {
-        const element = event.target;
-        const name = successful ? "model-button-success" : "model-button-failure";
-        element.classList.add(name);
-        element.innerHTML = successful ? "✔" : "✖";
-        // TODO: debounce would be nice to get working...
-        window.setTimeout((element, name) => {
-            element.classList.remove(name);
-            element.innerHTML = innerHTML;
-        }, 500, element, name);
-    }
-
-    static #addModel(event, modelType, path) {
-        let successful = false;
+    static #addModel(event, modelType, path, removeEmbeddingExtension, addOffset) {
+        let success = false;
         if (modelType !== "embeddings") {
             const nodeType = modelNodeType(modelType);
             const widgetIndex = modelWidgetIndex(nodeType);
@@ -305,9 +316,8 @@ class ModelGrid {
                 let isSelectedNode = false;
                 for (var i in selectedNodes) {
                     const selectedNode = selectedNodes[i];
-                    // TODO: settings.model_add_offset
-                    node.pos[0] = selectedNode.pos[0] + 25;
-                    node.pos[1] = selectedNode.pos[1] + 25;
+                    node.pos[0] = selectedNode.pos[0] + addOffset;
+                    node.pos[1] = selectedNode.pos[1] + addOffset;
                     isSelectedNode = true;
                     break;
                 }
@@ -318,7 +328,7 @@ class ModelGrid {
                 }
                 app.graph.add(node, {doProcessChange: true});
                 app.canvas.selectNode(node);
-                successful = true;
+                success = true;
             }
             event.stopPropagation();
         }
@@ -331,27 +341,33 @@ class ModelGrid {
                 const widgetIndex = modelWidgetIndex(nodeType);
                 const target = selectedNode.widgets[widgetIndex].element;
                 if (target && target.type === "textarea") {
-                    target.value = insertEmbeddingIntoText(target.value, embeddingFile);
-                    successful = true;
+                    target.value = insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
+                    success = true;
                 }
             }
-            if (!successful) {
+            if (!success) {
                 console.warn("Try selecting a node before adding the embedding.");
             }
             event.stopPropagation();
         }
-        this.#buttonAlert(event, successful, "✚");
+        buttonAlert(event.target, success, "✔", "✖", "✚");
     }
 
-    static #dragAddModel(event, modelType, path) {
+    static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictDragToAdd) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
             const nodeType = modelNodeType(modelType);
             const widgetIndex = modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
-            //if (nodeAtPos && nodeAtPos.type === nodeType && app.canvas.processNodeWidgets(nodeAtPos, pos, event) !== nodeAtPos.widgets[widgetIndex]) { // TODO: settings.strict_model_drag
-            if (nodeAtPos && nodeAtPos.type === nodeType) {
+
+            let draggedOnNode = nodeAtPos && nodeAtPos.type === nodeType;
+            if (strictDragToAdd) {
+                const draggedOnWidget = app.canvas.processNodeWidgets(nodeAtPos, pos, event) === nodeAtPos.widgets[widgetIndex];
+                draggedOnNode = draggedOnNode && draggedOnWidget;
+            }
+
+            if (draggedOnNode) {
                 let node = nodeAtPos;
                 node.widgets[widgetIndex].value = path;
                 app.canvas.selectNode(node);
@@ -374,20 +390,21 @@ class ModelGrid {
             if (nodeAtPos) {
                 app.canvas.selectNode(nodeAtPos);
                 const embeddingFile = pathToFileString(path);
-                target.value = insertEmbeddingIntoText(target.value, embeddingFile);
+                target.value = insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                 event.stopPropagation();
             }
         }
     }
 
-    static #copyModelToClipboard(event, modelType, path) {
+    static #copyModelToClipboard(event, modelType, path, removeEmbeddingExtension) {
         const nodeType = modelNodeType(modelType);
-        let successful = false;
+        let success = false;
         if (nodeType === "Embedding") {
             if (navigator.clipboard){
-                const embeddingText = pathToFileString(path);
+                const embeddingFile = pathToFileString(path);
+                const embeddingText = insertEmbeddingIntoText("", embeddingFile, removeEmbeddingExtension);
                 navigator.clipboard.writeText(embeddingText);
-                successful = true;
+                success = true;
             }
             else {
                 console.warn("Cannot copy the embedding to the system clipboard; Try dragging it instead.");
@@ -398,24 +415,47 @@ class ModelGrid {
             const widgetIndex = modelWidgetIndex(nodeType);
             node.widgets[widgetIndex].value = path;
             app.canvas.copyToClipboard([node]);
-            successful = true;
+            success = true;
         }
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
         }
-        this.#buttonAlert(event, successful, "⧉︎");
+        buttonAlert(event.target, success, "✔", "✖", "⧉︎");
     }
 
-    static generateInnerHtml(models, modelType) {
+    static generateInnerHtml(models, modelType, settingsElements) {
+        const showAddButton = settingsElements["model-show-add-button"].checked;
+        const showCopyButton = settingsElements["model-show-copy-button"].checked;
+        const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
+        const addOffset = parseInt(settingsElements["model-add-offset"].value);
+        const showModelExtension = settingsElements["model-show-label-extensions"].checked;
+        const removeEmbeddingExtension = !settingsElements["model-add-embedding-extension"].checked;
         if (models.length > 0) {
-            // TODO: settings.show_model_add_button
-            // TODO: settings.show_model_copy_button
             return models.map((item) => {
                 const uri = item.post ?? "no-post";
                 const imgUrl = `/model-manager/image-preview?uri=${uri}`;
-                const dragAdd = (e) => ModelGrid.#dragAddModel(e, modelType, item.path);
-                const clickCopy = (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path);
-                const clickAdd = (e) => ModelGrid.#addModel(e, modelType, item.path);
+                let buttons = [];
+                if (showAddButton) {
+                    buttons.push(
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "⧉︎",
+                            onclick: (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path, removeEmbeddingExtension),
+                            draggable: false,
+                        })
+                    );
+                }
+                if (showCopyButton) {
+                    buttons.push(
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "✚",
+                            onclick: (e) => ModelGrid.#addModel(e, modelType, item.path, removeEmbeddingExtension, addOffset),
+                            draggable: false,
+                        })
+                    );
+                }
+                const dragAdd = (e) => ModelGrid.#dragAddModel(e, modelType, item.path, removeEmbeddingExtension, strictDragToAdd);
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
                         src: imgUrl,
@@ -429,25 +469,13 @@ class ModelGrid {
                     $el("div.model-preview-top-right", {
                         draggable: false,
                     },
-                    [
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "⧉︎",
-                            onclick: (e) => clickCopy(e),
-                            draggable: false,
-                        }),
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "✚",
-                            onclick: (e) => clickAdd(e),
-                            draggable: false,
-                        }),
-                    ]),
+                        buttons
+                    ),
                     $el("div.model-label", {
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
                     }, [
-                        $el("p", [item.name])
+                        $el("p", [showModelExtension ? item.name : removeModelExtension(item.name)])
                     ]),
                 ]);
             });
@@ -501,10 +529,27 @@ class ModelManager extends ComfyDialog {
         sourceInstalledFilter: null,
         sourceContentFilter: null,
         sourceFilterBtn: null,
+
         modelGrid: null,
         modelTypeSelect: null,
         modelContentFilter: null,
+
         sidebarButtons: null,
+
+        settingsTab: null,
+        reloadSettingsBtn: null,
+        saveSettingsBtn: null,
+        settings: {
+            "sidebar-default-height": null,
+            "sidebar-default-width": null,
+            "model-search-always-append": null,
+            "model-show-label-extensions": null,
+            "model-show-add-button": null,
+            "model-show-copy-button": null,
+            "model-add-embedding-extension": null,
+            "model-add-drag-strict-on-field": null,
+            "model-add-offset": null,
+        }
     };
 
     #data = {
@@ -557,7 +602,7 @@ class ModelManager extends ComfyDialog {
                     $tabs([
                         $tab("Install", this.#createSourceInstall()),
                         $tab("Models", this.#createModelTabHtml()),
-                        $tab("Settings", []),
+                        $tab("Settings", this.#createSettingsTabHtml()),
                     ]),
                 ]),
             ]
@@ -567,6 +612,7 @@ class ModelManager extends ComfyDialog {
     }
 
     #init() {
+        this.#reloadSettings(false);
         this.#refreshSourceList();
         this.#modelGridRefresh();
     }
@@ -748,15 +794,15 @@ class ModelManager extends ComfyDialog {
     }
 
     #modelGridUpdate() {
-        const searchText = this.#el.modelContentFilter.value;
-        // TODO: settings.always_append_to_search
+        const searchAppend = this.#el.settings["model-search-always-append"].value;
+        const searchText = this.#el.modelContentFilter.value + " " + searchAppend;
         const modelType = this.#el.modelTypeSelect.value;
         const models = this.#data.models;
         const modelList = ModelGrid.filter(models[modelType], searchText);
 
         const modelGrid = this.#el.modelGrid;
         modelGrid.innerHTML = [];
-        const innerHTML = ModelGrid.generateInnerHtml(modelList, modelType);
+        const innerHTML = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
         modelGrid.append.apply(modelGrid, innerHTML);
     };
 
@@ -766,9 +812,8 @@ class ModelManager extends ComfyDialog {
     };
 
     #setSidebar(event) {
-        // TODO: use checkboxes with 0 or 1 values set at once?
-        // TODO: settings.sidebar_side_width
-        // TODO: settings.sidebar_bottom_height
+        // TODO: settings["sidebar-default-width"]
+        // TODO: settings["sidebar-default-height"]
         // TODO: draggable resize?
         const button = event.target;
         const sidebarButtons = this.#el.sidebarButtons.children;
@@ -794,6 +839,169 @@ class ModelManager extends ComfyDialog {
             const newSidebarState = sidebarStates[buttonIndex];
             modelManager.classList.add(newSidebarState);
         }
+    }
+
+    #setSettings(settings, reloadData) {
+        const el = this.#el.settings;
+        for (const [key, value] of Object.entries(settings)) {
+            const setting = el[key];
+            if (setting) {
+                const type = setting.type;
+                switch (type) {
+                    case "checkbox": setting.checked = Boolean(value); break;
+                    case "range": setting.value = parseFloat(value); break;
+                    case "textarea": setting.value = value; break;
+                    case "number": setting.value = parseInt(value); break;
+                    default: console.warn("Unknown settings input type!");
+                }
+            }
+        }
+
+        if (reloadData) {
+            // Is this slow?
+            this.#refreshSourceList();
+            this.#modelGridRefresh();
+        }
+    }
+
+    async #reloadSettings(reloadData) {
+        const data = await request("/model-manager/settings/load");
+        const settings = data["settings"];
+        this.#setSettings(settings, reloadData);
+        buttonAlert(this.#el.reloadSettingsBtn, true);
+    };
+
+    async #saveSettings() {
+        let settings = {};
+        for (const [setting, el] of Object.entries(this.#el.settings)) {
+            if (!el) { continue; } // hack
+            const type = el.type;
+            let value = null;
+            switch (type) {
+                case "checkbox": value = el.checked; break;
+                case "range": value = el.value; break;
+                case "textarea": value = el.value; break;
+                case "number": value = el.value; break;
+                default: console.warn("Unknown settings input type!");
+            }
+            settings[setting] = value;
+        }
+
+        const data = await request(
+            "/model-manager/settings/save",
+            {
+                method: "POST",
+                body: JSON.stringify({ "settings": settings }),
+            }
+        );
+        const success = data["success"];
+        if (success) {
+            const settings = data["settings"];
+            this.#setSettings(settings, true);
+        }
+        buttonAlert(this.#el.saveSettingsBtn, success);
+    }
+
+    #createSettingsTabHtml() {
+        const settingsTab = $el("div.model-manager-settings", [
+            $el("h1", ["Settings"]),
+            $el("div", [
+                $el("button", {
+                    $: (el) => (this.#el.reloadSettingsBtn = el),
+                    type: "button",
+                    textContent: "Reload", // ⟳
+                    onclick: () => this.#reloadSettings(true),
+                }),
+                $el("button", {
+                    $: (el) => (this.#el.saveSettingsBtn = el),
+                    type: "button",
+                    textContent: "Save", // 💾︎
+                    onclick: () => this.#saveSettings(),
+                }),
+            ]),
+            /*
+            $el("h2", ["Window"]),
+            $el("div", [
+                $el("p", ["Default sidebar width"]),
+                $el("input", {
+                    $: (el) => (this.#el.settings["sidebar-default-width"] = el),
+                    type: "number",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            $el("div", [
+                $el("p", ["Default sidebar height"]),
+                $el("input", {
+                    $: (el) => (this.#el.settings["sidebar-default-height"] = el),
+                    type: "number",
+                    textContent: "Default sidebar height",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            */
+            $el("h2", ["Model Search"]),
+            $el("div", [
+                $el("div.search-settings-text", [
+                    $el("p", ["Always append to model search:"]),
+                    $el("textarea.comfy-multiline-input", {
+                        $: (el) => (this.#el.settings["model-search-always-append"] = el),
+                        placeholder: "example: -nsfw",
+                    }),
+                ]),
+            ]),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-show-label-extensions"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Show extensions in models tab"]),
+            ]),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-show-add-button"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Show add button"]),
+            ]),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-show-copy-button"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Show copy button"]),
+            ]),
+            $el("h2", ["Model Add"]),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-add-embedding-extension"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Add extension to embedding"]),
+            ]),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-add-drag-strict-on-field"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Strict dragging model onto a node's model field to add"]),
+            ]),
+            $el("div", [
+                $el("p", ["Add model offset"]),
+                $el("input", {
+                    $: (el) => (this.#el.settings["model-add-offset"] = el),
+                    type: "number",
+                    step: 5,
+                }),
+            ]),
+        ]);
+        this.#el.settingsTab = settingsTab;
+        return [settingsTab];
     }
 }
 
