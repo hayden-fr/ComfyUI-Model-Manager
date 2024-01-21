@@ -59,6 +59,14 @@ Currently it is still missing some features it should have.
 
 ### Search filtering and sort
 
+- &#9744; Directory dropdown
+  - &#9744; Use always filter to filter directory content auto-suggest dropdown
+  - &#9744; Highlight selection
+    - &#9744; Key shortcuts
+      - &#9744; Down & Up arrows to select dropdown option
+      - &#9744; Right arrow or enter to add selection
+      - &#9744; Escape to loose focus on dropdown
+    - &#9744; Generalize search dropdown for download location selection
 - &#9744; Filters dropdown
   - &#9744; Stable Diffusion model version/Clip/Upscale/?
   - &#9744; Favorites
