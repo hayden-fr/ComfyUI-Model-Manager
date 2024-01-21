@@ -31,8 +31,8 @@ image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")
 
 #hash_buffer_size = 4096
 
-_folder_names_and_paths: dict[str, tuple[list[str], list[str]]] = None
-def folder_paths_folder_names_and_paths(refresh = False) -> dict[str, tuple[list[str], list[str]]]:
+_folder_names_and_paths = None # dict[str, tuple[list[str], list[str]]]
+def folder_paths_folder_names_and_paths(refresh = False):
     global _folder_names_and_paths
     if refresh or _folder_names_and_paths is None:
         _folder_names_and_paths = {}
@@ -50,7 +50,7 @@ def folder_paths_folder_names_and_paths(refresh = False) -> dict[str, tuple[list
             _folder_names_and_paths[item_name] = (dir_paths, extensions)
     return _folder_names_and_paths
 
-def folder_paths_get_folder_paths(folder_name, refresh = False) -> list[str]: # API function crashes querying unknown model folder
+def folder_paths_get_folder_paths(folder_name, refresh = False): # API function crashes querying unknown model folder
     paths = folder_paths_folder_names_and_paths(refresh)
     if folder_name in paths:
         return paths[folder_name][0]
@@ -60,7 +60,7 @@ def folder_paths_get_folder_paths(folder_name, refresh = False) -> list[str]: # 
         return [maybe_path]
     return []
 
-def folder_paths_get_supported_pt_extensions(folder_name, refresh = False) -> list[str]: # Missing API function
+def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Missing API function
     paths = folder_paths_folder_names_and_paths(refresh)
     if folder_name in paths:
         return paths[folder_name][1]
@@ -309,7 +309,7 @@ async def load_download_models(request):
     return web.json_response(models)
 
 
-def linear_directory_list(refresh = False) -> dict[str, list]:
+def linear_directory_list(refresh = False):
     model_paths = folder_paths_folder_names_and_paths(refresh)
     dir_list = []
     dir_list.append({ "name": "", "childIndex": 1, "childCount": len(model_paths) })
@@ -360,7 +360,7 @@ def linear_directory_list(refresh = False) -> dict[str, list]:
     return dir_list
 
 
-@server.PromptServer.instance.routes.get("/model-manager/directory-list")
+@server.PromptServer.instance.routes.get("/model-manager/model-directory-list")
 async def directory_list(request):
     #body = await request.json()
     dir_list = linear_directory_list(True)

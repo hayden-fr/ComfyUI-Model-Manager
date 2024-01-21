@@ -833,7 +833,7 @@ class ModelManager extends ComfyDialog {
 
     async #modelGridRefresh() {
         this.#data.models = await request("/model-manager/models");
-        this.#data.modelDirectories = await request("/model-manager/directory-list");
+        this.#data.modelDirectories = await request("/model-manager/model-directory-list");
         this.#modelGridUpdate();
     };
 
