@@ -744,6 +744,7 @@ class ModelManager extends ComfyDialog {
     #createModelTabHtml() {
         const modelGrid = $el("div.comfy-grid");
         this.#el.modelGrid = modelGrid;
+
         return [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
@@ -758,22 +759,7 @@ class ModelManager extends ComfyDialog {
                             name: "model-type",
                             onchange: () => this.#modelGridUpdate(),
                         },
-                        [ // TODO: generate based on existing model folders
-                            $el("option", ["checkpoints"]),
-                            $el("option", ["clip"]),
-                            $el("option", ["clip_vision"]),
-                            $el("option", ["controlnet"]),
-                            $el("option", ["diffusers"]),
-                            $el("option", ["embeddings"]),
-                            $el("option", ["gligen"]),
-                            $el("option", ["hypernetworks"]),
-                            $el("option", ["loras"]),
-                            $el("option", ["style_models"]),
-                            $el("option", ["unet"]),
-                            $el("option", ["upscale_models"]),
-                            $el("option", ["vae"]),
-                            $el("option", ["vae_approx"]),
-                        ]
+                        [],
                     ),
                 ]),
                 $el("div.row.tab-header-flex-block", [
@@ -794,16 +780,30 @@ class ModelManager extends ComfyDialog {
     }
 
     #modelGridUpdate() {
+        const models = this.#data.models;
+        const modelSelect = this.#el.modelTypeSelect;
+        let modelType = modelSelect.value;
+        if (models[modelType] === undefined) {
+            modelType = "checkpoints"; // TODO: magic value
+        }
+
+        let modelTypeOptions = [];
+        for (const [key, value] of Object.entries(models)) {
+            const el = $el("option", [key]);
+            modelTypeOptions.push(el);
+        }
+        modelSelect.innerHTML = "";
+        modelTypeOptions.forEach(option => modelSelect.add(option));
+        modelSelect.value = modelType;
+
         const searchAppend = this.#el.settings["model-search-always-append"].value;
         const searchText = this.#el.modelContentFilter.value + " " + searchAppend;
-        const modelType = this.#el.modelTypeSelect.value;
-        const models = this.#data.models;
         const modelList = ModelGrid.filter(models[modelType], searchText);
 
         const modelGrid = this.#el.modelGrid;
-        modelGrid.innerHTML = [];
-        const innerHTML = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
-        modelGrid.append.apply(modelGrid, innerHTML);
+        modelGrid.innerHTML = "";
+        const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
+        modelGrid.append.apply(modelGrid, modelGridModels);
     };
 
     async #modelGridRefresh() {

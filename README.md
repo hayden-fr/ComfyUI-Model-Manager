@@ -15,7 +15,7 @@ Currently it is still missing some features it should have.
 - Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
-- Include models listed in ComfyUI's `extra_model_paths.yaml`.
+- Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left, top and bottom toggleable sidebar modes.
