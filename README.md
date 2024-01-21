@@ -14,7 +14,8 @@ Currently it is still missing some features it should have.
 
 - Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
-- Search `/`subdirectories of model directories based on your file structure (for example, `/styles/clothing`).
+- Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
+  - Add `/` at the start of the search bar to see auto-complete suggestions.
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
@@ -58,7 +59,6 @@ Currently it is still missing some features it should have.
 
 ### Search filtering and sort
 
-- &#9744; Add auto-suggest paths in search
 - &#9744; Filters dropdown
   - &#9744; Stable Diffusion model version/Clip/Upscale/?
   - &#9744; Favorites

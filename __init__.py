@@ -40,6 +40,8 @@ def folder_paths_folder_names_and_paths(refresh = False) -> dict[str, tuple[list
             item_path = os.path.join(comfyui_model_uri, item_name)
             if not os.path.isdir(item_path):
                 continue
+            if item_name == "configs":
+                continue
             if item_name in folder_paths.folder_names_and_paths:
                 dir_paths, extensions = copy.deepcopy(folder_paths.folder_names_and_paths[item_name])
             else:
@@ -294,7 +296,7 @@ async def load_download_models(request):
             # TODO: Stop sending redundant information
             item = {
                 "name": model,
-                "search-path": os.path.join(model_type, rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
+                "search-path": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
                 "path": os.path.join(rel_path, model),
             }
             if image is not None:
@@ -305,6 +307,65 @@ async def load_download_models(request):
         models[model_type] = model_items
 
     return web.json_response(models)
+
+
+def linear_directory_list(refresh = False) -> dict[str, list]:
+    model_paths = folder_paths_folder_names_and_paths(refresh)
+    dir_list = []
+    dir_list.append({ "name": "", "childIndex": 1, "childCount": len(model_paths) })
+    for model_dir_name, (model_dirs, _) in model_paths.items():
+        dir_list.append({ "name": model_dir_name, "childIndex": None, "childCount": len(model_dirs) })
+    for model_dir_index, (_, (model_dirs, extension_whitelist)) in enumerate(model_paths.items()):
+        model_dir_child_index = len(dir_list)
+        dir_list[model_dir_index + 1]["childIndex"] = model_dir_child_index
+        for dir_path_index, dir_path in enumerate(model_dirs):
+            dir_list.append({ "name": str(dir_path_index), "childIndex": None, "childCount": None })
+        for dir_path_index, dir_path in enumerate(model_dirs):
+            if not os.path.exists(dir_path) or os.path.isfile(dir_path):
+                continue
+
+            #dir_list.append({ "name": str(dir_path_index), "childIndex": None, "childCount": 0 })
+            dir_stack = [(dir_path, model_dir_child_index + dir_path_index)]
+            while len(dir_stack) > 0: # DEPTH-FIRST
+                dir_path, dir_index = dir_stack.pop()
+                
+                dir_items = os.listdir(dir_path)
+                dir_items = sorted(dir_items, key=str.casefold)
+                
+                dir_list[dir_index]["childIndex"] = len(dir_list)
+                dir_child_count = 0
+                
+                # TODO: sort content of directory: alphabetically
+                # TODO: sort content of directory: files first
+                
+                subdirs = []
+                for item_name in dir_items: # BREADTH-FIRST
+                    item_path = os.path.join(dir_path, item_name)
+                    if os.path.isdir(item_path):
+                        # dir
+                        subdir_index = len(dir_list) # this must be done BEFORE `dir_list.append`
+                        subdirs.append((item_path, subdir_index))
+                        dir_list.append({ "name": item_name, "childIndex": None, "childCount": 0 })
+                        dir_child_count += 1
+                    else:
+                        # file
+                        _, file_extension = os.path.splitext(item_name)
+                        if extension_whitelist is None or file_extension in extension_whitelist:
+                            dir_list.append({ "name": item_name })
+                            dir_child_count += 1
+                dir_list[dir_index]["childCount"] = dir_child_count
+                subdirs.reverse()
+                for dir_path, subdir_index in subdirs:
+                    dir_stack.append((dir_path, subdir_index))
+    return dir_list
+
+
+@server.PromptServer.instance.routes.get("/model-manager/directory-list")
+async def directory_list(request):
+    #body = await request.json()
+    dir_list = linear_directory_list(True)
+    #json.dump(dir_list, sys.stdout, indent=4)
+    return web.json_response(dir_list)
 
 
 def_headers = {

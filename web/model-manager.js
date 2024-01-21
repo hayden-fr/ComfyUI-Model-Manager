@@ -36,7 +36,10 @@ function modelNodeType(modelType) {
     else if (modelType === "upscale_models") { return "UpscaleModelLoader"; }
     else if (modelType === "vae") { return "VAELoader"; }
     else if (modelType === "vae_approx") { return undefined; }
-    else { console.warn(`ModelType ${modelType} unrecognized.`); return undefined; }
+    else {
+        //console.warn(`ModelType ${modelType} unrecognized.`);
+        return undefined;
+    }
 }
 
 function modelWidgetIndex(nodeType) {
@@ -424,8 +427,11 @@ class ModelGrid {
     }
 
     static generateInnerHtml(models, modelType, settingsElements) {
-        const showAddButton = settingsElements["model-show-add-button"].checked;
-        const showCopyButton = settingsElements["model-show-copy-button"].checked;
+        // TODO: seperate text and model logic; getting too messy
+        // TODO: fallback on button failure to copy text?
+        const canShowButtons = modelNodeType(modelType) !== undefined;
+        const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
+        const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
@@ -532,6 +538,7 @@ class ModelManager extends ComfyDialog {
 
         modelGrid: null,
         modelTypeSelect: null,
+        modelDirectorySearchOptions: null,
         modelContentFilter: null,
 
         sidebarButtons: null,
@@ -555,6 +562,8 @@ class ModelManager extends ComfyDialog {
     #data = {
         sources: [],
         models: {},
+        modelDirectories: null,
+        previousModelDirectoryFilter: "",
     };
 
     /** @type {SourceList} */
@@ -745,6 +754,11 @@ class ModelManager extends ComfyDialog {
         const modelGrid = $el("div.comfy-grid");
         this.#el.modelGrid = modelGrid;
 
+        const searchDropdown = $el("div.search-dropdown", {
+            $: (el) => (this.#el.modelDirectorySearchOptions = el),
+            style: { display: "none" },
+        });
+        
         return [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
@@ -753,21 +767,31 @@ class ModelManager extends ComfyDialog {
                         textContent: "⟳",
                         onclick: () => this.#modelGridRefresh(),
                     }),
-                    $el("select.model-type-dropdown",
-                        {
-                            $: (el) => (this.#el.modelTypeSelect = el),
-                            name: "model-type",
-                            onchange: () => this.#modelGridUpdate(),
-                        },
-                        [],
-                    ),
+                    $el("select.model-type-dropdown", {
+                        $: (el) => (this.#el.modelTypeSelect = el),
+                        name: "model-type",
+                        onchange: () => this.#modelGridUpdate(),
+                    }),
                 ]),
                 $el("div.row.tab-header-flex-block", [
-                    $el("input.search-text-area", {
-                        $: (el) => (this.#el.modelContentFilter = el),
-                        placeholder: "example: styles/clothing -.pt",
-                        onkeyup: (e) => e.key === "Enter" && this.#modelGridUpdate(),
-                    }),
+                    $el("div.search-models", [
+                        $el("input.search-text-area", {
+                            $: (el) => (this.#el.modelContentFilter = el),
+                            placeholder: "example: /0/1.5/styles/clothing -.pt",
+                            onkeyup: (e) => e.key === "Enter" && this.#modelGridUpdate(),
+                            oninput: () => this.#updateSearchDropdown(),
+                            onfocus: () => {
+                                if (searchDropdown.innerHTML === "") {
+                                    searchDropdown.style.display = "none";
+                                }
+                                else {
+                                    searchDropdown.style.display = "block";
+                                }
+                            },
+                            onblur: () => { searchDropdown.style.display = "none"; },
+                        }),
+                        searchDropdown,
+                    ]),
                     $el("button.icon-button", {
                         type: "button",
                         textContent: "🔍︎",
@@ -782,6 +806,7 @@ class ModelManager extends ComfyDialog {
     #modelGridUpdate() {
         const models = this.#data.models;
         const modelSelect = this.#el.modelTypeSelect;
+        
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -808,6 +833,7 @@ class ModelManager extends ComfyDialog {
 
     async #modelGridRefresh() {
         this.#data.models = await request("/model-manager/models");
+        this.#data.modelDirectories = await request("/model-manager/directory-list");
         this.#modelGridUpdate();
     };
 
@@ -1002,6 +1028,114 @@ class ModelManager extends ComfyDialog {
         ]);
         this.#el.settingsTab = settingsTab;
         return [settingsTab];
+    }
+
+    #getFilterDirectory(filter, directory, sep, cwd = 0) {
+        // TODO: directories === undefined
+        let filterIndex0 = 1;
+        while (true) {
+            const filterIndex1 = filter.indexOf(sep, filterIndex0);
+            if (filterIndex1 === -1) {
+                // end of filter
+                break;
+            }
+            
+            const item = directory[cwd];
+            if (item["childCount"] === undefined) {
+                // file
+                break;
+            }
+            
+            const childCount = item["childCount"];
+            if (childCount === 0) {
+                // directory is empty
+                cwd = null;
+                break;
+            }
+            const childIndex = item["childIndex"];
+            const items = directory.slice(childIndex, childIndex + childCount);
+            
+            const word = filter.substring(filterIndex0, filterIndex1);
+            cwd = null;
+            for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+                const itemName = items[itemIndex]["name"];
+                if (itemName === word) {
+                    // directory exists
+                    cwd = childIndex + itemIndex;
+                    break;
+                }
+            }
+            if (cwd === null) {
+                // directory does not exist
+                break;
+            }
+            filterIndex0 = filterIndex1 + 1;
+        }
+        return [filterIndex0, cwd];
+    }
+
+    async #updateSearchDropdown() {
+        const directories = this.#data.modelDirectories;
+        const previousFilter = this.#data.previousModelDirectoryFilter;
+        const searchDropdown = this.#el.modelDirectorySearchOptions;
+        const filter = this.#el.modelContentFilter.value;
+        const modelType = this.#el.modelTypeSelect.value;
+
+        if (previousFilter !== filter) {
+            let options = [];
+            const sep = "/";
+            if (filter[0] === sep) {
+                let initCwd = null;
+                const root = directories[0];
+                const rootChildIndex = root["childIndex"];
+                const rootChildCount = root["childCount"];
+                for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
+                    const modelDir = directories[i];
+                    if (modelDir["name"] === modelType) {
+                        initCwd = i;
+                        break;
+                    }
+                }
+                const [filterIndex0, cwd] = this.#getFilterDirectory(
+                    filter, 
+                    directories, 
+                    sep,
+                    initCwd
+                );
+                if (cwd !== null) {
+                    const lastWord = filter.substring(filterIndex0);
+                    const item = directories[cwd];
+                    if (item["childIndex"] !== undefined) {
+                        const childIndex = item["childIndex"];
+                        const childCount = item["childCount"];
+                        const items = directories.slice(childIndex, childIndex + childCount);
+                        for (let i = 0; i < items.length; i++) {
+                            const itemName = items[i]["name"];
+                            if (itemName.startsWith(lastWord)) {
+                                options.push(itemName);
+                            }
+                        }
+                    }
+                    else {
+                        const filename = item["name"];
+                        if (filename.startsWith(lastWord)) {
+                            options.push(filename);
+                        }
+                    }
+                }
+            }
+
+            const innerHtml = options.map((text) => {
+                const el = document.createElement("p");
+                el.innerHTML = text;
+                return el;
+            });
+            searchDropdown.innerHTML = "";
+            searchDropdown.append.apply(searchDropdown, innerHtml);
+            searchDropdown.style.display = options.length === 0 ? "none" : "block";
+        }
+
+        this.#data.previousModelDirectoryFilter = filter;
     }
 }
 
