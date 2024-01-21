@@ -59,8 +59,11 @@ Currently it is still missing some features it should have.
 
 ### Search filtering and sort
 
+- &#9744; Real-time search
+  - &#9744; Check search code is optimized to avoid recalculation on every minor input change
 - &#9744; Directory dropdown
   - &#9744; Use always filter to filter directory content auto-suggest dropdown
+    - &#9744; Generalize model list filtering code to reuse approach
   - &#9744; Highlight selection
     - &#9744; Key shortcuts
       - &#9744; Down & Up arrows to select dropdown option
