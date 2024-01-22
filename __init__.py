@@ -26,6 +26,7 @@ index_uri = os.path.join(extension_uri, "index.json")
 no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 
+fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
 image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")
 #video_extensions = (".avi", ".mp4", ".webm") # TODO: Requires ffmpeg or cv2. Cache preview frame?
 
@@ -45,8 +46,8 @@ def folder_paths_folder_names_and_paths(refresh = False):
             if item_name in folder_paths.folder_names_and_paths:
                 dir_paths, extensions = copy.deepcopy(folder_paths.folder_names_and_paths[item_name])
             else:
-                dir_paths = [item_name]
-                extensions = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"] # TODO: magic values
+                dir_paths = [item_path]
+                extensions = copy.deepcopy(fallback_model_extensions)
             _folder_names_and_paths[item_name] = (dir_paths, extensions)
     return _folder_names_and_paths
 
@@ -64,7 +65,8 @@ def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Mi
     paths = folder_paths_folder_names_and_paths(refresh)
     if folder_name in paths:
         return paths[folder_name][1]
-    return set([".ckpt", ".pt", ".bin", ".pth", ".safetensors"]) # TODO: magic values
+    model_extensions = copy.deepcopy(fallback_model_extensions)
+    return model_extensions
 
 
 def get_safetensor_header(path):
@@ -309,7 +311,7 @@ async def load_download_models(request):
     return web.json_response(models)
 
 
-def linear_directory_list(refresh = False):
+def linear_directory_hierarchy(refresh = False):
     model_paths = folder_paths_folder_names_and_paths(refresh)
     dir_list = []
     dir_list.append({ "name": "", "childIndex": 1, "childCount": len(model_paths) })
@@ -332,7 +334,6 @@ def linear_directory_list(refresh = False):
                 dir_items = os.listdir(dir_path)
                 dir_items = sorted(dir_items, key=str.casefold)
                 
-                dir_list[dir_index]["childIndex"] = len(dir_list)
                 dir_child_count = 0
                 
                 # TODO: sort content of directory: alphabetically
@@ -353,6 +354,8 @@ def linear_directory_list(refresh = False):
                         if extension_whitelist is None or file_extension in extension_whitelist:
                             dir_list.append({ "name": item_name })
                             dir_child_count += 1
+                if dir_child_count > 0:
+                    dir_list[dir_index]["childIndex"] = len(dir_list) - dir_child_count
                 dir_list[dir_index]["childCount"] = dir_child_count
                 subdirs.reverse()
                 for dir_path, subdir_index in subdirs:
@@ -363,7 +366,7 @@ def linear_directory_list(refresh = False):
 @server.PromptServer.instance.routes.get("/model-manager/model-directory-list")
 async def directory_list(request):
     #body = await request.json()
-    dir_list = linear_directory_list(True)
+    dir_list = linear_directory_hierarchy(True)
     #json.dump(dir_list, sys.stdout, indent=4)
     return web.json_response(dir_list)
 

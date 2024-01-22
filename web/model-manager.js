@@ -1049,7 +1049,6 @@ class ModelManager extends ComfyDialog {
             const childCount = item["childCount"];
             if (childCount === 0) {
                 // directory is empty
-                cwd = null;
                 break;
             }
             const childIndex = item["childIndex"];
