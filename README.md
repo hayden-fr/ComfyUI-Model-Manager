@@ -43,6 +43,7 @@ Currently it is still missing some features it should have.
 ### Model Copying
 
 - &#9744; Copy image?
+- &#9744; Copy model path?
 
 ### Model info window/panel (server load/send on demand)
 

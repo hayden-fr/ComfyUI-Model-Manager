@@ -28,8 +28,10 @@
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
+    background-color: var(--comfy-menu-bg);
     cursor: pointer;
     margin-bottom: 0px;
+    z-index: 1;
 }
 
 .comfy-tabs-head .head-item.active {
