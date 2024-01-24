@@ -778,7 +778,17 @@ class ModelManager extends ComfyDialog {
                         $el("input.search-text-area", {
                             $: (el) => (this.#el.modelContentFilter = el),
                             placeholder: "example: /0/1.5/styles/clothing -.pt",
-                            onkeyup: (e) => e.key === "Enter" && this.#modelGridUpdate(),
+                            onkeyup: (e) => {
+                                if (e.key === "Enter") {
+                                    this.#modelGridUpdate();
+                                    searchDropdown.style.display = "none";
+                                    e.stopPropagation();
+                                }
+                                else if (e.key === "Escape") {
+                                    e.target.blur();
+                                    e.stopPropagation();
+                                }
+                            },
                             oninput: () => this.#updateSearchDropdown(),
                             onfocus: () => this.#updateSearchDropdown(),
                             onblur: () => { searchDropdown.style.display = "none"; },
@@ -807,15 +817,14 @@ class ModelManager extends ComfyDialog {
 
         const prevousModelType = this.#el.prevousModelType;
         if (modelType !== prevousModelType) {
-            const modelFilter = this.#el.modelContentFilter;
-            const filterText = modelFilter.value;
             if (this.#el.settings["model-persistent-search"].checked) {
                 this.#data.prevousModelFilters = [];
             }
             else {
+                const modelFilter = this.#el.modelContentFilter;
                 const prevousModelFilters = this.#data.prevousModelFilters;
                 // cache previous filter text
-                prevousModelFilters[prevousModelType] = filterText;
+                prevousModelFilters[prevousModelType] = modelFilter.value;
                 // read cached filter text
                 modelFilter.value = prevousModelFilters[modelType] ?? "";
             }
