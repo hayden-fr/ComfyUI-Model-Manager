@@ -806,7 +806,7 @@ class ModelManager extends ComfyDialog {
     #modelGridUpdate() {
         const models = this.#data.models;
         const modelSelect = this.#el.modelTypeSelect;
-        
+
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -827,7 +827,6 @@ class ModelManager extends ComfyDialog {
                 modelFilter.value = prevousModelFilters[modelType] ?? "";
             }
             this.#el.prevousModelType = modelType;
-            this.#updateSearchDropdown();
         }
 
         let modelTypeOptions = [];
@@ -847,13 +846,15 @@ class ModelManager extends ComfyDialog {
         modelGrid.innerHTML = "";
         const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
         modelGrid.append.apply(modelGrid, modelGridModels);
-    };
+
+        this.#updateSearchDropdown();
+    }
 
     async #modelGridRefresh() {
         this.#data.models = await request("/model-manager/models");
         this.#data.modelDirectories = await request("/model-manager/model-directory-list");
         this.#modelGridUpdate();
-    };
+    }
 
     #setSidebar(event) {
         // TODO: settings["sidebar-default-width"]
@@ -913,7 +914,7 @@ class ModelManager extends ComfyDialog {
         const settings = data["settings"];
         this.#setSettings(settings, reloadData);
         buttonAlert(this.#el.reloadSettingsBtn, true);
-    };
+    }
 
     async #saveSettings() {
         let settings = {};
