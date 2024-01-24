@@ -847,7 +847,7 @@ class ModelManager extends ComfyDialog {
         const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
         modelGrid.append.apply(modelGrid, modelGridModels);
 
-        this.#updateSearchDropdown();
+        this.#updateSearchDropdown(true);
     }
 
     async #modelGridRefresh() {
@@ -1099,7 +1099,7 @@ class ModelManager extends ComfyDialog {
         return [filterIndex0, cwd];
     }
 
-    async #updateSearchDropdown() {
+    async #updateSearchDropdown(setHidden = false) {
         const modelType = this.#el.modelTypeSelect.value;
         const searchDropdown = this.#el.modelDirectorySearchOptions;
         const filter = this.#el.modelContentFilter.value;
@@ -1158,7 +1158,7 @@ class ModelManager extends ComfyDialog {
             });
             searchDropdown.innerHTML = "";
             searchDropdown.append.apply(searchDropdown, innerHtml);
-            searchDropdown.style.display = options.length === 0 ? "none" : "block";
+            searchDropdown.style.display = setHidden || options.length == 0 ? "none" : "block";
         }
 
         this.#data.prevousModelFilters[modelType] = filter;
