@@ -21,26 +21,22 @@ function request(url, options) {
     });
 }
 
-function modelNodeType(modelType) {
-    if (modelType === "checkpoints") { return "CheckpointLoaderSimple"; }
-    else if (modelType === "clip") { return "CLIPLoader"; }
-    else if (modelType === "clip_vision") { return "CLIPVisionLoader"; }
-    else if (modelType === "controlnet") { return "ControlNetLoader"; }
-    else if (modelType === "diffusers") { return "DiffusersLoader"; }
-    else if (modelType === "embeddings") { return "Embedding"; }
-    else if (modelType === "gligen") { return "GLIGENLoader"; }
-    else if (modelType === "hypernetworks") { return "HypernetworkLoader"; }
-    else if (modelType === "loras") { return "LoraLoader"; }
-    else if (modelType === "style_models") { return "StyleModelLoader"; }
-    else if (modelType === "unet") { return "UNETLoader"; }
-    else if (modelType === "upscale_models") { return "UpscaleModelLoader"; }
-    else if (modelType === "vae") { return "VAELoader"; }
-    else if (modelType === "vae_approx") { return undefined; }
-    else {
-        //console.warn(`ModelType ${modelType} unrecognized.`);
-        return undefined;
-    }
-}
+const modelNodeType = {
+    "checkpoints": "CheckpointLoaderSimple",
+    "clip": "CLIPLoader",
+    "clip_vision": "CLIPVisionLoader",
+    "controlnet": "ControlNetLoader",
+    "diffusers": "DiffusersLoader",
+    "embeddings": "Embedding",
+    "gligen": "GLIGENLoader",
+    "hypernetworks": "HypernetworkLoader",
+    "loras": "LoraLoader",
+    "style_models": "StyleModelLoader",
+    "unet": "UNETLoader",
+    "upscale_models": "UpscaleModelLoader",
+    "vae": "VAELoader",
+    "vae_approx": undefined,
+};
 
 function modelWidgetIndex(nodeType) {
     return 0;
@@ -246,6 +242,8 @@ class SourceList {
                 .toLowerCase())
             .filter(Boolean);
 
+        // TODO: handle /directory keywords seperately/differently
+
         let fields = ["type", "name", "base", "description"];
         const regexSHA256 = /^[a-f0-9]{64}$/gi;
         const newList = list.filter((element) => {
@@ -310,7 +308,7 @@ class ModelGrid {
     static #addModel(event, modelType, path, removeEmbeddingExtension, addOffset) {
         let success = false;
         if (modelType !== "embeddings") {
-            const nodeType = modelNodeType(modelType);
+            const nodeType = modelNodeType[modelType];
             const widgetIndex = modelWidgetIndex(nodeType);
             let node = LiteGraph.createNode(nodeType, null, []);
             if (node) {
@@ -359,7 +357,7 @@ class ModelGrid {
     static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictDragToAdd) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
-            const nodeType = modelNodeType(modelType);
+            const nodeType = modelNodeType[modelType];
             const widgetIndex = modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
@@ -400,7 +398,7 @@ class ModelGrid {
     }
 
     static #copyModelToClipboard(event, modelType, path, removeEmbeddingExtension) {
-        const nodeType = modelNodeType(modelType);
+        const nodeType = modelNodeType[modelType];
         let success = false;
         if (nodeType === "Embedding") {
             if (navigator.clipboard){
@@ -429,7 +427,7 @@ class ModelGrid {
     static generateInnerHtml(models, modelType, settingsElements) {
         // TODO: seperate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
-        const canShowButtons = modelNodeType(modelType) !== undefined;
+        const canShowButtons = modelNodeType[modelType] !== undefined;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
         const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
@@ -550,6 +548,7 @@ class ModelManager extends ComfyDialog {
             "sidebar-default-height": null,
             "sidebar-default-width": null,
             "model-search-always-append": null,
+            "model-persistent-search": null,
             "model-show-label-extensions": null,
             "model-show-add-button": null,
             "model-show-copy-button": null,
@@ -563,7 +562,8 @@ class ModelManager extends ComfyDialog {
         sources: [],
         models: {},
         modelDirectories: null,
-        previousModelDirectoryFilter: "",
+        prevousModelFilters: [],
+        prevousModelType: undefined,
     };
 
     /** @type {SourceList} */
@@ -812,6 +812,24 @@ class ModelManager extends ComfyDialog {
             modelType = "checkpoints"; // TODO: magic value
         }
 
+        const prevousModelType = this.#el.prevousModelType;
+        if (modelType !== prevousModelType) {
+            const modelFilter = this.#el.modelContentFilter;
+            const filterText = modelFilter.value;
+            if (this.#el.settings["model-persistent-search"].checked) {
+                this.#data.prevousModelFilters = [];
+            }
+            else {
+                const prevousModelFilters = this.#data.prevousModelFilters;
+                // cache previous filter text
+                prevousModelFilters[prevousModelType] = filterText;
+                // read cached filter text
+                modelFilter.value = prevousModelFilters[modelType] ?? "";
+            }
+            this.#el.prevousModelType = modelType;
+            this.#updateSearchDropdown();
+        }
+
         let modelTypeOptions = [];
         for (const [key, value] of Object.entries(models)) {
             const el = $el("option", [key]);
@@ -974,7 +992,7 @@ class ModelManager extends ComfyDialog {
             $el("h2", ["Model Search"]),
             $el("div", [
                 $el("div.search-settings-text", [
-                    $el("p", ["Always append to model search:"]),
+                    $el("p", ["Always include in model search:"]),
                     $el("textarea.comfy-multiline-input", {
                         $: (el) => (this.#el.settings["model-search-always-append"] = el),
                         placeholder: "example: -nsfw",
@@ -983,10 +1001,17 @@ class ModelManager extends ComfyDialog {
             ]),
             $el("div", [
                 $el("input", {
+                    $: (el) => (this.#el.settings["model-persistent-search"] = el),
+                    type: "checkbox",
+                }),
+                $el("p", ["Search text persistent across model types"]),
+            ]),
+            $el("div", [
+                $el("input", {
                     $: (el) => (this.#el.settings["model-show-label-extensions"] = el),
                     type: "checkbox",
                 }),
-                $el("p", ["Show extensions in models tab"]),
+                $el("p", ["Show model file extension in labels"]),
             ]),
             $el("div", [
                 $el("input", {
@@ -1018,12 +1043,12 @@ class ModelManager extends ComfyDialog {
                 $el("p", ["Strict dragging model onto a node's model field to add"]),
             ]),
             $el("div", [
-                $el("p", ["Add model offset"]),
                 $el("input", {
                     $: (el) => (this.#el.settings["model-add-offset"] = el),
                     type: "number",
                     step: 5,
                 }),
+                $el("p", ["Add model offset"]),
             ]),
         ]);
         this.#el.settingsTab = settingsTab;
@@ -1074,11 +1099,12 @@ class ModelManager extends ComfyDialog {
     }
 
     async #updateSearchDropdown() {
-        const directories = this.#data.modelDirectories;
-        const previousFilter = this.#data.previousModelDirectoryFilter;
+        const modelType = this.#el.modelTypeSelect.value;
         const searchDropdown = this.#el.modelDirectorySearchOptions;
         const filter = this.#el.modelContentFilter.value;
-        const modelType = this.#el.modelTypeSelect.value;
+
+        const directories = this.#data.modelDirectories;
+        const previousFilter = this.#data.prevousModelFilters[modelType];
 
         if (previousFilter !== filter) {
             let options = [];
@@ -1134,7 +1160,7 @@ class ModelManager extends ComfyDialog {
             searchDropdown.style.display = options.length === 0 ? "none" : "block";
         }
 
-        this.#data.previousModelDirectoryFilter = filter;
+        this.#data.prevousModelFilters[modelType] = filter;
     }
 }
 

@@ -109,6 +109,7 @@ def ui_rules():
         Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
         Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
         Rule("model-search-always-append", "", str),
+        Rule("model-persistent-search", True, bool),
         Rule("model-show-label-extensions", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
