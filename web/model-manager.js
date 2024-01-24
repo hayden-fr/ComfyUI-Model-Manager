@@ -780,14 +780,7 @@ class ModelManager extends ComfyDialog {
                             placeholder: "example: /0/1.5/styles/clothing -.pt",
                             onkeyup: (e) => e.key === "Enter" && this.#modelGridUpdate(),
                             oninput: () => this.#updateSearchDropdown(),
-                            onfocus: () => {
-                                if (searchDropdown.innerHTML === "") {
-                                    searchDropdown.style.display = "none";
-                                }
-                                else {
-                                    searchDropdown.style.display = "block";
-                                }
-                            },
+                            onfocus: () => this.#updateSearchDropdown(),
                             onblur: () => { searchDropdown.style.display = "none"; },
                         }),
                         searchDropdown,
@@ -846,8 +839,6 @@ class ModelManager extends ComfyDialog {
         modelGrid.innerHTML = "";
         const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
         modelGrid.append.apply(modelGrid, modelGridModels);
-
-        this.#updateSearchDropdown(true);
     }
 
     async #modelGridRefresh() {
@@ -1005,7 +996,7 @@ class ModelManager extends ComfyDialog {
                     $: (el) => (this.#el.settings["model-persistent-search"] = el),
                     type: "checkbox",
                 }),
-                $el("p", ["Search text persistent across model types"]),
+                $el("p", ["Persistent search text across model types"]),
             ]),
             $el("div", [
                 $el("input", {
@@ -1099,54 +1090,52 @@ class ModelManager extends ComfyDialog {
         return [filterIndex0, cwd];
     }
 
-    async #updateSearchDropdown(setHidden = false) {
+    async #updateSearchDropdown() {
         const modelType = this.#el.modelTypeSelect.value;
         const searchDropdown = this.#el.modelDirectorySearchOptions;
         const filter = this.#el.modelContentFilter.value;
 
         const directories = this.#data.modelDirectories;
-        const previousFilter = this.#data.prevousModelFilters[modelType];
+        //const previousFilter = this.#data.prevousModelFilters[modelType];
 
-        if (previousFilter !== filter) {
-            let options = [];
-            const sep = "/";
-            if (filter[0] === sep) {
-                let initCwd = null;
-                const root = directories[0];
-                const rootChildIndex = root["childIndex"];
-                const rootChildCount = root["childCount"];
-                for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
-                    const modelDir = directories[i];
-                    if (modelDir["name"] === modelType) {
-                        initCwd = i;
-                        break;
+        let options = [];
+        const sep = "/";
+        if (filter[0] === sep) {
+            let initCwd = null;
+            const root = directories[0];
+            const rootChildIndex = root["childIndex"];
+            const rootChildCount = root["childCount"];
+            for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
+                const modelDir = directories[i];
+                if (modelDir["name"] === modelType) {
+                    initCwd = i;
+                    break;
+                }
+            }
+            const [filterIndex0, cwd] = this.#getFilterDirectory(
+                filter, 
+                directories, 
+                sep,
+                initCwd
+            );
+            if (cwd !== null) {
+                const lastWord = filter.substring(filterIndex0);
+                const item = directories[cwd];
+                if (item["childIndex"] !== undefined) {
+                    const childIndex = item["childIndex"];
+                    const childCount = item["childCount"];
+                    const items = directories.slice(childIndex, childIndex + childCount);
+                    for (let i = 0; i < items.length; i++) {
+                        const itemName = items[i]["name"];
+                        if (itemName.startsWith(lastWord)) {
+                            options.push(itemName);
+                        }
                     }
                 }
-                const [filterIndex0, cwd] = this.#getFilterDirectory(
-                    filter, 
-                    directories, 
-                    sep,
-                    initCwd
-                );
-                if (cwd !== null) {
-                    const lastWord = filter.substring(filterIndex0);
-                    const item = directories[cwd];
-                    if (item["childIndex"] !== undefined) {
-                        const childIndex = item["childIndex"];
-                        const childCount = item["childCount"];
-                        const items = directories.slice(childIndex, childIndex + childCount);
-                        for (let i = 0; i < items.length; i++) {
-                            const itemName = items[i]["name"];
-                            if (itemName.startsWith(lastWord)) {
-                                options.push(itemName);
-                            }
-                        }
-                    }
-                    else {
-                        const filename = item["name"];
-                        if (filename.startsWith(lastWord)) {
-                            options.push(filename);
-                        }
+                else {
+                    const filename = item["name"];
+                    if (filename.startsWith(lastWord)) {
+                        options.push(filename);
                     }
                 }
             }
@@ -1158,7 +1147,7 @@ class ModelManager extends ComfyDialog {
             });
             searchDropdown.innerHTML = "";
             searchDropdown.append.apply(searchDropdown, innerHtml);
-            searchDropdown.style.display = setHidden || options.length == 0 ? "none" : "block";
+            searchDropdown.style.display = options.length === 0 ? "none" : "block";
         }
 
         this.#data.prevousModelFilters[modelType] = filter;
