@@ -784,7 +784,9 @@ class ModelManager extends ComfyDialog {
                                     searchDropdown.style.display = "none";
                                     e.stopPropagation();
                                 }
-                                else if (e.key === "Escape") {
+                            },
+                            onkeydown: (e) => {
+                                if (e.key === "Escape") {
                                     e.target.blur();
                                     e.stopPropagation();
                                 }
