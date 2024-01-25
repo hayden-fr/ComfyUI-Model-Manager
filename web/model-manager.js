@@ -30,6 +30,7 @@ const modelNodeType = {
     "embeddings": "Embedding",
     "gligen": "GLIGENLoader",
     "hypernetworks": "HypernetworkLoader",
+    "photomaker": "PhotoMakerLoader",
     "loras": "LoraLoader",
     "style_models": "StyleModelLoader",
     "unet": "UNETLoader",
@@ -758,7 +759,7 @@ class ModelManager extends ComfyDialog {
             $: (el) => (this.#el.modelDirectorySearchOptions = el),
             style: { display: "none" },
         });
-        
+
         return [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
