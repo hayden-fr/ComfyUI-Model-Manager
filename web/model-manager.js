@@ -1050,10 +1050,11 @@ class ModelManager extends ComfyDialog {
 
     async #modelUpdateFilterDropdown() {
         const filter = this.#el.modelContentFilter.value;
+        const modelType = this.#el.modelTypeSelect.value;
         updateDirectorySuggestionDropdown(
             this.#el.modelDirectorySearchOptions,
             this.#data.modelDirectories,
-            this.#el.modelTypeSelect.value,
+            modelType,
             filter
         );
         this.#data.prevousModelFilters[modelType] = filter;
