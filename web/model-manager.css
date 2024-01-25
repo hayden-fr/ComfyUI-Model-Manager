@@ -362,7 +362,14 @@
 }
 
 .model-manager .search-dropdown > p {
-    margin-left: 20px;
+    margin: 0;
+    padding-left: 20px;
+    padding-top: 0.85em;
+    padding-bottom: 0.85em;
+}
+
+.model-manager .search-dropdown > p.search-dropdown-selected {
+    background-color: var(--border-color);
 }
 
 .model-manager .button-success {

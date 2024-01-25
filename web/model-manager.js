@@ -55,9 +55,8 @@ const modelNodeType = {
  * @param {string} modelType
  * @param {string} filter
  */
-function updateDirectorySuggestionDropdown(dropdown, directories, modelType, filter) {
+function updateDirectorySuggestionDropdown(dropdown, directories, modelType, filter, sep) {
     let options = [];
-    const sep = "/";
     if (filter[0] === sep) {
         let cwd = null;
         const root = directories[0];
@@ -134,7 +133,9 @@ function updateDirectorySuggestionDropdown(dropdown, directories, modelType, fil
         }
 
         const innerHtml = options.map((text) => {
-            return $el("p", [text]);
+            const p = $el("p", [text]);
+            //p.onclick = (e) => { console.log(e.target); }; // TODO: Click on dropdown elements when input gets blurred?
+            return p;
         });
         dropdown.innerHTML = "";
         dropdown.append.apply(dropdown, innerHtml);
@@ -709,43 +710,45 @@ function $radioGroup(attr) {
 
 class ModelManager extends ComfyDialog {
     #el = {
-        loadSourceBtn: null,
-        loadSourceFromInput: null,
-        sourceInstalledFilter: null,
-        sourceContentFilter: null,
-        sourceFilterBtn: null,
+        /** @type {HTMLButtonElement} */ loadSourceBtn: null,
+        /** @type {HTMLInputElement} */ loadSourceFromInput: null,
+        /** @type {HTMLSelectElement} */ sourceInstalledFilter: null,
+        /** @type {HTMLInputElement} */ sourceContentFilter: null,
 
-        modelGrid: null,
-        modelTypeSelect: null,
-        modelDirectorySearchOptions: null,
-        modelContentFilter: null,
+        /** @type {HTMLDivElement} */ modelGrid: null,
+        /** @type {HTMLSelectElement} */ modelTypeSelect: null,
+        /** @type {HTMLDivElement} */ modelDirectorySearchOptions: null,
+        /** @type {HTMLInputElement} */ modelContentFilter: null,
 
-        sidebarButtons: null,
+        /** @type {HTMLDivElement} */ sidebarButtons: null,
 
-        settingsTab: null,
-        reloadSettingsBtn: null,
-        saveSettingsBtn: null,
+        /** @type {HTMLDivElement} */ settingsTab: null,
+        /** @type {HTMLButtonElement} */ reloadSettingsBtn: null,
+        /** @type {HTMLButtonElement} */ saveSettingsBtn: null,
         settings: {
-            "sidebar-default-height": null,
-            "sidebar-default-width": null,
-            "model-search-always-append": null,
-            "model-persistent-search": null,
-            "model-show-label-extensions": null,
-            "model-show-add-button": null,
-            "model-show-copy-button": null,
-            "model-add-embedding-extension": null,
-            "model-add-drag-strict-on-field": null,
-            "model-add-offset": null,
+            //"sidebar-default-height": null,
+            //"sidebar-default-width": null,
+            /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
+            /** @type {HTMLInputElement} */ "model-persistent-search": null,
+            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
+            /** @type {HTMLInputElement} */ "model-show-add-button": null,
+            /** @type {HTMLInputElement} */ "model-show-copy-button": null,
+            /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
+            /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
+            /** @type {HTMLInputElement} */ "model-add-offset": null,
         }
     };
 
     #data = {
-        sources: [],
-        models: {},
-        modelDirectories: null,
-        prevousModelFilters: [],
-        prevousModelType: undefined,
+        /** @type {Array} */ sources: [],
+        /** @type {Object} */ models: {},
+        /** @type {{name: string, childCount: ?int, childIndex: ?int}[]} */ modelDirectories: null,
+        /** @type {Array} */ prevousModelFilters: [],
+        /** @type {string} */ prevousModelType: undefined,
     };
+
+    /** @type {string} */
+    sep = "/";
 
     /** @type {SourceList} */
     #sourceList = null;
@@ -830,7 +833,7 @@ class ModelManager extends ComfyDialog {
                     $el("input.search-text-area", {
                         $: (el) => (this.#el.sourceContentFilter = el),
                         placeholder: "example: \"sd_xl\" -vae",
-                        onkeyup: (e) => e.key === "Enter" && this.#filterSourceList(),
+                        onkeydown: (e) => e.key === "Enter" && this.#filterSourceList(),
                     }),
                     $el("select",
                         {
@@ -938,16 +941,19 @@ class ModelManager extends ComfyDialog {
     }
 
     /**
-     * @returns {HTMLElement}
+     * @returns {HTMLElement[]}
      */
     #createModelTabHtml() {
+        /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.#el.modelGrid = modelGrid;
 
+        /** @type {HTMLDivElement} */
         const searchDropdown = $el("div.search-dropdown", {
             $: (el) => (this.#el.modelDirectorySearchOptions = el),
             style: { display: "none" },
         });
+        const dropdownSelectClass = "search-dropdown-selected";
 
         return [
             $el("div.row.tab-header", [
@@ -968,17 +974,71 @@ class ModelManager extends ComfyDialog {
                         $el("input.search-text-area", {
                             $: (el) => (this.#el.modelContentFilter = el),
                             placeholder: "example: /0/1.5/styles/clothing -.pt",
-                            onkeyup: (e) => {
-                                if (e.key === "Enter") {
+                            onkeydown: (e) => {
+                                const children = searchDropdown.children;
+                                let iChild;
+                                for (iChild = 0; iChild < children.length; iChild++) {
+                                    const child = children[iChild];
+                                    if (child.classList.contains(dropdownSelectClass)) {
+                                        break;
+                                    }
+                                }
+                                if (e.key === "Escape") {
+                                    e.stopPropagation();
+                                    if (iChild < children.length) {
+                                        const child = children[iChild];
+                                        child.classList.remove(dropdownSelectClass);
+                                    }
+                                    else {
+                                        e.target.blur();
+                                    }
+                                }
+                                else if (e.key === "Enter") {
+                                    e.stopPropagation();
+                                    if (iChild < children.length) {
+                                        const child = children[iChild];
+                                        child.classList.remove(dropdownSelectClass);
+                                        const selectedText = child.innerText;
+                                        const filterText = e.target.value;
+                                        const iSep = filterText.lastIndexOf(this.sep);
+                                        const previousPath = filterText.substring(0, iSep + 1);
+                                        e.target.value = previousPath + selectedText;
+                                        this.#modelUpdateFilterDropdown();
+                                    }
                                     this.#modelGridUpdate();
                                     searchDropdown.style.display = "none";
-                                    e.stopPropagation();
                                 }
-                            },
-                            onkeydown: (e) => {
-                                if (e.key === "Escape") {
-                                    e.target.blur();
+                                else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                     e.stopPropagation();
+                                    let iNext = children.length;
+                                    if (iChild < children.length) {
+                                        const child = children[iChild];
+                                        child.classList.remove(dropdownSelectClass);
+                                        const delta = e.key === "ArrowDown" ? 1 : -1;
+                                        iNext = iChild + delta;
+                                        if (0 <= iNext && iNext < children.length) {
+                                            const nextChild = children[iNext];
+                                            nextChild.classList.add(dropdownSelectClass);
+                                        }
+                                    }
+                                    else if (iChild === children.length) {
+                                        iNext = e.key === "ArrowDown" ? 0 : children.length-1;
+                                        const nextChild = children[iNext]
+                                        nextChild.classList.add(dropdownSelectClass);
+                                    }
+                                    if (0 <= iNext && iNext < children.length) {
+                                        let scrollTop = searchDropdown.scrollTop;
+                                        const dropdownHeight = searchDropdown.offsetHeight;
+                                        const child = children[iNext];
+                                        const childHeight = child.offsetHeight;
+                                        const childTop = child.offsetTop;
+                                        scrollTop = Math.max(scrollTop, childTop - dropdownHeight + childHeight);
+                                        scrollTop = Math.min(scrollTop, childTop);
+                                        searchDropdown.scrollTop = scrollTop;
+                                    }
+                                    else {
+                                        searchDropdown.scrollTop = 0;
+                                    }
                                 }
                             },
                             oninput: () => this.#modelUpdateFilterDropdown(),
@@ -1055,7 +1115,8 @@ class ModelManager extends ComfyDialog {
             this.#el.modelDirectorySearchOptions,
             this.#data.modelDirectories,
             modelType,
-            filter
+            filter,
+            this.sep
         );
         this.#data.prevousModelFilters[modelType] = filter;
     }
