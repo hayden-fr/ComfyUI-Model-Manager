@@ -975,6 +975,7 @@ class ModelManager extends ComfyDialog {
                             $: (el) => (this.#el.modelContentFilter = el),
                             placeholder: "example: /0/1.5/styles/clothing -.pt",
                             onkeydown: (e) => {
+                                if (searchDropdown.style.display === "none") { return; }
                                 const children = searchDropdown.children;
                                 let iChild;
                                 for (iChild = 0; iChild < children.length; iChild++) {
@@ -1006,7 +1007,7 @@ class ModelManager extends ComfyDialog {
                                         this.#modelUpdateFilterDropdown();
                                     }
                                     this.#modelGridUpdate();
-                                    searchDropdown.style.display = "none";
+                                    e.target.blur();
                                 }
                                 else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                     e.stopPropagation();
