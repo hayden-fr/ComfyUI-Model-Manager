@@ -975,7 +975,6 @@ class ModelManager extends ComfyDialog {
                             $: (el) => (this.#el.modelContentFilter = el),
                             placeholder: "example: /0/1.5/styles/clothing -.pt",
                             onkeydown: (e) => {
-                                if (searchDropdown.style.display === "none") { return; }
                                 const children = searchDropdown.children;
                                 let iChild;
                                 for (iChild = 0; iChild < children.length; iChild++) {
@@ -1039,6 +1038,13 @@ class ModelManager extends ComfyDialog {
                                     }
                                     else {
                                         searchDropdown.scrollTop = 0;
+                                        const children = searchDropdown.children;
+                                        for (iChild = 0; iChild < children.length; iChild++) {
+                                            const child = children[iChild];
+                                            if (child.classList.contains(dropdownSelectClass)) {
+                                                child.classList.remove(dropdownSelectClass);
+                                            }
+                                        }
                                     }
                                 }
                             },
