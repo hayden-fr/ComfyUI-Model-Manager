@@ -1161,6 +1161,9 @@ class ModelManager extends ComfyDialog {
             searchDropdown.append.apply(searchDropdown, innerHtml);
             searchDropdown.style.display = options.length === 0 ? "none" : "block";
         }
+        else {
+            searchDropdown.style.display = "none";
+        }
 
         this.#data.prevousModelFilters[modelType] = filter;
     }
