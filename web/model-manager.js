@@ -2,6 +2,11 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 
+/**
+ * @param {Function} callback
+ * @param {number | undefined} delay
+ * @returns {Function}
+ */
 function debounce(callback, delay) {
     let timeoutId = null;
     return (...args) => {
@@ -12,6 +17,11 @@ function debounce(callback, delay) {
     };
 }
 
+/**
+ * @param {string} url
+ * @param {any} options
+ * @returns {Promise}
+ */
 function request(url, options) {
     return new Promise((resolve, reject) => {
         api.fetchApi(url, options)
@@ -39,15 +49,123 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
+/**
+ * @param {HTMLDivElement} dropdown
+ * @param {Array.<{name: string, childCount: ?int, childIndex: ?int}>} directories
+ * @param {string} modelType
+ * @param {string} filter
+ */
+function updateDirectorySuggestionDropdown(dropdown, directories, modelType, filter) {
+    let options = [];
+    const sep = "/";
+    if (filter[0] === sep) {
+        let cwd = null;
+        const root = directories[0];
+        const rootChildIndex = root["childIndex"];
+        const rootChildCount = root["childCount"];
+        for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
+            const modelDir = directories[i];
+            if (modelDir["name"] === modelType) {
+                cwd = i;
+                break;
+            }
+        }
+
+        // TODO: directories === undefined
+        let filterIndex0 = 1;
+        while (true) {
+            const filterIndex1 = filter.indexOf(sep, filterIndex0);
+            if (filterIndex1 === -1) {
+                // end of filter
+                break;
+            }
+
+            const item = directories[cwd];
+            if (item["childCount"] === undefined) {
+                // file
+                break;
+            }
+
+            const childCount = item["childCount"];
+            if (childCount === 0) {
+                // directory is empty
+                break;
+            }
+            const childIndex = item["childIndex"];
+            const items = directories.slice(childIndex, childIndex + childCount);
+
+            const word = filter.substring(filterIndex0, filterIndex1);
+            cwd = null;
+            for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
+                const itemName = items[itemIndex]["name"];
+                if (itemName === word) {
+                    // directory exists
+                    cwd = childIndex + itemIndex;
+                    break;
+                }
+            }
+            if (cwd === null) {
+                // directory does not exist
+                break;
+            }
+            filterIndex0 = filterIndex1 + 1;
+        }
+
+        if (cwd !== null) {
+            const lastWord = filter.substring(filterIndex0);
+            const item = directories[cwd];
+            if (item["childIndex"] !== undefined) {
+                const childIndex = item["childIndex"];
+                const childCount = item["childCount"];
+                const items = directories.slice(childIndex, childIndex + childCount);
+                for (let i = 0; i < items.length; i++) {
+                    const itemName = items[i]["name"];
+                    if (itemName.startsWith(lastWord)) {
+                        options.push(itemName);
+                    }
+                }
+            }
+            else {
+                const filename = item["name"];
+                if (filename.startsWith(lastWord)) {
+                    options.push(filename);
+                }
+            }
+        }
+
+        const innerHtml = options.map((text) => {
+            return $el("p", [text]);
+        });
+        dropdown.innerHTML = "";
+        dropdown.append.apply(dropdown, innerHtml);
+        dropdown.style.display = options.length === 0 ? "none" : "block";
+    }
+    else {
+        dropdown.style.display = "none";
+    }
+}
+
+/**
+ * @param {string} nodeType
+ * @returns {int}
+ */
 function modelWidgetIndex(nodeType) {
     return 0;
 }
 
+/**
+ * @param {string} path
+ * @returns {string}
+ */
 function pathToFileString(path) {
     const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
     return path.slice(i);
 }
 
+/**
+ * @param {string} file
+ * @returns {string | undefined}
+ */
 function removeModelExtension(file) {
     // This is a bit sloppy (can assume server sends without)
     const i = file.lastIndexOf(".");
@@ -56,6 +174,12 @@ function removeModelExtension(file) {
     }
 }
 
+/**
+ * @param {string} text
+ * @param {string} file
+ * @param {boolean} removeExtension
+ * @returns {string}
+ */
 function insertEmbeddingIntoText(text, file, removeExtension) {
     let name = file;
     if (removeExtension) {
@@ -65,6 +189,13 @@ function insertEmbeddingIntoText(text, file, removeExtension) {
     return text + sep + "(embedding:" +  name  + ":1.0)";
 }
 
+/**
+ * @param {HTMLButtonElement} element
+ * @param {boolean} success
+ * @param {string} [successText=""]
+ * @param {string} [failureText=""]
+ * @param {string} [resetText=""]
+ */
 function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
     const name = success ? "button-success" : "button-failure";
     element.classList.add(name);
@@ -87,7 +218,7 @@ class Tabs {
     #body = {};
 
     /**
-     * @param {Array<HTMLDivElement>} tabs
+     * @param {HTMLDivElement[]} tabs
      */
     constructor(tabs) {
         const head = [];
@@ -123,6 +254,9 @@ class Tabs {
 
     #active = undefined;
 
+    /**
+     * @param {string} name
+     */
     active(name) {
         this.#active = name;
         Object.keys(this.#head).forEach((key) => {
@@ -138,8 +272,8 @@ class Tabs {
 }
 
 /**
- * @param {Record<string, any>} option
- * @param {Array<HTMLDivElement>} tabs
+ * @param {Record<HTMLDivElement, Any>} tabs
+ * @returns {HTMLDivElement[]}
  */
 function $tabs(tabs) {
     const instance = new Tabs(tabs);
@@ -148,7 +282,7 @@ function $tabs(tabs) {
 
 /**
  * @param {string} name
- * @param {Array<HTMLDivElement>} el
+ * @param {HTMLDivElement[]} el
  * @returns {HTMLDivElement}
  */
 function $tab(name, el) {
@@ -165,17 +299,17 @@ class SourceList {
      * @prop {Function} render
      */
 
-    /** @type {Array<Column>} */
+    /** @type {Column[]} */
     #columns = [];
 
-    /** @type {Array<Record<string, any>>} */
+    /** @type {Record<string, any>[]} */
     #dataSource = [];
 
     /** @type {HTMLDivElement} */
     #tbody = null;
 
     /**
-     * @param {Array<Column>} columns
+     * @param {Column[]} columns
      */
     constructor(columns) {
         this.#columns = columns;
@@ -203,11 +337,17 @@ class SourceList {
         ]);
     }
 
+    /**
+     * @param {Array} dataSource
+     */
     setData(dataSource) {
         this.#dataSource = dataSource;
         this.#updateList();
     }
 
+    /**
+     * @returns {Array}
+     */
     getData() {
         return this.#dataSource;
     }
@@ -232,8 +372,13 @@ class SourceList {
         );
     }
 
+    /**
+     * @param {Array} list
+     * @param {string} searchString
+     * @param {string} installedType
+     */
     filterList(list, searchString, installedType) {
-        /** @type {Array<string>} */
+        /** @type {string[]} */
         const keywords = searchString
             .replace("*", " ")
             .split(/(-?".*?"|[^\s"]+)+/g)
@@ -275,8 +420,13 @@ class SourceList {
 }
 
 class ModelGrid {
+    /**
+     * @param {Array} list
+     * @param {string} searchString
+     * @returns {Array}
+     */
     static filter(list, searchString) {
-        /** @type {Array<string>} */
+        /** @type {string[]} */
         const keywords = searchString
             .replace("*", " ")
             .split(/(-?".*?"|[^\s"]+)+/g)
@@ -306,6 +456,13 @@ class ModelGrid {
         });
     }
 
+    /**
+     * @param {Event} event
+     * @param {string} modelType
+     * @param {string} path
+     * @param {boolean} removeEmbeddingExtension
+     * @param {int} addOffset
+     */
     static #addModel(event, modelType, path, removeEmbeddingExtension, addOffset) {
         let success = false;
         if (modelType !== "embeddings") {
@@ -355,6 +512,13 @@ class ModelGrid {
         buttonAlert(event.target, success, "✔", "✖", "✚");
     }
 
+    /**
+     * @param {Event} event
+     * @param {string} modelType
+     * @param {string} path
+     * @param {boolean} removeEmbeddingExtension
+     * @param {boolean} strictDragToAdd
+     */
     static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictDragToAdd) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
@@ -398,6 +562,12 @@ class ModelGrid {
         }
     }
 
+    /**
+     * @param {Event} event
+     * @param {string} modelType
+     * @param {string} path
+     * @param {boolean} removeEmbeddingExtension
+     */
     static #copyModelToClipboard(event, modelType, path, removeEmbeddingExtension) {
         const nodeType = modelNodeType[modelType];
         let success = false;
@@ -425,6 +595,12 @@ class ModelGrid {
         buttonAlert(event.target, success, "✔", "✖", "⧉︎");
     }
 
+    /**
+     * @param {Array} models
+     * @param {string} modelType
+     * @param {Object.<HTMLInputElement>} settingsElements
+     * @returns {HTMLElement[]}
+     */
     static generateInnerHtml(models, modelType, settingsElements) {
         // TODO: seperate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
@@ -490,6 +666,10 @@ class ModelGrid {
     }
 }
 
+/**
+ * @param {Any} attr
+ * @returns {HTMLDivElement}
+ */
 function $radioGroup(attr) {
     const { name = Date.now(), onchange, options = [], $ } = attr;
 
@@ -627,6 +807,9 @@ class ModelManager extends ComfyDialog {
         this.#modelGridRefresh();
     }
 
+    /**
+     * @returns {HTMLDivElement[]}
+     */
     #createSourceInstall() {
         this.#createSourceList();
         return [
@@ -672,6 +855,9 @@ class ModelManager extends ComfyDialog {
         ];
     }
 
+    /**
+     * @returns {HTMLElement}
+     */
     #createSourceList() {
         const sourceList = new SourceList([
             {
@@ -751,6 +937,9 @@ class ModelManager extends ComfyDialog {
         );
     }
 
+    /**
+     * @returns {HTMLElement}
+     */
     #createModelTabHtml() {
         const modelGrid = $el("div.comfy-grid");
         this.#el.modelGrid = modelGrid;
@@ -792,8 +981,8 @@ class ModelManager extends ComfyDialog {
                                     e.stopPropagation();
                                 }
                             },
-                            oninput: () => this.#updateSearchDropdown(),
-                            onfocus: () => this.#updateSearchDropdown(),
+                            oninput: () => this.#modelUpdateFilterDropdown(),
+                            onfocus: () => this.#modelUpdateFilterDropdown(),
                             onblur: () => { searchDropdown.style.display = "none"; },
                         }),
                         searchDropdown,
@@ -859,12 +1048,28 @@ class ModelManager extends ComfyDialog {
         this.#modelGridUpdate();
     }
 
+    async #modelUpdateFilterDropdown() {
+        const filter = this.#el.modelContentFilter.value;
+        updateDirectorySuggestionDropdown(
+            this.#el.modelDirectorySearchOptions,
+            this.#data.modelDirectories,
+            this.#el.modelTypeSelect.value,
+            filter
+        );
+        this.#data.prevousModelFilters[modelType] = filter;
+    }
+
+    /**
+     * @param {Event} event 
+     */
     #setSidebar(event) {
         // TODO: settings["sidebar-default-width"]
         // TODO: settings["sidebar-default-height"]
         // TODO: draggable resize?
         const button = event.target;
+        const modelManager = this.element;
         const sidebarButtons = this.#el.sidebarButtons.children;
+
         let buttonIndex;
         for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
             if (sidebarButtons[buttonIndex] === button) {
@@ -872,7 +1077,6 @@ class ModelManager extends ComfyDialog {
             }
         }
 
-        const modelManager = this.element;
         const sidebarStates = ["sidebar-left", "sidebar-top", "sidebar-bottom", "sidebar-right"];
         let stateIndex;
         for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
@@ -889,6 +1093,10 @@ class ModelManager extends ComfyDialog {
         }
     }
 
+    /**
+     * @param {HTMLInputElement[]} settings 
+     * @param {boolean} reloadData 
+     */
     #setSettings(settings, reloadData) {
         const el = this.#el.settings;
         for (const [key, value] of Object.entries(settings)) {
@@ -912,6 +1120,9 @@ class ModelManager extends ComfyDialog {
         }
     }
 
+    /**
+     * @param {boolean} reloadData 
+     */
     async #reloadSettings(reloadData) {
         const data = await request("/model-manager/settings/load");
         const settings = data["settings"];
@@ -950,6 +1161,9 @@ class ModelManager extends ComfyDialog {
         buttonAlert(this.#el.saveSettingsBtn, success);
     }
 
+    /**
+     * @returns {HTMLElement[]}
+     */
     #createSettingsTabHtml() {
         const settingsTab = $el("div.model-manager-settings", [
             $el("h1", ["Settings"]),
@@ -1057,115 +1271,6 @@ class ModelManager extends ComfyDialog {
         ]);
         this.#el.settingsTab = settingsTab;
         return [settingsTab];
-    }
-
-    #getFilterDirectory(filter, directory, sep, cwd = 0) {
-        // TODO: directories === undefined
-        let filterIndex0 = 1;
-        while (true) {
-            const filterIndex1 = filter.indexOf(sep, filterIndex0);
-            if (filterIndex1 === -1) {
-                // end of filter
-                break;
-            }
-            
-            const item = directory[cwd];
-            if (item["childCount"] === undefined) {
-                // file
-                break;
-            }
-            
-            const childCount = item["childCount"];
-            if (childCount === 0) {
-                // directory is empty
-                break;
-            }
-            const childIndex = item["childIndex"];
-            const items = directory.slice(childIndex, childIndex + childCount);
-            
-            const word = filter.substring(filterIndex0, filterIndex1);
-            cwd = null;
-            for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-                const itemName = items[itemIndex]["name"];
-                if (itemName === word) {
-                    // directory exists
-                    cwd = childIndex + itemIndex;
-                    break;
-                }
-            }
-            if (cwd === null) {
-                // directory does not exist
-                break;
-            }
-            filterIndex0 = filterIndex1 + 1;
-        }
-        return [filterIndex0, cwd];
-    }
-
-    async #updateSearchDropdown() {
-        const modelType = this.#el.modelTypeSelect.value;
-        const searchDropdown = this.#el.modelDirectorySearchOptions;
-        const filter = this.#el.modelContentFilter.value;
-
-        const directories = this.#data.modelDirectories;
-        //const previousFilter = this.#data.prevousModelFilters[modelType];
-
-        let options = [];
-        const sep = "/";
-        if (filter[0] === sep) {
-            let initCwd = null;
-            const root = directories[0];
-            const rootChildIndex = root["childIndex"];
-            const rootChildCount = root["childCount"];
-            for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
-                const modelDir = directories[i];
-                if (modelDir["name"] === modelType) {
-                    initCwd = i;
-                    break;
-                }
-            }
-            const [filterIndex0, cwd] = this.#getFilterDirectory(
-                filter, 
-                directories, 
-                sep,
-                initCwd
-            );
-            if (cwd !== null) {
-                const lastWord = filter.substring(filterIndex0);
-                const item = directories[cwd];
-                if (item["childIndex"] !== undefined) {
-                    const childIndex = item["childIndex"];
-                    const childCount = item["childCount"];
-                    const items = directories.slice(childIndex, childIndex + childCount);
-                    for (let i = 0; i < items.length; i++) {
-                        const itemName = items[i]["name"];
-                        if (itemName.startsWith(lastWord)) {
-                            options.push(itemName);
-                        }
-                    }
-                }
-                else {
-                    const filename = item["name"];
-                    if (filename.startsWith(lastWord)) {
-                        options.push(filename);
-                    }
-                }
-            }
-
-            const innerHtml = options.map((text) => {
-                const el = document.createElement("p");
-                el.innerHTML = text;
-                return el;
-            });
-            searchDropdown.innerHTML = "";
-            searchDropdown.append.apply(searchDropdown, innerHtml);
-            searchDropdown.style.display = options.length === 0 ? "none" : "block";
-        }
-        else {
-            searchDropdown.style.display = "none";
-        }
-
-        this.#data.prevousModelFilters[modelType] = filter;
     }
 }
 
