@@ -49,13 +49,28 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
+const dropdownSelectClass = "search-dropdown-selected";
+
 /**
  * @param {HTMLDivElement} dropdown
  * @param {Array.<{name: string, childCount: ?int, childIndex: ?int}>} directories
  * @param {string} modelType
  * @param {string} filter
+ * @param {string} sep
+ * @param {HTMLInputElement} inputElement
+ * @param {Function} updateModelDropdown
+ * @param {Function} updateModelGrid
  */
-function updateDirectorySuggestionDropdown(dropdown, directories, modelType, filter, sep) {
+function updateDirectorySuggestionDropdown(
+    dropdown,
+    directories,
+    modelType,
+    filter,
+    sep,
+    inputElement,
+    updateModelDropdown,
+    updateModelGrid
+) {
     let options = [];
     if (filter[0] === sep) {
         let cwd = null;
@@ -131,10 +146,63 @@ function updateDirectorySuggestionDropdown(dropdown, directories, modelType, fil
                 }
             }
         }
+        
+        const setActiveMouseOver = (e) => {
+            const children = dropdown.children;
+            let iChild;
+            for (iChild = 0; iChild < children.length; iChild++) {
+                const child = children[iChild];
+                if (child.classList.contains(dropdownSelectClass)) {
+                    child.classList.remove(dropdownSelectClass);
+                }
+            }
+            e.target.classList.add(dropdownSelectClass);
+        };
+        
+        const onMouseEnter = (e) => {
+            e.stopPropagation();
+            setActiveMouseOver(e);
+        };
+
+        const onMouseMove = (e) => {
+            if (!e.target.classList.contains(dropdownSelectClass)) {
+                // assumes only one will ever selected at a time
+                e.stopPropagation();
+                setActiveMouseOver(e);
+            }
+        };
+
+        const onMouseLeave = (e) => {
+            e.stopPropagation();
+            e.target.classList.remove(dropdownSelectClass);
+        };
+
+        const onMouseDown = (e) => {
+            e.stopPropagation();
+            //e.target.classList.remove(dropdownSelectClass);
+            appendDropdownSelectionToInput(
+                inputElement,
+                e.target,
+                sep,
+                updateModelDropdown,
+                updateModelGrid
+            );
+        };
 
         const innerHtml = options.map((text) => {
-            const p = $el("p", [text]);
-            //p.onclick = (e) => { console.log(e.target); }; // TODO: Click on dropdown elements when input gets blurred?
+            /** @type {HTMLParagraphElement} */
+            const p = $el(
+                "p",
+                {
+                    onmouseenter: (e) => onMouseEnter(e),
+                    onmousemove: (e) => onMouseMove(e),
+                    onmouseleave: (e) => onMouseLeave(e),
+                    onmousedown: (e) => onMouseDown(e),
+                },
+                [
+                    text
+                ]
+            );
             return p;
         });
         dropdown.innerHTML = "";
@@ -144,6 +212,75 @@ function updateDirectorySuggestionDropdown(dropdown, directories, modelType, fil
     else {
         dropdown.style.display = "none";
     }
+}
+
+/**
+ * @param {HTMLInputElement} inputElement
+ * @param {HTMLParagraphElement} child
+ * @param {string} sep
+ * @param {Function} updateModelDropdown
+ * @param {Function} updateModelGrid
+ */
+function appendDropdownSelectionToInput(inputElement, child, sep, updateModelDropdown, updateModelGrid) {
+    if (child !== undefined && child !== null) {
+        child.classList.remove(dropdownSelectClass);
+        const selectedText = child.innerText;
+        const oldFilterText = inputElement.value;
+        const iSep = oldFilterText.lastIndexOf(sep);
+        const previousPath = oldFilterText.substring(0, iSep + 1);
+        const newFilterText = previousPath + selectedText;
+        
+        inputElement.value = newFilterText;
+        updateModelDropdown(); // TODO: should this be here?
+    }
+    updateModelGrid(); // TODO: GENERALIZATION -> this shouldn't be here
+    inputElement.blur();
+}
+
+/**
+ * @param {HTMLDivElement} modelGrid
+ * @param {Object} models
+ * @param {HTMLSelectElement} modelSelect
+ * @param {Object.<{value: string}>} previousModelType
+ * @param {Object} settings
+ * @param {Array} previousModelFilters
+ * @param {HTMLInputElement} modelFilter
+ */
+function updateModelGrid(modelGrid, models, modelSelect, previousModelType, settings, previousModelFilters, modelFilter) {
+    let modelType = modelSelect.value;
+    if (models[modelType] === undefined) {
+        modelType = "checkpoints"; // TODO: magic value
+    }
+
+    if (modelType !== previousModelType.value) {
+        if (settings["model-persistent-search"].checked) {
+            previousModelFilters.splice(0, previousModelFilters.length); // TODO: make sure this actually worked!
+        }
+        else {
+            // cache previous filter text
+            previousModelFilters[previousModelType.value] = modelFilter.value;
+            // read cached filter text
+            modelFilter.value = previousModelFilters[modelType] ?? "";
+        }
+        previousModelType.value = modelType;
+    }
+
+    let modelTypeOptions = [];
+    for (const [key, value] of Object.entries(models)) {
+        const el = $el("option", [key]);
+        modelTypeOptions.push(el);
+    }
+    modelSelect.innerHTML = "";
+    modelTypeOptions.forEach(option => modelSelect.add(option));
+    modelSelect.value = modelType;
+
+    const searchAppend = settings["model-search-always-append"].value;
+    const searchText = modelFilter.value + " " + searchAppend;
+    const modelList = ModelGrid.filter(models[modelType], searchText);
+
+    modelGrid.innerHTML = "";
+    const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, settings);
+    modelGrid.append.apply(modelGrid, modelGridModels);
 }
 
 /**
@@ -433,7 +570,7 @@ class ModelGrid {
             .split(/(-?".*?"|[^\s"]+)+/g)
             .map((item) => item
                 .trim()
-                .replace(/(?:'|")+/g, "")
+                .replace(/(?:")+/g, "")
                 .toLowerCase())
             .filter(Boolean);
 
@@ -743,8 +880,8 @@ class ModelManager extends ComfyDialog {
         /** @type {Array} */ sources: [],
         /** @type {Object} */ models: {},
         /** @type {{name: string, childCount: ?int, childIndex: ?int}[]} */ modelDirectories: null,
-        /** @type {Array} */ prevousModelFilters: [],
-        /** @type {string} */ prevousModelType: undefined,
+        /** @type {Array} */ previousModelFilters: [],
+        /** @type {Object.<{value: string}>} */ previousModelType: { value: undefined },
     };
 
     /** @type {string} */
@@ -953,7 +1090,6 @@ class ModelManager extends ComfyDialog {
             $: (el) => (this.#el.modelDirectorySearchOptions = el),
             style: { display: "none" },
         });
-        const dropdownSelectClass = "search-dropdown-selected";
 
         return [
             $el("div.row.tab-header", [
@@ -995,18 +1131,13 @@ class ModelManager extends ComfyDialog {
                                 }
                                 else if (e.key === "Enter") {
                                     e.stopPropagation();
-                                    if (iChild < children.length) {
-                                        const child = children[iChild];
-                                        child.classList.remove(dropdownSelectClass);
-                                        const selectedText = child.innerText;
-                                        const filterText = e.target.value;
-                                        const iSep = filterText.lastIndexOf(this.sep);
-                                        const previousPath = filterText.substring(0, iSep + 1);
-                                        e.target.value = previousPath + selectedText;
-                                        this.#modelUpdateFilterDropdown();
-                                    }
-                                    this.#modelGridUpdate();
-                                    e.target.blur();
+                                    appendDropdownSelectionToInput(
+                                        e.target,
+                                        children[iChild],
+                                        this.sep,
+                                        this.#modelUpdateFilterDropdown,
+                                        this.#modelGridUpdate
+                                    );
                                 }
                                 else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                                     e.stopPropagation();
@@ -1065,49 +1196,15 @@ class ModelManager extends ComfyDialog {
         ];
     }
 
-    #modelGridUpdate() {
-        const models = this.#data.models;
-        const modelSelect = this.#el.modelTypeSelect;
-
-        let modelType = modelSelect.value;
-        if (models[modelType] === undefined) {
-            modelType = "checkpoints"; // TODO: magic value
-        }
-
-        const prevousModelType = this.#el.prevousModelType;
-        if (modelType !== prevousModelType) {
-            if (this.#el.settings["model-persistent-search"].checked) {
-                this.#data.prevousModelFilters = [];
-            }
-            else {
-                const modelFilter = this.#el.modelContentFilter;
-                const prevousModelFilters = this.#data.prevousModelFilters;
-                // cache previous filter text
-                prevousModelFilters[prevousModelType] = modelFilter.value;
-                // read cached filter text
-                modelFilter.value = prevousModelFilters[modelType] ?? "";
-            }
-            this.#el.prevousModelType = modelType;
-        }
-
-        let modelTypeOptions = [];
-        for (const [key, value] of Object.entries(models)) {
-            const el = $el("option", [key]);
-            modelTypeOptions.push(el);
-        }
-        modelSelect.innerHTML = "";
-        modelTypeOptions.forEach(option => modelSelect.add(option));
-        modelSelect.value = modelType;
-
-        const searchAppend = this.#el.settings["model-search-always-append"].value;
-        const searchText = this.#el.modelContentFilter.value + " " + searchAppend;
-        const modelList = ModelGrid.filter(models[modelType], searchText);
-
-        const modelGrid = this.#el.modelGrid;
-        modelGrid.innerHTML = "";
-        const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, this.#el.settings);
-        modelGrid.append.apply(modelGrid, modelGridModels);
-    }
+    #modelGridUpdate = () => updateModelGrid(
+        this.#el.modelGrid,
+        this.#data.models,
+        this.#el.modelTypeSelect,
+        this.#data.previousModelType,
+        this.#el.settings,
+        this.#data.previousModelFilters,
+        this.#el.modelContentFilter
+    );
 
     async #modelGridRefresh() {
         this.#data.models = await request("/model-manager/models");
@@ -1115,17 +1212,20 @@ class ModelManager extends ComfyDialog {
         this.#modelGridUpdate();
     }
 
-    async #modelUpdateFilterDropdown() {
-        const filter = this.#el.modelContentFilter.value;
+    #modelUpdateFilterDropdown = () => {
         const modelType = this.#el.modelTypeSelect.value;
+        const filter = this.#el.modelContentFilter.value;
         updateDirectorySuggestionDropdown(
             this.#el.modelDirectorySearchOptions,
             this.#data.modelDirectories,
             modelType,
             filter,
-            this.sep
+            this.sep,
+            this.#el.modelContentFilter,
+            this.#modelUpdateFilterDropdown,
+            this.#modelGridUpdate,
         );
-        this.#data.prevousModelFilters[modelType] = filter;
+        this.#data.previousModelFilters[modelType] = filter;
     }
 
     /**
