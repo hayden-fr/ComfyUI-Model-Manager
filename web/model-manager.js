@@ -252,7 +252,7 @@ class DirectoryDropdown {
 
         const selection_select = (e) => {
             const selection = e.target;
-            if (e.movementX === 0 && e.movementY === 0) { return ; }
+            if (e.movementX === 0 && e.movementY === 0) { return; }
             if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
                 // assumes only one will ever selected at a time
                 e.stopPropagation();
@@ -1411,7 +1411,7 @@ class ModelManager extends ComfyDialog {
             ]),
         ]);
         this.#el.settingsTab = settingsTab;
-        return [settingsTab];
+        return settingsTab;
     }
 
     /**
