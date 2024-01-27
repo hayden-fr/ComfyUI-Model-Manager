@@ -49,30 +49,127 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
-const dropdownSelectClass = "search-dropdown-selected";
+const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
 
 /**
- * @param {HTMLDivElement} dropdown
- * @param {Array.<{name: string, childCount: ?int, childIndex: ?int}>} directories
- * @param {string} modelType
- * @param {string} filter
- * @param {string} sep
- * @param {HTMLInputElement} inputElement
- * @param {Function} updateModelDropdown
- * @param {Function} updateModelGrid
+ * @typedef {Object} DirectoryItem
+ * @param {string} name
+ * @param {number | undefined} childCount
+ * @param {number | undefined} childIndex
  */
-function updateDirectorySuggestionDropdown(
-    dropdown,
-    directories,
-    modelType,
-    filter,
-    sep,
-    inputElement,
-    updateModelDropdown,
-    updateModelGrid
-) {
-    let options = [];
-    if (filter[0] === sep) {
+
+class DirectoryDropdown {
+    /** @type {HTMLDivElement} */
+    element = undefined;
+
+    /** @type {HTMLInputElement} */
+    #input = undefined;
+
+    /** @type {Function} */
+    #submitSearch = null;
+
+    /**
+     * @param {HTMLInputElement} input
+     * @param {Function} updateDropdown
+     * @param {Function} submitSearch
+     */
+    constructor(input, updateDropdown, submitSearch) {
+        /** @type {HTMLDivElement} */
+        const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
+            style: { display: "none" },
+        });
+        this.element = dropdown;
+        this.#input = input;
+        this.#submitSearch = submitSearch;
+
+        input.addEventListener("input", () => updateDropdown());
+        input.addEventListener("focus", () => updateDropdown());
+        input.addEventListener("blur", () => { dropdown.style.display = "none"; });
+        input.addEventListener(
+            "keydown",
+            (e) => {
+                const children = dropdown.children;
+                let iChild;
+                for (iChild = 0; iChild < children.length; iChild++) {
+                    const child = children[iChild];
+                    if (child.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                        break;
+                    }
+                }
+                if (e.key === "Escape") {
+                    e.stopPropagation();
+                    if (iChild < children.length) {
+                        // remove select
+                        const child = children[iChild];
+                        child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    }
+                    else {
+                        e.target.blur();
+                    }
+                }
+                else if (e.key === "Enter") {
+                    e.stopPropagation();
+                    submitSearch(e.target, children[iChild]);
+                }
+                else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                    e.stopPropagation();
+                    let iNext = children.length;
+                    if (iChild < children.length) {
+                        const child = children[iChild];
+                        child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const delta = e.key === "ArrowDown" ? 1 : -1;
+                        iNext = iChild + delta;
+                        if (0 <= iNext && iNext < children.length) {
+                            const nextChild = children[iNext];
+                            nextChild.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        }
+                    }
+                    else if (iChild === children.length) {
+                        iNext = e.key === "ArrowDown" ? 0 : children.length-1;
+                        const nextChild = children[iNext]
+                        nextChild.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    }
+                    if (0 <= iNext && iNext < children.length) {
+                        let scrollTop = dropdown.scrollTop;
+                        const dropdownHeight = dropdown.offsetHeight;
+                        const child = children[iNext];
+                        const childHeight = child.offsetHeight;
+                        const childTop = child.offsetTop;
+                        scrollTop = Math.max(scrollTop, childTop - dropdownHeight + childHeight);
+                        scrollTop = Math.min(scrollTop, childTop);
+                        dropdown.scrollTop = scrollTop;
+                    }
+                    else {
+                        dropdown.scrollTop = 0;
+                        const children = dropdown.children;
+                        for (iChild = 0; iChild < children.length; iChild++) {
+                            const child = children[iChild];
+                            if (child.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                                child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                            }
+                        }
+                    }
+                }
+            },
+        );
+    }
+
+    /**
+     * @param {DirectoryItem[]} directories
+     * @param {string} modelType
+     * @param {string} sep
+     */
+    update(directories, modelType, sep) {
+        const dropdown = this.element;
+        const input = this.#input;
+        const submitSearch = this.#submitSearch;
+
+        const filter = input.value;
+        if (filter[0] !== sep) {
+            dropdown.style.display = "none";
+            return;
+        }
+
         let cwd = null;
         const root = directories[0];
         const rootChildIndex = root["childIndex"];
@@ -85,22 +182,21 @@ function updateDirectorySuggestionDropdown(
             }
         }
 
-        // TODO: directories === undefined
-        let filterIndex0 = 1;
+        // TODO: directories === undefined?
+        let indexLastWord = 1;
         while (true) {
-            const filterIndex1 = filter.indexOf(sep, filterIndex0);
-            if (filterIndex1 === -1) {
+            const indexNextWord = filter.indexOf(sep, indexLastWord);
+            if (indexNextWord === -1) {
                 // end of filter
                 break;
             }
 
             const item = directories[cwd];
-            if (item["childCount"] === undefined) {
+            const childCount = item["childCount"];
+            if (childCount === undefined) {
                 // file
                 break;
             }
-
-            const childCount = item["childCount"];
             if (childCount === 0) {
                 // directory is empty
                 break;
@@ -108,7 +204,7 @@ function updateDirectorySuggestionDropdown(
             const childIndex = item["childIndex"];
             const items = directories.slice(childIndex, childIndex + childCount);
 
-            const word = filter.substring(filterIndex0, filterIndex1);
+            const word = filter.substring(indexLastWord, indexNextWord);
             cwd = null;
             for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
                 const itemName = items[itemIndex]["name"];
@@ -122,82 +218,69 @@ function updateDirectorySuggestionDropdown(
                 // directory does not exist
                 break;
             }
-            filterIndex0 = filterIndex1 + 1;
+            indexLastWord = indexNextWord + 1;
+        }
+        if (cwd === null) {
+            dropdown.style.display = "none";
+            return;
         }
 
-        if (cwd !== null) {
-            const lastWord = filter.substring(filterIndex0);
-            const item = directories[cwd];
-            if (item["childIndex"] !== undefined) {
-                const childIndex = item["childIndex"];
-                const childCount = item["childCount"];
-                const items = directories.slice(childIndex, childIndex + childCount);
-                for (let i = 0; i < items.length; i++) {
-                    const itemName = items[i]["name"];
-                    if (itemName.startsWith(lastWord)) {
-                        options.push(itemName);
-                    }
-                }
-            }
-            else {
-                const filename = item["name"];
-                if (filename.startsWith(lastWord)) {
-                    options.push(filename);
+        let options = [];
+        const lastWord = filter.substring(indexLastWord);
+        const item = directories[cwd];
+        if (item["childIndex"] !== undefined) {
+            const childIndex = item["childIndex"];
+            const childCount = item["childCount"];
+            const items = directories.slice(childIndex, childIndex + childCount);
+            for (let i = 0; i < items.length; i++) {
+                const itemName = items[i]["name"];
+                if (itemName.startsWith(lastWord)) {
+                    options.push(itemName);
                 }
             }
         }
-        
-        const setActiveMouseOver = (e) => {
-            const children = dropdown.children;
-            let iChild;
-            for (iChild = 0; iChild < children.length; iChild++) {
-                const child = children[iChild];
-                if (child.classList.contains(dropdownSelectClass)) {
-                    child.classList.remove(dropdownSelectClass);
-                }
+        else {
+            const filename = item["name"];
+            if (filename.startsWith(lastWord)) {
+                options.push(filename);
             }
-            e.target.classList.add(dropdownSelectClass);
-        };
-        
-        const onMouseEnter = (e) => {
-            e.stopPropagation();
-            setActiveMouseOver(e);
-        };
+        }
+        if (options.length === 0) {
+            dropdown.style.display = "none";
+            return;
+        }
 
-        const onMouseMove = (e) => {
-            if (!e.target.classList.contains(dropdownSelectClass)) {
+        const selection_select = (e) => {
+            const selection = e.target;
+            if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
                 // assumes only one will ever selected at a time
                 e.stopPropagation();
-                setActiveMouseOver(e);
+                const children = dropdown.children;
+                let iChild;
+                for (iChild = 0; iChild < children.length; iChild++) {
+                    const child = children[iChild];
+                    child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                }
+                selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
             }
         };
-
-        const onMouseLeave = (e) => {
+        const selection_deselect = (e) => {
             e.stopPropagation();
-            e.target.classList.remove(dropdownSelectClass);
+            e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
         };
-
-        const onMouseDown = (e) => {
+        const selection_submit = (e) => {
             e.stopPropagation();
-            //e.target.classList.remove(dropdownSelectClass);
-            appendDropdownSelectionToInput(
-                inputElement,
-                e.target,
-                sep,
-                updateModelDropdown,
-                updateModelGrid
-            );
+            submitSearch(input, e.target);
         };
-
         const innerHtml = options.map((text) => {
             /** @type {HTMLParagraphElement} */
             const p = $el(
                 "p",
                 {
-                    onmouseenter: (e) => onMouseEnter(e),
-                    onmousemove: (e) => onMouseMove(e),
-                    onmouseleave: (e) => onMouseLeave(e),
-                    onmousedown: (e) => onMouseDown(e),
+                    onmouseenter: (e) => selection_select(e),
+                    onmousemove: (e) => selection_select(e),
+                    onmouseleave: (e) => selection_deselect(e),
+                    onmousedown: (e) => selection_submit(e),
                 },
                 [
                     text
@@ -207,80 +290,8 @@ function updateDirectorySuggestionDropdown(
         });
         dropdown.innerHTML = "";
         dropdown.append.apply(dropdown, innerHtml);
-        dropdown.style.display = options.length === 0 ? "none" : "block";
+        dropdown.style.display = "block";
     }
-    else {
-        dropdown.style.display = "none";
-    }
-}
-
-/**
- * @param {HTMLInputElement} inputElement
- * @param {HTMLParagraphElement} child
- * @param {string} sep
- * @param {Function} updateModelDropdown
- * @param {Function} updateModelGrid
- */
-function appendDropdownSelectionToInput(inputElement, child, sep, updateModelDropdown, updateModelGrid) {
-    if (child !== undefined && child !== null) {
-        child.classList.remove(dropdownSelectClass);
-        const selectedText = child.innerText;
-        const oldFilterText = inputElement.value;
-        const iSep = oldFilterText.lastIndexOf(sep);
-        const previousPath = oldFilterText.substring(0, iSep + 1);
-        const newFilterText = previousPath + selectedText;
-        
-        inputElement.value = newFilterText;
-        updateModelDropdown(); // TODO: should this be here?
-    }
-    updateModelGrid(); // TODO: GENERALIZATION -> this shouldn't be here
-    inputElement.blur();
-}
-
-/**
- * @param {HTMLDivElement} modelGrid
- * @param {Object} models
- * @param {HTMLSelectElement} modelSelect
- * @param {Object.<{value: string}>} previousModelType
- * @param {Object} settings
- * @param {Array} previousModelFilters
- * @param {HTMLInputElement} modelFilter
- */
-function updateModelGrid(modelGrid, models, modelSelect, previousModelType, settings, previousModelFilters, modelFilter) {
-    let modelType = modelSelect.value;
-    if (models[modelType] === undefined) {
-        modelType = "checkpoints"; // TODO: magic value
-    }
-
-    if (modelType !== previousModelType.value) {
-        if (settings["model-persistent-search"].checked) {
-            previousModelFilters.splice(0, previousModelFilters.length); // TODO: make sure this actually worked!
-        }
-        else {
-            // cache previous filter text
-            previousModelFilters[previousModelType.value] = modelFilter.value;
-            // read cached filter text
-            modelFilter.value = previousModelFilters[modelType] ?? "";
-        }
-        previousModelType.value = modelType;
-    }
-
-    let modelTypeOptions = [];
-    for (const [key, value] of Object.entries(models)) {
-        const el = $el("option", [key]);
-        modelTypeOptions.push(el);
-    }
-    modelSelect.innerHTML = "";
-    modelTypeOptions.forEach(option => modelSelect.add(option));
-    modelSelect.value = modelType;
-
-    const searchAppend = settings["model-search-always-append"].value;
-    const searchText = modelFilter.value + " " + searchAppend;
-    const modelList = ModelGrid.filter(models[modelType], searchText);
-
-    modelGrid.innerHTML = "";
-    const modelGridModels = ModelGrid.generateInnerHtml(modelList, modelType, settings);
-    modelGrid.append.apply(modelGrid, modelGridModels);
 }
 
 /**
@@ -563,7 +574,7 @@ class ModelGrid {
      * @param {string} searchString
      * @returns {Array}
      */
-    static filter(list, searchString) {
+    static #filter(list, searchString) {
         /** @type {string[]} */
         const keywords = searchString
             .replace("*", " ")
@@ -739,7 +750,7 @@ class ModelGrid {
      * @param {Object.<HTMLInputElement>} settingsElements
      * @returns {HTMLElement[]}
      */
-    static generateInnerHtml(models, modelType, settingsElements) {
+    static #generateInnerHtml(models, modelType, settingsElements) {
         // TODO: seperate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
@@ -802,6 +813,52 @@ class ModelGrid {
             return [$el("h2", ["No Models"])];
         }
     }
+
+    /**
+     * @param {HTMLDivElement} modelGrid
+     * @param {Object} models
+     * @param {HTMLSelectElement} modelSelect
+     * @param {Object.<{value: string}>} previousModelType
+     * @param {Object} settings
+     * @param {Array} previousModelFilters
+     * @param {HTMLInputElement} modelFilter
+     */
+    static update(modelGrid, models, modelSelect, previousModelType, settings, previousModelFilters, modelFilter) {
+        let modelType = modelSelect.value;
+        if (models[modelType] === undefined) {
+            modelType = "checkpoints"; // TODO: magic value
+        }
+
+        if (modelType !== previousModelType.value) {
+            if (settings["model-persistent-search"].checked) {
+                previousModelFilters.splice(0, previousModelFilters.length); // TODO: make sure this actually worked!
+            }
+            else {
+                // cache previous filter text
+                previousModelFilters[previousModelType.value] = modelFilter.value;
+                // read cached filter text
+                modelFilter.value = previousModelFilters[modelType] ?? "";
+            }
+            previousModelType.value = modelType;
+        }
+
+        let modelTypeOptions = [];
+        for (const [key, value] of Object.entries(models)) {
+            const el = $el("option", [key]);
+            modelTypeOptions.push(el);
+        }
+        modelSelect.innerHTML = "";
+        modelTypeOptions.forEach(option => modelSelect.add(option));
+        modelSelect.value = modelType;
+
+        const searchAppend = settings["model-search-always-append"].value;
+        const searchText = modelFilter.value + " " + searchAppend;
+        const modelList = ModelGrid.#filter(models[modelType], searchText);
+
+        modelGrid.innerHTML = "";
+        const modelGridModels = ModelGrid.#generateInnerHtml(modelList, modelType, settings);
+        modelGrid.append.apply(modelGrid, modelGridModels);
+    }
 }
 
 /**
@@ -854,14 +911,14 @@ class ModelManager extends ComfyDialog {
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
-        /** @type {HTMLDivElement} */ modelDirectorySearchOptions: null,
+        /** @type {HTMLDivElement} */ searchDirectoryDropdown: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
 
         /** @type {HTMLDivElement} */ sidebarButtons: null,
 
         /** @type {HTMLDivElement} */ settingsTab: null,
-        /** @type {HTMLButtonElement} */ reloadSettingsBtn: null,
-        /** @type {HTMLButtonElement} */ saveSettingsBtn: null,
+        /** @type {HTMLButtonElement} */ settings_reloadBtn: null,
+        /** @type {HTMLButtonElement} */ settings_saveBtn: null,
         settings: {
             //"sidebar-default-height": null,
             //"sidebar-default-width": null,
@@ -879,13 +936,13 @@ class ModelManager extends ComfyDialog {
     #data = {
         /** @type {Array} */ sources: [],
         /** @type {Object} */ models: {},
-        /** @type {{name: string, childCount: ?int, childIndex: ?int}[]} */ modelDirectories: null,
+        /** @type {DirectoryItem[]} */ modelDirectories: [],
         /** @type {Array} */ previousModelFilters: [],
         /** @type {Object.<{value: string}>} */ previousModelType: { value: undefined },
     };
 
     /** @type {string} */
-    sep = "/";
+    #sep = "/";
 
     /** @type {SourceList} */
     #sourceList = null;
@@ -931,8 +988,8 @@ class ModelManager extends ComfyDialog {
                     ),
                     $tabs([
                         $tab("Install", this.#createSourceInstall()),
-                        $tab("Models", this.#createModelTabHtml()),
-                        $tab("Settings", this.#createSettingsTabHtml()),
+                        $tab("Models", this.#modelTab_new()),
+                        $tab("Settings", [this.#settingsTab_new()]),
                     ]),
                 ]),
             ]
@@ -942,9 +999,9 @@ class ModelManager extends ComfyDialog {
     }
 
     #init() {
-        this.#reloadSettings(false);
+        this.#settingsTab_reload(false);
         this.#refreshSourceList();
-        this.#modelGridRefresh();
+        this.#modelTab_updateModels();
     }
 
     /**
@@ -1077,19 +1134,28 @@ class ModelManager extends ComfyDialog {
         );
     }
 
+    /** @type {DirectoryDropdown} */
+    #modelContentFilterDirectoryDropdown = null;
+
     /**
      * @returns {HTMLElement[]}
      */
-    #createModelTabHtml() {
+    #modelTab_new() {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.#el.modelGrid = modelGrid;
 
-        /** @type {HTMLDivElement} */
-        const searchDropdown = $el("div.search-dropdown", {
-            $: (el) => (this.#el.modelDirectorySearchOptions = el),
-            style: { display: "none" },
+        const searchInput = $el("input.search-text-area", {
+            $: (el) => (this.#el.modelContentFilter = el),
+            placeholder: "example: /0/1.5/styles/clothing -.pt",
         });
+
+        const searchDropdown = new DirectoryDropdown(
+            searchInput,
+            this.#modelTab_updateDirectoryDropdown,
+            this.#modelTab_submitSearch
+        );
+        this.#modelContentFilterDirectoryDropdown = searchDropdown;
 
         return [
             $el("div.row.tab-header", [
@@ -1097,98 +1163,23 @@ class ModelManager extends ComfyDialog {
                     $el("button.icon-button", {
                         type: "button",
                         textContent: "⟳",
-                        onclick: () => this.#modelGridRefresh(),
+                        onclick: () => this.#modelTab_updateModels(),
                     }),
                     $el("select.model-type-dropdown", {
                         $: (el) => (this.#el.modelTypeSelect = el),
                         name: "model-type",
-                        onchange: () => this.#modelGridUpdate(),
+                        onchange: () => this.#modelTab_updateModelGrid(),
                     }),
                 ]),
                 $el("div.row.tab-header-flex-block", [
                     $el("div.search-models", [
-                        $el("input.search-text-area", {
-                            $: (el) => (this.#el.modelContentFilter = el),
-                            placeholder: "example: /0/1.5/styles/clothing -.pt",
-                            onkeydown: (e) => {
-                                const children = searchDropdown.children;
-                                let iChild;
-                                for (iChild = 0; iChild < children.length; iChild++) {
-                                    const child = children[iChild];
-                                    if (child.classList.contains(dropdownSelectClass)) {
-                                        break;
-                                    }
-                                }
-                                if (e.key === "Escape") {
-                                    e.stopPropagation();
-                                    if (iChild < children.length) {
-                                        const child = children[iChild];
-                                        child.classList.remove(dropdownSelectClass);
-                                    }
-                                    else {
-                                        e.target.blur();
-                                    }
-                                }
-                                else if (e.key === "Enter") {
-                                    e.stopPropagation();
-                                    appendDropdownSelectionToInput(
-                                        e.target,
-                                        children[iChild],
-                                        this.sep,
-                                        this.#modelUpdateFilterDropdown,
-                                        this.#modelGridUpdate
-                                    );
-                                }
-                                else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                                    e.stopPropagation();
-                                    let iNext = children.length;
-                                    if (iChild < children.length) {
-                                        const child = children[iChild];
-                                        child.classList.remove(dropdownSelectClass);
-                                        const delta = e.key === "ArrowDown" ? 1 : -1;
-                                        iNext = iChild + delta;
-                                        if (0 <= iNext && iNext < children.length) {
-                                            const nextChild = children[iNext];
-                                            nextChild.classList.add(dropdownSelectClass);
-                                        }
-                                    }
-                                    else if (iChild === children.length) {
-                                        iNext = e.key === "ArrowDown" ? 0 : children.length-1;
-                                        const nextChild = children[iNext]
-                                        nextChild.classList.add(dropdownSelectClass);
-                                    }
-                                    if (0 <= iNext && iNext < children.length) {
-                                        let scrollTop = searchDropdown.scrollTop;
-                                        const dropdownHeight = searchDropdown.offsetHeight;
-                                        const child = children[iNext];
-                                        const childHeight = child.offsetHeight;
-                                        const childTop = child.offsetTop;
-                                        scrollTop = Math.max(scrollTop, childTop - dropdownHeight + childHeight);
-                                        scrollTop = Math.min(scrollTop, childTop);
-                                        searchDropdown.scrollTop = scrollTop;
-                                    }
-                                    else {
-                                        searchDropdown.scrollTop = 0;
-                                        const children = searchDropdown.children;
-                                        for (iChild = 0; iChild < children.length; iChild++) {
-                                            const child = children[iChild];
-                                            if (child.classList.contains(dropdownSelectClass)) {
-                                                child.classList.remove(dropdownSelectClass);
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            oninput: () => this.#modelUpdateFilterDropdown(),
-                            onfocus: () => this.#modelUpdateFilterDropdown(),
-                            onblur: () => { searchDropdown.style.display = "none"; },
-                        }),
-                        searchDropdown,
+                        searchInput,
+                        searchDropdown.element,
                     ]),
                     $el("button.icon-button", {
                         type: "button",
                         textContent: "🔍︎",
-                        onclick: () => this.#modelGridUpdate(),
+                        onclick: () => this.#modelTab_updateModelGrid(),
                     }),
                 ]),
             ]),
@@ -1196,7 +1187,7 @@ class ModelManager extends ComfyDialog {
         ];
     }
 
-    #modelGridUpdate = () => updateModelGrid(
+    #modelTab_updateModelGrid = () => ModelGrid.update(
         this.#el.modelGrid,
         this.#data.models,
         this.#el.modelTypeSelect,
@@ -1206,60 +1197,40 @@ class ModelManager extends ComfyDialog {
         this.#el.modelContentFilter
     );
 
-    async #modelGridRefresh() {
+    async #modelTab_updateModels() {
         this.#data.models = await request("/model-manager/models");
         this.#data.modelDirectories = await request("/model-manager/model-directory-list");
-        this.#modelGridUpdate();
+        this.#modelTab_updateModelGrid();
     }
 
-    #modelUpdateFilterDropdown = () => {
+    #modelTab_updateDirectoryDropdown = () => {
         const modelType = this.#el.modelTypeSelect.value;
-        const filter = this.#el.modelContentFilter.value;
-        updateDirectorySuggestionDropdown(
-            this.#el.modelDirectorySearchOptions,
+        this.#modelContentFilterDirectoryDropdown.update(
             this.#data.modelDirectories,
             modelType,
-            filter,
-            this.sep,
-            this.#el.modelContentFilter,
-            this.#modelUpdateFilterDropdown,
-            this.#modelGridUpdate,
+            this.#sep,
         );
-        this.#data.previousModelFilters[modelType] = filter;
+        const value = this.#el.modelContentFilter.value;
+        this.#data.previousModelFilters[modelType] = value;
     }
 
     /**
-     * @param {Event} event 
+     * @param {HTMLInputElement} input
+     * @param {HTMLParagraphElement} selection
      */
-    #setSidebar(event) {
-        // TODO: settings["sidebar-default-width"]
-        // TODO: settings["sidebar-default-height"]
-        // TODO: draggable resize?
-        const button = event.target;
-        const modelManager = this.element;
-        const sidebarButtons = this.#el.sidebarButtons.children;
-
-        let buttonIndex;
-        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            if (sidebarButtons[buttonIndex] === button) {
-                break;
-            }
+    #modelTab_submitSearch = (input, selection) => {
+        if (selection !== undefined && selection !== null) {
+            selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+            const selectedText = selection.innerText;
+            const oldFilterText = input.value;
+            const iSep = oldFilterText.lastIndexOf(this.#sep);
+            const previousPath = oldFilterText.substring(0, iSep + 1);
+            const newFilterText = previousPath + selectedText;
+            input.value = newFilterText;
+            this.#modelTab_updateDirectoryDropdown();
         }
-
-        const sidebarStates = ["sidebar-left", "sidebar-top", "sidebar-bottom", "sidebar-right"];
-        let stateIndex;
-        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
-            const state = sidebarStates[stateIndex];
-            if (modelManager.classList.contains(state)) {
-                modelManager.classList.remove(state);
-                break;
-            }
-        }
-
-        if (stateIndex != buttonIndex) {
-            const newSidebarState = sidebarStates[buttonIndex];
-            modelManager.classList.add(newSidebarState);
-        }
+        input.blur();
+        this.#modelTab_updateModelGrid();
     }
 
     /**
@@ -1285,21 +1256,21 @@ class ModelManager extends ComfyDialog {
         if (reloadData) {
             // Is this slow?
             this.#refreshSourceList();
-            this.#modelGridRefresh();
+            this.#modelTab_updateModels();
         }
     }
 
     /**
      * @param {boolean} reloadData 
      */
-    async #reloadSettings(reloadData) {
+    async #settingsTab_reload(reloadData) {
         const data = await request("/model-manager/settings/load");
         const settings = data["settings"];
         this.#setSettings(settings, reloadData);
-        buttonAlert(this.#el.reloadSettingsBtn, true);
+        buttonAlert(this.#el.settings_reloadBtn, true);
     }
 
-    async #saveSettings() {
+    async #settingsTab_save() {
         let settings = {};
         for (const [setting, el] of Object.entries(this.#el.settings)) {
             if (!el) { continue; } // hack
@@ -1327,27 +1298,27 @@ class ModelManager extends ComfyDialog {
             const settings = data["settings"];
             this.#setSettings(settings, true);
         }
-        buttonAlert(this.#el.saveSettingsBtn, success);
+        buttonAlert(this.#el.settings_saveBtn, success);
     }
 
     /**
-     * @returns {HTMLElement[]}
+     * @returns {HTMLElement}
      */
-    #createSettingsTabHtml() {
+    #settingsTab_new() {
         const settingsTab = $el("div.model-manager-settings", [
             $el("h1", ["Settings"]),
             $el("div", [
                 $el("button", {
-                    $: (el) => (this.#el.reloadSettingsBtn = el),
+                    $: (el) => (this.#el.settings_reloadBtn = el),
                     type: "button",
                     textContent: "Reload", // ⟳
-                    onclick: () => this.#reloadSettings(true),
+                    onclick: () => this.#settingsTab_reload(true),
                 }),
                 $el("button", {
-                    $: (el) => (this.#el.saveSettingsBtn = el),
+                    $: (el) => (this.#el.settings_saveBtn = el),
                     type: "button",
                     textContent: "Save", // 💾︎
-                    onclick: () => this.#saveSettings(),
+                    onclick: () => this.#settingsTab_save(),
                 }),
             ]),
             /*
@@ -1440,6 +1411,40 @@ class ModelManager extends ComfyDialog {
         ]);
         this.#el.settingsTab = settingsTab;
         return [settingsTab];
+    }
+
+    /**
+     * @param {Event} e
+     */
+    #setSidebar(e) {
+        // TODO: settings["sidebar-default-width"]
+        // TODO: settings["sidebar-default-height"]
+        // TODO: draggable resize?
+        const button = e.target;
+        const modelManager = this.element;
+        const sidebarButtons = this.#el.sidebarButtons.children;
+
+        let buttonIndex;
+        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
+            if (sidebarButtons[buttonIndex] === button) {
+                break;
+            }
+        }
+
+        const sidebarStates = ["sidebar-left", "sidebar-top", "sidebar-bottom", "sidebar-right"];
+        let stateIndex;
+        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
+            const state = sidebarStates[stateIndex];
+            if (modelManager.classList.contains(state)) {
+                modelManager.classList.remove(state);
+                break;
+            }
+        }
+
+        if (stateIndex != buttonIndex) {
+            const newSidebarState = sidebarStates[buttonIndex];
+            modelManager.classList.add(newSidebarState);
+        }
     }
 }
 
