@@ -88,20 +88,19 @@ class DirectoryDropdown {
         input.addEventListener(
             "keydown",
             (e) => {
-                const children = dropdown.children;
-                let iChild;
-                for (iChild = 0; iChild < children.length; iChild++) {
-                    const child = children[iChild];
-                    if (child.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                const options = dropdown.children;
+                let iSelection;
+                for (iSelection = 0; iSelection < options.length; iSelection++) {
+                    const selection = options[iSelection];
+                    if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
                         break;
                     }
                 }
                 if (e.key === "Escape") {
                     e.stopPropagation();
-                    if (iChild < children.length) {
-                        // remove select
-                        const child = children[iChild];
-                        child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    if (iSelection < options.length) {
+                        const selection = options[iSelection];
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                     }
                     else {
                         e.target.blur();
@@ -109,43 +108,43 @@ class DirectoryDropdown {
                 }
                 else if (e.key === "Enter") {
                     e.stopPropagation();
-                    submitSearch(e.target, children[iChild]);
+                    submitSearch(e.target, options[iSelection]);
                 }
                 else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                     e.stopPropagation();
-                    let iNext = children.length;
-                    if (iChild < children.length) {
-                        const child = children[iChild];
-                        child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    let iNext = options.length;
+                    if (iSelection < options.length) {
+                        const selection = options[iSelection];
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                         const delta = e.key === "ArrowDown" ? 1 : -1;
-                        iNext = iChild + delta;
-                        if (0 <= iNext && iNext < children.length) {
-                            const nextChild = children[iNext];
-                            nextChild.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        iNext = iSelection + delta;
+                        if (0 <= iNext && iNext < options.length) {
+                            const selectionNext = options[iNext];
+                            selectionNext.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                         }
                     }
-                    else if (iChild === children.length) {
-                        iNext = e.key === "ArrowDown" ? 0 : children.length-1;
-                        const nextChild = children[iNext]
-                        nextChild.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    else if (iSelection === options.length) {
+                        iNext = e.key === "ArrowDown" ? 0 : options.length-1;
+                        const selection = options[iNext]
+                        selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                     }
-                    if (0 <= iNext && iNext < children.length) {
-                        let scrollTop = dropdown.scrollTop;
+                    if (0 <= iNext && iNext < options.length) {
+                        let dropdownTop = dropdown.scrollTop;
                         const dropdownHeight = dropdown.offsetHeight;
-                        const child = children[iNext];
-                        const childHeight = child.offsetHeight;
-                        const childTop = child.offsetTop;
-                        scrollTop = Math.max(scrollTop, childTop - dropdownHeight + childHeight);
-                        scrollTop = Math.min(scrollTop, childTop);
-                        dropdown.scrollTop = scrollTop;
+                        const selection = options[iNext];
+                        const selectionHeight = selection.offsetHeight;
+                        const selectionTop = selection.offsetTop;
+                        dropdownTop = Math.max(dropdownTop, selectionTop - dropdownHeight + selectionHeight);
+                        dropdownTop = Math.min(dropdownTop, selectionTop);
+                        dropdown.scrollTop = dropdownTop;
                     }
                     else {
                         dropdown.scrollTop = 0;
-                        const children = dropdown.children;
-                        for (iChild = 0; iChild < children.length; iChild++) {
-                            const child = children[iChild];
-                            if (child.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
-                                child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const options = dropdown.children;
+                        for (iSelection = 0; iSelection < options.length; iSelection++) {
+                            const selection = options[iSelection];
+                            if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                                selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                             }
                         }
                     }
@@ -292,6 +291,20 @@ class DirectoryDropdown {
         dropdown.innerHTML = "";
         dropdown.append.apply(dropdown, innerHtml);
         dropdown.style.display = "block";
+    }
+
+    /**
+     * @param {HTMLParagraphElement} selection
+     * @param {HTMLInputElement} input
+     * @param {string} sep
+     */
+    static appendSelectionToInput(selection, input, sep) {
+        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+        const selectedText = selection.innerText;
+        const oldFilterText = input.value;
+        const iSep = oldFilterText.lastIndexOf(sep);
+        const previousPath = oldFilterText.substring(0, iSep + 1);
+        input.value = previousPath + selectedText;
     }
 }
 
@@ -793,7 +806,6 @@ class ModelGrid {
                         draggable: false,
                     }),
                     $el("div.model-preview-overlay", {
-                        src: imgUrl,
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
                     }),
@@ -1217,17 +1229,11 @@ class ModelManager extends ComfyDialog {
 
     /**
      * @param {HTMLInputElement} input
-     * @param {HTMLParagraphElement} selection
+     * @param {HTMLParagraphElement | undefined | null} selection
      */
     #modelTab_submitSearch = (input, selection) => {
         if (selection !== undefined && selection !== null) {
-            selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-            const selectedText = selection.innerText;
-            const oldFilterText = input.value;
-            const iSep = oldFilterText.lastIndexOf(this.#sep);
-            const previousPath = oldFilterText.substring(0, iSep + 1);
-            const newFilterText = previousPath + selectedText;
-            input.value = newFilterText;
+            DirectoryDropdown.appendSelectionToInput(selection, input, this.#sep);
             this.#modelTab_updateDirectoryDropdown();
         }
         input.blur();
