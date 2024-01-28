@@ -155,10 +155,10 @@ class DirectoryDropdown {
 
     /**
      * @param {DirectoryItem[]} directories
-     * @param {string} modelType
      * @param {string} sep
+     * @param {string} [modelType = ""]
      */
-    update(directories, modelType, sep) {
+    update(directories, sep, modelType = "") {
         const dropdown = this.element;
         const input = this.#input;
         const submitSearch = this.#submitSearch;
@@ -169,15 +169,18 @@ class DirectoryDropdown {
             return;
         }
 
-        let cwd = null;
-        const root = directories[0];
-        const rootChildIndex = root["childIndex"];
-        const rootChildCount = root["childCount"];
-        for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
-            const modelDir = directories[i];
-            if (modelDir["name"] === modelType) {
-                cwd = i;
-                break;
+        let cwd = 0;
+        if (modelType !== "") {
+            const root = directories[0];
+            const rootChildIndex = root["childIndex"];
+            const rootChildCount = root["childCount"];
+            cwd = null;
+            for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
+                const modelDir = directories[i];
+                if (modelDir["name"] === modelType) {
+                    cwd = i;
+                    break;
+                }
             }
         }
 
@@ -1220,8 +1223,8 @@ class ModelManager extends ComfyDialog {
         const modelType = this.#el.modelTypeSelect.value;
         this.#modelContentFilterDirectoryDropdown.update(
             this.#data.modelDirectories,
-            modelType,
             this.#sep,
+            modelType,
         );
         const value = this.#el.modelContentFilter.value;
         this.#data.previousModelFilters[modelType] = value;
