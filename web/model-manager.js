@@ -662,7 +662,7 @@ class ModelGrid {
             const selectedNodes = app.canvas.selected_nodes;
             for (var i in selectedNodes) {
                 const selectedNode = selectedNodes[i];
-                const nodeType = modelNodeType(modelType);
+                const nodeType = modelNodeType[modelType];
                 const widgetIndex = modelWidgetIndex(nodeType);
                 const target = selectedNode.widgets[widgetIndex].element;
                 if (target && target.type === "textarea") {
