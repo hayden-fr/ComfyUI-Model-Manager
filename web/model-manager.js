@@ -51,6 +51,10 @@ const modelNodeType = {
 
 const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
 
+const MODEL_SORT_DATE_CREATED = "dateCreated";
+const MODEL_SORT_DATE_MODIFIED = "dateModified";
+const MODEL_SORT_DATE_NAME = "name";
+
 /**
  * @typedef {Object} DirectoryItem
  * @param {string} name
@@ -594,7 +598,7 @@ class ModelGrid {
     static #filter(list, searchString) {
         /** @type {string[]} */
         const keywords = searchString
-            .replace("*", " ")
+            //.replace("*", " ") // TODO: this is wrong for wildcards
             .split(/(-?".*?"|[^\s"]+)+/g)
             .map((item) => item
                 .trim()
@@ -603,7 +607,7 @@ class ModelGrid {
             .filter(Boolean);
 
         const regexSHA256 = /^[a-f0-9]{64}$/gi;
-        const fields = ["name", "search-path"]; // TODO: Remove "search-path" hack.
+        const fields = ["name", "searchPath"]; // TODO: Remove "searchPath" hack.
         return list.filter((element) => {
             const text = fields
                 .reduce((memo, field) => memo + " " + element[field], "")
@@ -620,6 +624,33 @@ class ModelGrid {
                 }
             }, true);
         });
+    }
+    
+    /**
+     * In-place sort. Returns an arrat alias.
+     * @param {Array} list
+     * @param {string} sortBy
+     * @param {bool} [reverse=false]
+     * @returns {Array}
+     */
+    static #sort(list, sortBy, reverse = false) {
+        let compareFn = undefined;
+        switch (sortBy) {
+            case MODEL_SORT_DATE_NAME:
+                compareFn = (a, b) => { return a[MODEL_SORT_DATE_NAME].localeCompare(b[MODEL_SORT_DATE_NAME]); };
+                break;
+            case MODEL_SORT_DATE_MODIFIED:
+                compareFn = (a, b) => { return b[MODEL_SORT_DATE_MODIFIED] - a[MODEL_SORT_DATE_MODIFIED]; };
+                break;
+            case MODEL_SORT_DATE_CREATED:
+                compareFn = (a, b) => { return b[MODEL_SORT_DATE_CREATED] - a[MODEL_SORT_DATE_CREATED]; };
+                break;
+            default:
+                console.warn("Invalid filter sort value: '" + sortBy + "'");
+                return list;
+        }
+        const sorted = list.sort(compareFn);
+        return reverse ? sorted.reverse() : sorted;
     }
 
     /**
@@ -836,10 +867,12 @@ class ModelGrid {
      * @param {HTMLSelectElement} modelSelect
      * @param {Object.<{value: string}>} previousModelType
      * @param {Object} settings
+     * @param {string} sortBy
+     * @param {boolean} reverseSort
      * @param {Array} previousModelFilters
      * @param {HTMLInputElement} modelFilter
      */
-    static update(modelGrid, models, modelSelect, previousModelType, settings, previousModelFilters, modelFilter) {
+    static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter) {
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -870,6 +903,7 @@ class ModelGrid {
         const searchAppend = settings["model-search-always-append"].value;
         const searchText = modelFilter.value + " " + searchAppend;
         const modelList = ModelGrid.#filter(models[modelType], searchText);
+        ModelGrid.#sort(modelList, sortBy, reverseSort);
 
         modelGrid.innerHTML = "";
         const modelGridModels = ModelGrid.#generateInnerHtml(modelList, modelType, settings);
@@ -927,6 +961,7 @@ class ModelManager extends ComfyDialog {
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
+        /** @type {HTMLSelectElement} */ modelSortSelect: null,
         /** @type {HTMLDivElement} */ searchDirectoryDropdown: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
 
@@ -1181,11 +1216,25 @@ class ModelManager extends ComfyDialog {
                         textContent: "⟳",
                         onclick: () => this.#modelTab_updateModels(),
                     }),
-                    $el("select.model-type-dropdown", {
+                    $el("select.model-select-dropdown", {
                         $: (el) => (this.#el.modelTypeSelect = el),
                         name: "model-type",
                         onchange: () => this.#modelTab_updateModelGrid(),
                     }),
+                    $el("select.model-select-dropdown",
+                        {
+                            $: (el) => (this.#el.modelSortSelect = el),
+                            onchange: () => this.#modelTab_updateModelGrid(),
+                        },
+                        [
+                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Date Created (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Date Created (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Date Modified (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Date Modified (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
+                        ],
+                    ),
                 ]),
                 $el("div.row.tab-header-flex-block", [
                     $el("div.search-models", [
@@ -1203,15 +1252,22 @@ class ModelManager extends ComfyDialog {
         ];
     }
 
-    #modelTab_updateModelGrid = () => ModelGrid.update(
-        this.#el.modelGrid,
-        this.#data.models,
-        this.#el.modelTypeSelect,
-        this.#data.previousModelType,
-        this.#el.settings,
-        this.#data.previousModelFilters,
-        this.#el.modelContentFilter
-    );
+    #modelTab_updateModelGrid = () => {
+        const sortValue = this.#el.modelSortSelect.value;
+        const reverseSort = sortValue[0] === "-";
+        const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
+        ModelGrid.update(
+            this.#el.modelGrid,
+            this.#data.models,
+            this.#el.modelTypeSelect,
+            this.#data.previousModelType,
+            this.#el.settings,
+            sortBy,
+            reverseSort,
+            this.#data.previousModelFilters,
+            this.#el.modelContentFilter
+        );
+    }
 
     async #modelTab_updateModels() {
         this.#data.models = await request("/model-manager/models");

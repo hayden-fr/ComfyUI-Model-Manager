@@ -1,4 +1,5 @@
 import os
+import pathlib
 import sys
 import copy
 import hashlib
@@ -268,7 +269,7 @@ async def load_download_models(request):
     models = {}
     for model_type in model_types:
         model_extensions = tuple(folder_paths_get_supported_pt_extensions(model_type))
-        file_names = []
+        file_infos = []
         for base_path_index, model_base_path in enumerate(folder_paths_get_folder_paths(model_type)):
             if not os.path.exists(model_base_path): # Bug in main code?
                 continue
@@ -290,17 +291,26 @@ async def load_download_models(request):
                         if model_name == image_name:
                             image = end_swap_and_pop(dir_images, iImage)
                             break
+                    abs_path = os.path.join(cwd, model)
+                    stats = pathlib.Path(abs_path).stat()
+                    date_modified = stats.st_mtime_ns
+                    date_created = stats.st_ctime_ns
                     rel_path = "" if cwd == model_base_path else os.path.relpath(cwd, model_base_path)
-                    file_names.append((model, image, base_path_index, rel_path))
-        file_names.sort(key=lambda tup: tup[0].lower())
+                    info = (model, image, base_path_index, rel_path, date_modified, date_created)
+                    file_infos.append(info)
+        file_infos.sort(key=lambda tup: tup[4], reverse=True) # TODO: remove sort; sorted on client
 
         model_items = []
-        for model, image, base_path_index, rel_path in file_names:
-            # TODO: Stop sending redundant information
+        for model, image, base_path_index, rel_path, date_modified, date_created in file_infos:
+            # TODO: Stop sending redundant path information
             item = {
                 "name": model,
-                "search-path": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
+                "searchPath": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
                 "path": os.path.join(rel_path, model),
+                "dateModified": date_modified,
+                "dateCreated": date_created,
+                #"dateLastUsed": "", # TODO: track server-side, send increment client-side
+                #"countUsed": 0, # TODO: track server-side, send increment client-side
             }
             if image is not None:
                 raw_post = os.path.join(model_type, str(base_path_index), rel_path, image)

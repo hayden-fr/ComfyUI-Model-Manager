@@ -6,7 +6,7 @@ Browse models in ComfyUI. (Downloading and deleting are WIP.)
 
 ## About this fork
 
-I made this fork because the original repo was inactive and missing many things I needed to make the ComfyUI usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
+I made this fork because the original repo was inactive and missing many things I needed to make ComfyUI more usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
 
 Currently it is still missing some features it should have.
 
@@ -17,6 +17,7 @@ Currently it is still missing some features it should have.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
   - Add `/` at the start of the search bar to see auto-complete suggestions.
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
+- Sort for models (Date Created, Date Modified, Name).
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left, top and bottom toggleable sidebar modes.
@@ -65,12 +66,7 @@ Currently it is still missing some features it should have.
 - &#9744; Directory dropdown
   - &#9744; Use always filter to filter directory content auto-suggest dropdown
     - &#9744; Generalize model list filtering code to reuse approach
-  - &#9744; Highlight selection
-    - &#9744; Key shortcuts
-      - &#9744; Down & Up arrows to select dropdown option
-      - &#9744; Right arrow or enter to add selection
-      - &#9744; Escape to loose focus on dropdown
-    - &#9744; Generalize search dropdown for download location selection
+  - &#9744; Generalize search dropdown for download location selection
 - &#9744; Filters dropdown
   - &#9744; Stable Diffusion model version/Clip/Upscale/?
   - &#9744; Favorites

@@ -342,7 +342,7 @@
 
 .model-manager .search-text-area,
 .model-manager .source-text-area,
-.model-manager .model-type-dropdown {
+.model-manager .model-select-dropdown {
 	flex: 1;
 }
 
