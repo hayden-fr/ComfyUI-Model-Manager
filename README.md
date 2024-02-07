@@ -71,8 +71,6 @@ Currently it is still missing some features it should have.
   - &#9744; Stable Diffusion model version/Clip/Upscale/?
   - &#9744; Favorites
 - &#9744; Sort-by dropdown
-  - &#9744; Date modified (ascending/decending)
-  - &#9744; Date created (ascending/decending)
   - &#9744; Recently used (ascending/decending)
   - &#9744; Frequently used (ascending/decending)
 - &#9744; `or` vs `and` type of keyword search (currently `and`)

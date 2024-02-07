@@ -261,6 +261,7 @@
 /* model manager row */
 .model-manager .row {
     display: flex;
+    min-width: 0;
     gap: 8px;
 }
 
@@ -338,6 +339,11 @@
     display: flex;
     flex-direction: row;
     flex: 1;
+}
+
+.model-manager .model-select-dropdown {
+    min-width: 0;
+    overflow: auto;
 }
 
 .model-manager .search-text-area,
