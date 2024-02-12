@@ -56,6 +56,294 @@ const MODEL_SORT_DATE_MODIFIED = "dateModified";
 const MODEL_SORT_DATE_NAME = "name";
 
 /**
+ * Tries to return the related ComfyUI model directory if unambigious.
+ *
+ * @param {string} modelType - Civitai model type.
+ * @param {string} [fileType] - Civitai file type. Relevant for "Diffusers".
+ *
+ * @returns {(string|null)} Logical base directory name for model type. May be null if the directory is ambiguous or not a model type.
+ */
+function civitai_comfyUiDirectory(modelType, fileType) {
+    if (fileType == "Diffusers") { return "diffusers"; } // TODO: is this correct?
+
+    // TODO: somehow allow for SERVER to set dir?
+    // TODO: allow user to choose EXISTING folder override/null? (style_models, HuggingFace) (use an object/map instead so settings can be dynamically set)
+    if (modelType == "AestheticGradient") { return null; }
+    else if (modelType == "Checkpoint") { return "checkpoints"; } // TODO: what about VAE?
+    //else if (modelType == "") { return "clip"; }
+    //else if (modelType == "") { return "clip_vision"; }
+    else if (modelType == "Controlnet") { return "controlnet"; }
+    //else if (modelType == "Controlnet") { return "style_models"; } // are these controlnets? (TI-Adapter)
+    //else if (modelType == "") { return "gligen"; }
+    else if (modelType == "Hypernetwork") { return "hypernetworks"; }
+    else if (modelType == "LORA") { return "loras"; }
+    else if (modelType == "LoCon") { return "loras"; }
+    else if (modelType == "MotionModule") { return null; }
+    else if (modelType == "Other") { return null; }
+    else if (modelType == "Pose") { return null; }
+    else if (modelType == "TextualInversion") { return "embeddings"; }
+    //else if (modelType == "") { return "unet"; }
+    else if (modelType == "Upscaler") { return "upscale_models"; }
+    else if (modelType == "VAE") { return "vae"; }
+    else if (modelType == "Wildcards") { return null; }
+    else if (modelType == "Workflows") { return null; }
+    return null;
+}
+
+/**
+ * Get model info from Civitai.
+ *
+ * @param {string} id - Model ID.
+ * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
+ *
+ * @returns {Object} Dictionary containing recieved model info. Returns an empty if fails.
+ */
+async function civitai_requestInfo(id, apiPath) {
+    const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
+    return await request(url);
+}
+
+/**
+ * Extract file information from the given model version infomation.
+ *
+ * @param {Object} modelVersionInfo - Model version infomation.
+ * @param {(string|null)} [type=null] - Optional select by model type.
+ * @param {(string|null)} [fp=null] - Optional select by floating point quantization.
+ * @param {(string|null)} [size=null] - Optional select by sizing.
+ * @param {(string|null)} [format=null] - Optional select by file format.
+ *
+ * @returns {Object} - Extracted list of infomation on each file of the given model version.
+ */
+function civitai_getModelFilesInfo(modelVersionInfo, type = null, fp = null, size = null, format = null) {
+    const files = [];
+    const modelVersionFiles = modelVersionInfo["files"];
+    for (let i = 0; i < modelVersionFiles.length; i++) {
+        const modelVersionFile = modelVersionFiles[i];
+        
+        const fileType = modelVersionFile["type"];
+        if (type instanceof String && type != fileType) { continue; }
+        
+        const fileMeta = modelVersionFile["metadata"];
+        
+        const fileFp = fileMeta["fp"];
+        if (fp instanceof String && fp != fileFp) { continue; }
+        
+        const fileSize = fileMeta["size"];
+        if (size instanceof String && size != fileSize) { continue; }
+        
+        const fileFormat = fileMeta["format"];
+        if (format instanceof String && format != fileFormat) { continue; }
+        
+        files.push({
+            "downloadUrl": modelVersionFile["downloadUrl"],
+            "format": fileFormat,
+            "fp": fileFp,
+            "hashes": modelVersionFile["hashes"],
+            "name": modelVersionFile["name"],
+            "size": fileSize,
+            "sizeKB": modelVersionFile["sizeKB"],
+            "type": fileType,
+        });
+    }
+    return {
+        "files": files,
+        "id": modelVersionInfo["id"],
+        "images": modelVersionInfo["images"].map((image) => {
+            // TODO: do I need to double-check image matches resource?
+            return image["url"];
+        }),
+        "name": modelVersionInfo["name"],
+    };
+}
+
+/**
+ * 
+ *
+ * @param {string} stringUrl - Model url.
+ *
+ * @returns {Object} - Download information for the given url.
+ */
+async function civitai_getFilteredInfo(stringUrl) {
+    const url = new URL(stringUrl);
+    if (url.hostname != 'civitai.com') { return {}; }
+    if (url.pathname == '/') { return {} }
+    const urlPath = url.pathname;
+    if (urlPath.startsWith('/api')) {
+        const idEnd = urlPath.length - (urlPath.at(-1) == "/" ? 1 : 0);
+        const idStart = urlPath.lastIndexOf("/", idEnd - 1) + 1;
+        const modelVersionId = urlPath.substring(idStart, idEnd);
+        if (parseInt(modelVersionId, 10) == NaN) {
+            return {};
+        }
+        const modelVersionInfo = await civitai_requestInfo(modelVersionId, "model-versions");
+        if (Object.keys(modelVersionInfo).length == 0) {
+            return {};
+        }
+        const searchParams = url.searchParams;
+        const filesInfo = civitai_getModelFilesInfo(
+            modelVersionInfo,
+            searchParams.get("type"),
+            searchParams.get("fp"),
+            searchParams.get("size"),
+            searchParams.get("format"),
+        );
+        return {
+            "name": modelVersionInfo["model"]["name"],
+            "type": modelVersionInfo["model"]["type"],
+            "versions": [filesInfo]
+        }
+    }
+    else if (urlPath.startsWith('/models')) {
+        const idStart = urlPath.indexOf("/", 1) + 1;
+        const idEnd = urlPath.indexOf("/", idStart);
+        const modelId = urlPath.substring(idStart, idEnd);
+        if (parseInt(modelId, 10) == NaN) {
+            return {};
+        }
+        const modelInfo = await civitai_requestInfo(modelId, "models");
+        if (Object.keys(modelInfo).length == 0) {
+            return {};
+        }
+        const modelVersionId = parseInt(url.searchParams.get("modelVersionId"));
+        const modelVersions = [];
+        const modelVersionInfos = modelInfo["modelVersions"];
+        for (let i = 0; i < modelVersionInfos.length; i++) {
+            const versionInfo = modelVersionInfos[i];
+            if (modelVersionId  instanceof String && modelVersionId != versionInfo["id"]) { continue; }
+            const filesInfo = civitai_getModelFilesInfo(versionInfo);
+            modelVersions.push(filesInfo);
+        }
+        return {
+            "name": modelInfo["name"],
+            "type": modelInfo["type"],
+            "versions": modelVersions
+        }
+    }
+    else {
+        return {};
+    }
+}
+
+/**
+ * Get model info from Huggingface.
+ *
+ * @param {string} id - Model ID.
+ * @param {string} apiPath - API path.
+ *
+ * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+ */
+async function huggingFace_requestInfo(id, apiPath = "models") {
+    const url = "https://huggingface.co/api/" + apiPath + "/" + id;
+    return await request(url);
+}
+
+/**
+ * 
+ *
+ * @param {string} stringUrl - Model url.
+ *
+ * @returns {Promise<Object>}
+ */
+async function huggingFace_getFilteredInfo(stringUrl) {
+    const url = new URL(stringUrl);
+    if (url.hostname != 'huggingface.co') { return {}; }
+    if (url.pathname == '/') { return {} }
+    const urlPath = url.pathname;
+    const i0 = 1;
+    const i1 = urlPath.indexOf("/", i0);
+    if (i1 == -1 || urlPath.length - 1 == i1) {
+        // user-name only
+        return {};
+    }
+    let i2 = urlPath.indexOf("/", i1 + 1);
+    if (i2 == -1) {
+        // model id only
+        i2 = urlPath.length;
+    }
+    const modelId = urlPath.substring(i0, i2);
+    const urlPathEnd = urlPath.substring(i2);
+    
+    let branch = null;
+    if (urlPathEnd.startsWith("/resolve")) {
+        branch = "/resolve";
+    }
+    else if (urlPathEnd.startsWith("/blob")) {
+        branch = "/blob";
+    }
+    else if (urlPathEnd.startsWith("/tree")) {
+        branch = "/tree";
+    }
+    
+    let filePath = "";
+    if (branch == null) {
+        branch = "/tree/main";
+    }
+    else {
+        const i0 = branch.length;
+        const i1 = urlPathEnd.indexOf("/", i0 + 1);
+        if (i1 == -1) {
+            if (i0 == urlPathEnd.length) {
+                // ends with '/tree' (invalid?)
+                branch = "/tree/main";
+            }
+            else {
+                // ends with branch
+                branch = "/tree" + urlPathEnd.substring(i0);
+            }
+        }
+        else {
+            branch = "/tree" + urlPathEnd.substring(i0, i1);
+            if (urlPathEnd.length - 1 > i1) {
+                filePath = urlPathEnd.substring(i1);
+            }
+        }
+    }
+    
+    const modelInfo = await huggingFace_requestInfo(modelId);
+    //const modelInfo = await requestInfo(modelId + branch); // this only gives you the files at the given branch path...
+    // oid: SHA-1?, lfs.oid: SHA-256
+    
+    const validModelExtensions = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"]; // TODO: ask server for?
+    const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
+    const modelFiles = modelInfo["siblings"].filter((sib) => {
+        const filename = sib["rfilename"];
+        for (let i = 0; i < validModelExtensions.length; i++) {
+            if (filename.endsWith(validModelExtensions[i])) {
+                return filename.startsWith(clippedFilePath);
+            }
+        }
+        return false;
+    }).map((sib) => {
+        const filename = sib["rfilename"];
+        return filename;
+    });
+    if (modelFiles.length === 0) {
+        return {};
+    }
+    
+    const validImageExtensions = [".png", ".webp", ".gif"]; // TODO: ask server for?
+    const imageFiles = modelInfo["siblings"].filter((sib) => {
+        const filename = sib["rfilename"];
+        for (let i = 0; i < validImageExtensions.length; i++) {
+            if (filename.endsWith(validImageExtensions[i])) {
+                return filename.startsWith(filePath);
+            }
+        }
+        return false;
+    }).map((sib) => {
+        const filename = sib["rfilename"];
+        return filename;
+    });
+    
+    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
+    return {
+        "baseDownloadUrl": baseDownloadUrl,
+        "modelFiles": modelFiles,
+        "imageFiles": imageFiles,
+    };
+}
+
+/**
  * @typedef {Object} DirectoryItem
  * @param {string} name
  * @param {number | undefined} childCount
@@ -68,23 +356,36 @@ class DirectoryDropdown {
 
     /** @type {HTMLInputElement} */
     #input = undefined;
-
+    
+    // TODO: remove this
     /** @type {Function} */
-    #submitSearch = null;
-
+    #updateDropdown = null;
+    
+    /** @type {Function} */
+    #updateCallback = null;
+    
+    /** @type {Function} */
+    #submitCallback = null;
+    
     /**
      * @param {HTMLInputElement} input
      * @param {Function} updateDropdown
-     * @param {Function} submitSearch
+     * @param {Function} [updateCallback= () => {}]
+     * @param {Function} [submitCallback= () => {}]
+     * @param {String} [sep="/"]
      */
-    constructor(input, updateDropdown, submitSearch) {
+    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/") {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
-            style: { display: "none" },
+            style: {
+                display: "none",
+            },
         });
         this.element = dropdown;
         this.#input = input;
-        this.#submitSearch = submitSearch;
+        this.#updateDropdown = updateDropdown;
+        this.#updateCallback = updateCallback;
+        this.#submitCallback = submitCallback;
 
         input.addEventListener("input", () => updateDropdown());
         input.addEventListener("focus", () => updateDropdown());
@@ -110,12 +411,35 @@ class DirectoryDropdown {
                         e.target.blur();
                     }
                 }
+                else if (e.key === "ArrowRight") {
+                    const selection = options[iSelection];
+                    if (selection !== undefined && selection !== null) {
+                        e.stopPropagation();
+                        e.preventDefault(); // prevent cursor move
+                        DirectoryDropdown.submitSearch(
+                            e.target, 
+                            selection, 
+                            updateDropdown, 
+                            updateCallback, 
+                            submitCallback, 
+                            sep,
+                        );
+                    }
+                }
                 else if (e.key === "Enter") {
                     e.stopPropagation();
-                    submitSearch(e.target, options[iSelection]);
+                    DirectoryDropdown.submitSearch(
+                        e.target, 
+                        options[iSelection], 
+                        updateDropdown, 
+                        updateCallback, 
+                        submitCallback, 
+                        sep,
+                    );
                 }
                 else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                     e.stopPropagation();
+                    e.preventDefault(); // prevent cursor move
                     let iNext = options.length;
                     if (iSelection < options.length) {
                         const selection = options[iSelection];
@@ -158,6 +482,34 @@ class DirectoryDropdown {
     }
 
     /**
+     * @param {HTMLInputElement} input
+     * @param {HTMLParagraphElement | undefined | null} selection
+     * @param {Function} updateDropdown
+     * @param {Fucntion} [updateCallback=() => {}]
+     * @param {Function} [submitCallback=() => {}]
+     * @param {String} [sep="/"]
+     */
+    static submitSearch(input, selection, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/") {
+        let blur = true;
+        if (selection !== undefined && selection !== null) {
+            selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+            const selectedText = selection.innerText;
+            blur = !selectedText.endsWith(sep); // is directory
+            const oldFilterText = input.value;
+            const iSep = oldFilterText.lastIndexOf(sep);
+            const previousPath = oldFilterText.substring(0, iSep + 1);
+            input.value = previousPath + selectedText;
+            
+            updateDropdown();
+            updateCallback();
+        }
+        if (blur) {
+            input.blur();
+        }
+        submitCallback();
+    }
+    
+    /**
      * @param {DirectoryItem[]} directories
      * @param {string} sep
      * @param {string} [modelType = ""]
@@ -165,7 +517,9 @@ class DirectoryDropdown {
     update(directories, sep, modelType = "") {
         const dropdown = this.element;
         const input = this.#input;
-        const submitSearch = this.#submitSearch;
+        const updateDropdown = this.#updateDropdown;
+        const updateCallback = this.#updateCallback;
+        const submitCallback = this.#submitCallback;
 
         const filter = input.value;
         if (filter[0] !== sep) {
@@ -239,9 +593,12 @@ class DirectoryDropdown {
             const childCount = item["childCount"];
             const items = directories.slice(childIndex, childIndex + childCount);
             for (let i = 0; i < items.length; i++) {
-                const itemName = items[i]["name"];
+                const child = items[i];
+                const grandChildCount = child["childCount"];
+                const isDir = grandChildCount !== undefined && grandChildCount !== null && grandChildCount > 0;
+                const itemName = child["name"];
                 if (itemName.startsWith(lastWord)) {
-                    options.push(itemName);
+                    options.push(itemName + (isDir ? "/" : ""));
                 }
             }
         }
@@ -277,7 +634,14 @@ class DirectoryDropdown {
         };
         const selection_submit = (e) => {
             e.stopPropagation();
-            submitSearch(input, e.target);
+            DirectoryDropdown.submitSearch(
+                input, 
+                e.target, 
+                updateDropdown, 
+                updateCallback, 
+                submitCallback, 
+                sep
+            );
         };
         const innerHtml = options.map((text) => {
             /** @type {HTMLParagraphElement} */
@@ -297,21 +661,12 @@ class DirectoryDropdown {
         });
         dropdown.innerHTML = "";
         dropdown.append.apply(dropdown, innerHtml);
+        // TODO: handle when dropdown is near the bottom of the window
+        const inputRect = input.getBoundingClientRect();
+        dropdown.style.minWidth = inputRect.width + "px";
+        dropdown.style.top = (input.offsetTop + inputRect.height) + "px";
+        dropdown.style.left = input.offsetLeft + "px";
         dropdown.style.display = "block";
-    }
-
-    /**
-     * @param {HTMLParagraphElement} selection
-     * @param {HTMLInputElement} input
-     * @param {string} sep
-     */
-    static appendSelectionToInput(selection, input, sep) {
-        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-        const selectedText = selection.innerText;
-        const oldFilterText = input.value;
-        const iSep = oldFilterText.lastIndexOf(sep);
-        const previousPath = oldFilterText.substring(0, iSep + 1);
-        input.value = previousPath + selectedText;
     }
 }
 
@@ -958,6 +1313,9 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLInputElement} */ loadSourceFromInput: null,
         /** @type {HTMLSelectElement} */ sourceInstalledFilter: null,
         /** @type {HTMLInputElement} */ sourceContentFilter: null,
+        
+        /** @type {HTMLDivElement} */ modelInfoUrl: null,
+        /** @type {HTMLDivElement} */ modelInfos: null,
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
@@ -1041,6 +1399,7 @@ class ModelManager extends ComfyDialog {
                         $tab("Install", this.#createSourceInstall()),
                         $tab("Models", this.#modelTab_new()),
                         $tab("Settings", [this.#settingsTab_new()]),
+                        //$tab("Download2", [this.#downloadTab_new()]),
                     ]),
                 ]),
             ]
@@ -1204,7 +1563,9 @@ class ModelManager extends ComfyDialog {
         const searchDropdown = new DirectoryDropdown(
             searchInput,
             this.#modelTab_updateDirectoryDropdown,
-            this.#modelTab_submitSearch
+            this.#modelTab_updatePreviousModelFilter,
+            this.#modelTab_updateModelGrid,
+            this.#sep,
         );
         this.#modelContentFilterDirectoryDropdown = searchDropdown;
 
@@ -1227,10 +1588,10 @@ class ModelManager extends ComfyDialog {
                             onchange: () => this.#modelTab_updateModelGrid(),
                         },
                         [
-                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Date Created (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Date Created (oldest to newest)"]),
-                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Date Modified (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Date Modified (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest to newest)"]),
                             $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
                             $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
                         ],
@@ -1271,32 +1632,24 @@ class ModelManager extends ComfyDialog {
 
     async #modelTab_updateModels() {
         this.#data.models = await request("/model-manager/models");
-        this.#data.modelDirectories = await request("/model-manager/model-directory-list");
+        const newModelDirectories = await request("/model-manager/model-directory-list");
+        this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // note: do NOT create a new array
         this.#modelTab_updateModelGrid();
     }
 
-    #modelTab_updateDirectoryDropdown = () => {
+    #modelTab_updatePreviousModelFilter = () => {
         const modelType = this.#el.modelTypeSelect.value;
+        const value = this.#el.modelContentFilter.value;
+        this.#data.previousModelFilters[modelType] = value;
+    };
+
+    #modelTab_updateDirectoryDropdown = () => {
         this.#modelContentFilterDirectoryDropdown.update(
             this.#data.modelDirectories,
             this.#sep,
-            modelType,
+            this.#el.modelTypeSelect.value,
         );
-        const value = this.#el.modelContentFilter.value;
-        this.#data.previousModelFilters[modelType] = value;
-    }
-
-    /**
-     * @param {HTMLInputElement} input
-     * @param {HTMLParagraphElement | undefined | null} selection
-     */
-    #modelTab_submitSearch = (input, selection) => {
-        if (selection !== undefined && selection !== null) {
-            DirectoryDropdown.appendSelectionToInput(selection, input, this.#sep);
-            this.#modelTab_updateDirectoryDropdown();
-        }
-        input.blur();
-        this.#modelTab_updateModelGrid();
+        this.#modelTab_updatePreviousModelFilter();
     }
 
     /**
@@ -1511,6 +1864,367 @@ class ModelManager extends ComfyDialog {
             const newSidebarState = sidebarStates[buttonIndex];
             modelManager.classList.add(newSidebarState);
         }
+    }
+    
+    /**
+     * @param {HTMLDivElement} previewImageContainer
+     * @param {Event} e 
+     * @param {1 | -1} step 
+     */
+    static #downloadTab_updatePreview(previewImageContainer, step) {
+        const children = previewImageContainer.children;
+        if (children.length === 0) {
+            return;
+        }
+        let currentIndex = -step;
+        for (let i = 0; i < children.length; i++) {
+            const previewImage = children[i];
+            const display = previewImage.style.display;
+            if (display !== "none") {
+                currentIndex = i;
+            }
+            previewImage.style.display = "none";
+        }
+        currentIndex = currentIndex + step;
+        if (currentIndex >= children.length) { currentIndex = 0; }
+        else if (currentIndex < 0) { currentIndex = children.length - 1; }
+        children[currentIndex].style.display = "block";
+    }
+    
+    /**
+     * @param {Object} info
+     * @param {String[]} modelTypes
+     * @param {DirectoryItem[]} modelDirectories
+     * @param {String} sep
+     * @returns {HTMLDivElement}
+     */
+    #downloadTab_modelInfo(info, modelTypes, modelDirectories, sep) {
+        // TODO: use passed in info
+        const RADIO_MODEL_PREVIEW_GROUP_NAME = "model-download-info-preview-model";
+        const RADIO_MODEL_PREVIEW_DEFAULT = "Default Preview";
+        const RADIO_MODEL_PREVIEW_CUSTOM = "Custom Preview Url";
+        
+        const els = {
+            modelPreviewContainer: null,
+            previewImgs: null,
+            buttonLeft: null,
+            buttonRight: null,
+            
+            customPreviewContainer: null,
+            customPreviewUrl: null,
+            
+            modelTypeSelect: null,
+            saveDirectoryPath: null,
+            filename: null,
+        };
+        
+        const datas = {
+            cachedUrl: "",
+        };
+        
+        $el("input", {
+            $: (el) => (els.saveDirectoryPath = el),
+            type: "text",
+            placeholder: "/0",
+            value: "/0",
+        });
+        
+        $el("select", {
+            $: (el) => (els.modelTypeSelect = el),
+        }, (() => {
+            const options = [$el("option", { value: "" }, ["-- Model Type --"])];
+            modelTypes.forEach((modelType) => {
+                options.push($el("option", { value: modelType }, [modelType]));
+            });
+            return options;
+        })());
+        
+        let searchDropdown = null;
+        searchDropdown = new DirectoryDropdown(
+            els.saveDirectoryPath,
+            () => {
+                const modelType = els.modelTypeSelect.value;
+                if (modelType === "") { return; }
+                searchDropdown.update(
+                    modelDirectories,
+                    sep,
+                    modelType,
+                );
+            },
+            () => {},
+            () => {},
+            sep,
+        );
+        
+        const filepath = info["downloadFilePath"];
+        const modelInfo = $el("details", [
+            $el("summary", [filepath + info["fileName"]]),
+            $el("div", [
+                $el("div", [
+                    $el("button", {
+                        onclick: (e) => {
+                            const url = datas.cachedUrl;
+                            const modelType = els.modelTypeSelect.value; // TODO: cannot be empty string or invalid selection
+                            const path = els.saveDirectoryPath.value; // TODO: server: root must be valid
+                            const filename = els.filename.value; // note: does not include file extension
+                            const imgUrl = (() => {
+                                const value = document.querySelector(`input[name="${RADIO_MODEL_PREVIEW_GROUP_NAME}"]:checked`).value;
+                                switch (value) {
+                                    case RADIO_MODEL_PREVIEW_DEFAULT:
+                                        const children = els.previewImgs.children;
+                                        for (let i = 0; i < children.length; i++) {
+                                            const child = children[i];
+                                            if (child.style.display !== "none") {
+                                                return child.src;
+                                            }
+                                        }
+                                        return "";
+                                    case RADIO_MODEL_PREVIEW_CUSTOM:
+                                        return els.customPreviewUrl.value;
+                                }
+                                return "";
+                            })();
+                            // TODO: lock downloading
+                            // TODO: send download info to server
+                            // TODO: unlock downloading
+                        },
+                    }, ["Download"]),
+                    els.modelTypeSelect,
+                    $el("div", [
+                        els.saveDirectoryPath,
+                        searchDropdown.element,
+                    ]),
+                    $el("input", {
+                        $: (el) => (els.filename = el),
+                        type: "text",
+                        placeholder: (() => {
+                            const filename = info["fileName"];
+                            // TODO: only remove valid model file extensions
+                            const i = filename.lastIndexOf(".");
+                            return i === - 1 ? filename : filename.substring(0, i);
+                        })(),
+                    }),
+                ]),
+                /*
+                $el("div", (() => {
+                    return Object.entries(info["details"]).filter(([, value]) => {
+                        return value !== undefined && value !== null;
+                    }).map(([key, value]) => {
+                        const el = document.createElement("p");
+                        el.innerText = key + ": " + value;
+                        return el;
+                    });
+                })()),
+                */
+                $el("div.model-preview-select-radio-container", [
+                    $radioGroup({
+                        name: RADIO_MODEL_PREVIEW_GROUP_NAME,
+                        onchange: (value) => {
+                            switch (value) {
+                                case RADIO_MODEL_PREVIEW_DEFAULT:
+                                    const bottonStyleDisplay = els.previewImgs.children.length > 1 ? "block" : "none";
+                                    els.buttonLeft.style.display = bottonStyleDisplay;
+                                    els.buttonRight.style.display = bottonStyleDisplay;
+                                    els.modelPreviewContainer.style.display = "block";
+                                    els.customPreviewContainer.style.display = "none";
+                                    break;
+                                case RADIO_MODEL_PREVIEW_CUSTOM:
+                                    els.modelPreviewContainer.style.display = "none";
+                                    els.customPreviewContainer.style.display = "block";
+                                    break;
+                                default:
+                                    els.modelPreviewContainer.style.display = "none";
+                                    els.customPreviewContainer.style.display = "none";
+                                    break;
+                            }
+                        },
+                        options: (() => {
+                            const radios = [];
+                            radios.push({ value: "No Preview" });
+                            if (info["images"].length > 0) {
+                                radios.push({ value: RADIO_MODEL_PREVIEW_DEFAULT });
+                            }
+                            radios.push({ value: RADIO_MODEL_PREVIEW_CUSTOM });
+                            return radios;
+                        })(),
+                    }),
+                    $el("div", [
+                        $el("div", {
+                            $: (el) => (els.modelPreviewContainer = el),
+                            style: { display: "none" },
+                        }, [
+                            $el("div", {
+                                $: (el) => (els.previewImgs = el),
+                            }, (() => {
+                                const imgs = info["images"].map((url) => {
+                                    return $el("img", {
+                                        src: url,
+                                        style: { display: "none" },
+                                        loading: "lazy",
+                                    });
+                                });
+                                if (imgs.length > 0) {
+                                    imgs[0].style.display = "block";
+                                }
+                                return imgs;
+                            })()),
+                            $el("div", [
+                                $el("button", {
+                                    $: (el) => (els.buttonLeft = el),
+                                    onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, -1),
+                                }, ["LEFT"]),
+                                $el("button", {
+                                    $: (el) => (els.buttonRight = el),
+                                    onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, 1),
+                                }, ["RIGHT"]),
+                            ]),
+                        ]),
+                        $el("div", {
+                            $: (el) => (els.customPreviewContainer = el),
+                            style: { display: "none" },
+                        }, [
+                            $el("input.search-text-area", {
+                                $: (el) => (els.customPreviewUrl = el),
+                                type: "text",
+                                placeholder: "(preview image url)"
+                            }),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]);
+        
+        const modelTypeSelect = els.modelTypeSelect;
+        modelTypeSelect.selectedIndex = 0; // reset
+        const comfyUIModelType = (
+            civitai_comfyUiDirectory(info["details"]["fileType"]) ??
+            civitai_comfyUiDirectory(info["modelType"]) ??
+            null
+        );
+        if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
+            const modelTypeOptions = modelTypeSelect.children;
+            for (let i = 0; i < modelTypeOptions.length; i++) {
+                const option = modelTypeOptions[i];
+                if (option.value === comfyUIModelType) {
+                    modelTypeSelect.selectedIndex = i;
+                    break;
+                }
+            }
+        }
+        
+        return modelInfo;
+    }
+    
+    async #downloadTab_search() {
+        const infosHtml = this.#el.modelInfos;
+        infosHtml.innerHTML = "";
+        
+        const urlText = this.#el.modelInfoUrl.value;
+        const modelInfos = await (async () => {
+            if (urlText.startsWith("https://civitai.com")) {
+                const civitaiInfo = await civitai_getFilteredInfo(urlText);
+                if (Object.keys(civitaiInfo).length === 0) {
+                    return [];
+                }
+                const infos = [];
+                const type = civitaiInfo["type"];
+                civitaiInfo["versions"].forEach((version) => {
+                    const images = version["images"];
+                    version["files"].forEach((file) => {
+                        infos.push({
+                            "images": images,
+                            "fileName": file["name"],
+                            "modelType": type,
+                            "downloadUrl": file["downloadUrl"],
+                            "downloadFilePath": "",
+                            "details": {
+                                "fileSizeKB": file["sizeKB"],
+                                "fileType": file["type"],
+                                "fp": file["fp"],
+                                "quant": file["size"],
+                                "fileFormat": file["format"],
+                            },
+                        });
+                    });
+                });
+                return infos;
+            }
+            if (urlText.startsWith("https://huggingface.co")) {
+                const hfInfo = await huggingFace_getFilteredInfo(urlText);
+                if (Object.keys(hfInfo).length === 0) {
+                    return [];
+                }
+                const files = hfInfo["modelFiles"];
+                if (files.length === 0) {
+                    return [];
+                }
+                
+                const baseDownloadUrl = hfInfo["baseDownloadUrl"];
+                return hfInfo["modelFiles"].map((file) => {
+                    const indexSep = file.lastIndexOf("/");
+                    const filename = file.substring(indexSep + 1);
+                    return {
+                        "images": [], // TODO: ambiguous?
+                        "fileName": filename,
+                        "modelType": "",
+                        "downloadUrl": baseDownloadUrl + "/" + file,
+                        "downloadFilePath": file.substring(0, indexSep + 1),
+                        "details": {
+                            "fileSizeKB": undefined, // TODO: too hard?
+                        },
+                    };
+                });
+            }
+            if (urlText.endsWith(".json")) {
+                // TODO: support old index model files
+                return [];
+            }
+            return [];
+        })();
+        
+        const modelTypes = Object.keys(this.#data.models);
+        const modelInfosHtml = modelInfos.map((modelInfo) => {
+            return this.#downloadTab_modelInfo(
+                modelInfo,
+                modelTypes,
+                this.#data.modelDirectories,
+                this.#sep,
+            );
+        });
+        if (modelInfos.length === 0) {
+            modelInfosHtml.push($el("div", ["No results found."]));
+        }
+        else if (modelInfos.length === 1) {
+            modelInfosHtml[0].open = true;
+        }
+        infosHtml.append.apply(infosHtml, modelInfosHtml);
+    }
+    
+    /**
+     * @returns {HTMLElement}
+     */
+    #downloadTab_new() {
+        return $el("div", [
+            $el("div", [
+                $el("input.search-text-area", {
+                    $: (el) => (this.#el.modelInfoUrl = el),
+                    type: "text",
+                    placeholder: "Civitai or HuggingFace model",
+                    onkeydown: (e) => {
+                        if (e.key === "Enter") {
+                            e.stopPropagation();
+                            this.#downloadTab_search();
+                        }
+                    },
+                }),
+                $el("button", {
+                    onclick: () => this.#downloadTab_search(),
+                }, ["Search"]),
+            ]),
+            $el("div", {
+                $: (el) => (this.#el.modelInfos = el),
+            }),
+        ]);
     }
 }
 

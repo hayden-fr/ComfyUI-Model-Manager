@@ -139,10 +139,10 @@
 .comfy-radio {
     display: flex;
     gap: 4px;
-    padding: 4px 8px;
+    padding: 4px 16px;
     color: var(--input-text);
-	border: 2px solid var(--comfy-input-bg);
-    border-radius: 8px;
+	border: 2px solid var(--border-color);
+    border-radius: 16px;
     background-color: var(--comfy-input-bg);
     font-size: 18px;
 }
@@ -356,8 +356,6 @@
     position: absolute;
     background-color: var(--bg-color);
     border: 2px var(--border-color) solid;
-    top: 45px;
-    width: 94.7%;
     max-height: 30vh;
     overflow: auto;
     border-radius: 10px;
@@ -414,4 +412,14 @@
     font-size: 1.2em;
     border: solid 2px var(--border-color);
     border-radius: 8px;
+}
+
+.model-preview-select-radio-container img {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+	border-radius: 8px;
+    object-fit: cover;
 }
