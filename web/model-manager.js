@@ -386,7 +386,7 @@ class DirectoryDropdown {
         this.#updateDropdown = updateDropdown;
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
-
+        
         input.addEventListener("input", () => updateDropdown());
         input.addEventListener("focus", () => updateDropdown());
         input.addEventListener("blur", () => { dropdown.style.display = "none"; });
@@ -411,33 +411,81 @@ class DirectoryDropdown {
                         e.target.blur();
                     }
                 }
-                else if (e.key === "ArrowRight") {
+                else if (e.key === "ArrowRight" && dropdown.style.display !== "none") {
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
                         e.stopPropagation();
                         e.preventDefault(); // prevent cursor move
-                        DirectoryDropdown.submitSearch(
-                            e.target, 
-                            selection, 
-                            updateDropdown, 
-                            updateCallback, 
-                            submitCallback, 
-                            sep,
-                        );
+                        const input = e.target;
+                        DirectoryDropdown.selectionToInput(input, selection, sep);
+                        updateDropdown();
+                        //updateCallback();
+                        //submitCallback();
+                        const options = dropdown.children;
+                        if (options.length > 0) {
+                            // arrow key navigation
+                            options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        }
+                    }
+                }
+                else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
+                    const input = e.target;
+                    const oldFilterText = input.value;
+                    const iSep = oldFilterText.lastIndexOf(sep, oldFilterText.length - 2);
+                    const newFilterText = oldFilterText.substring(0, iSep + 1);
+                    if (oldFilterText !== newFilterText) {
+                        const delta = oldFilterText.substring(iSep + 1);
+                        let isMatch = delta[delta.length-1] === sep;
+                        if (!isMatch) {
+                            const options = dropdown.children;
+                            for (let i = 0; i < options.length; i++) {
+                                const option = options[i];
+                                if (option.innerText.startsWith(delta)) {
+                                    isMatch = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (isMatch) {
+                            e.stopPropagation();
+                            e.preventDefault(); // prevent cursor move
+                            input.value = newFilterText;
+                            updateDropdown();
+                            //updateCallback();
+                            //submitCallback();
+                            const options = dropdown.children;
+                            let isSelected = false;
+                            for (let i = 0; i < options.length; i++) {
+                                const option = options[i];
+                                if (option.innerText.startsWith(delta)) {
+                                    option.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                                    isSelected = true;
+                                    break;
+                                }
+                            }
+                            if (!isSelected) {
+                                const options = dropdown.children;
+                                if (options.length > 0) {
+                                    // arrow key navigation
+                                    options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                                }
+                            }
+                        }
                     }
                 }
                 else if (e.key === "Enter") {
                     e.stopPropagation();
-                    DirectoryDropdown.submitSearch(
-                        e.target, 
-                        options[iSelection], 
-                        updateDropdown, 
-                        updateCallback, 
-                        submitCallback, 
-                        sep,
-                    );
+                    const input = e.target
+                    const selection = options[iSelection];
+                    if (selection !== undefined && selection !== null) {
+                        DirectoryDropdown.selectionToInput(input, selection, sep);
+                        updateDropdown();
+                        updateCallback();
+                    }
+                    submitCallback();
+                    input.blur();
                 }
-                else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && dropdown.style.display !== "none") {
                     e.stopPropagation();
                     e.preventDefault(); // prevent cursor move
                     let iNext = options.length;
@@ -480,33 +528,19 @@ class DirectoryDropdown {
             },
         );
     }
-
+    
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
-     * @param {Function} updateDropdown
-     * @param {Fucntion} [updateCallback=() => {}]
-     * @param {Function} [submitCallback=() => {}]
      * @param {String} [sep="/"]
      */
-    static submitSearch(input, selection, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/") {
-        let blur = true;
-        if (selection !== undefined && selection !== null) {
-            selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-            const selectedText = selection.innerText;
-            blur = !selectedText.endsWith(sep); // is directory
-            const oldFilterText = input.value;
-            const iSep = oldFilterText.lastIndexOf(sep);
-            const previousPath = oldFilterText.substring(0, iSep + 1);
-            input.value = previousPath + selectedText;
-            
-            updateDropdown();
-            updateCallback();
-        }
-        if (blur) {
-            input.blur();
-        }
-        submitCallback();
+    static selectionToInput(input, selection, sep) {
+        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+        const selectedText = selection.innerText;
+        const oldFilterText = input.value;
+        const iSep = oldFilterText.lastIndexOf(sep);
+        const previousPath = oldFilterText.substring(0, iSep + 1);
+        input.value = previousPath + selectedText;
     }
     
     /**
@@ -634,14 +668,11 @@ class DirectoryDropdown {
         };
         const selection_submit = (e) => {
             e.stopPropagation();
-            DirectoryDropdown.submitSearch(
-                input, 
-                e.target, 
-                updateDropdown, 
-                updateCallback, 
-                submitCallback, 
-                sep
-            );
+            const selection = e.target;
+            DirectoryDropdown.selectionToInput(input, selection, sep);
+            updateDropdown();
+            updateCallback();e.target
+            submitCallback();
         };
         const innerHtml = options.map((text) => {
             /** @type {HTMLParagraphElement} */
