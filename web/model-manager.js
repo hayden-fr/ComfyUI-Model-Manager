@@ -2009,6 +2009,7 @@ class ModelManager extends ComfyDialog {
                             record["type"] = els.modelTypeSelect.value;
                             if (record["type"] === "") { return; } // TODO: notify user in app
                             record["path"] = els.saveDirectoryPath.value;
+                            if (record["path"] === "/") { return; } // TODO: notify user in app
                             record["name"] = (() => {
                                 const filename = info["fileName"];
                                 const name = els.filename.value;

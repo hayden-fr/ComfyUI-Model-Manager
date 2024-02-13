@@ -27,7 +27,8 @@ Currently it is still missing some features it should have.
 - Increased supported preview image types.
 - Correctly change colors using ComfyUI's theme colors.
 - Simplified UI.
-- Settings tab and config file.
+- Civitai and HuggingFace API token configurable in `server_settings.yaml`.
+- Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
   - Text to always search.
   - Show/Hide add embedding extension.
@@ -65,8 +66,6 @@ Currently it is still missing some features it should have.
   - &#9744; Check search code is optimized to avoid recalculation on every minor input change
 - &#9744; Directory dropdown
   - &#9744; Use always filter to filter directory content auto-suggest dropdown
-    - &#9744; Generalize model list filtering code to reuse approach
-  - &#9744; Generalize search dropdown for download location selection
 - &#9744; Filters dropdown
   - &#9744; Stable Diffusion model version/Clip/Upscale/?
   - &#9744; Favorites

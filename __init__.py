@@ -28,6 +28,7 @@ index_uri = os.path.join(extension_uri, "index.json")
 #checksum_cache_uri = os.path.join(extension_uri, "checksum_cache.txt")
 no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
+server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 
 fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
 image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")
@@ -122,13 +123,15 @@ def ui_rules():
     ]
 
 
-#def server_rules():
-#    Rule = config_loader.Rule
-#    return [
-#        Rule("model_extension_download_whitelist", [".safetensors"], list),
-#        Rule("civitai_api_key", "", str),
-#    ]
-
+def server_rules():
+    Rule = config_loader.Rule
+    return [
+        #Rule("model_extension_download_whitelist", [".safetensors"], list),
+        Rule("civitai_api_key", "", str),
+        Rule("huggingface_api_key", "", str),
+    ]
+server_settings = config_loader.yaml_load(server_settings_uri, server_rules())
+config_loader.yaml_save(server_settings_uri, server_rules(), server_settings)
 
 @server.PromptServer.instance.routes.get("/model-manager/settings/load")
 async def load_ui_settings(request):
@@ -384,17 +387,24 @@ async def directory_list(request):
     return web.json_response(dir_list)
 
 
-def_headers = {
-    "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148"
-}
-
-
 def download_file(url, filename, overwrite):
     if not overwrite and os.path.isfile(filename):
         raise Exception("File already exists!")
 
     # TODO: clear any previous failed partial download file
     dl_filename = filename + ".download"
+
+    def_headers = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+    }
+    if url.startswith("https://civitai.com/"):
+        api_key = server_settings["civitai_api_key"]
+        if (api_key != ""):
+            def_headers["Authorization"] = f"Bearer {api_key}"
+    elif url.startswith("https://huggingface.co/"):
+        api_key = server_settings["huggingface_api_key"]
+        if api_key != "":
+            def_headers["Authorization"] = f"Bearer {api_key}"
 
     rh = requests.get(url=url, stream=True, verify=False, headers=def_headers, proxies=None, allow_redirects=False)
     if not rh.ok:
