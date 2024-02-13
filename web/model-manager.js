@@ -1439,10 +1439,10 @@ class ModelManager extends ComfyDialog {
                         ]
                     ),
                     $tabs([
-                        $tab("Install", this.#createSourceInstall()),
+                        $tab("Download", [this.#downloadTab_new()]),
+                        //$tab("Install", this.#createSourceInstall()),
                         $tab("Models", this.#modelTab_new()),
                         $tab("Settings", [this.#settingsTab_new()]),
-                        //$tab("Download2", [this.#downloadTab_new()]),
                     ]),
                 ]),
             ]
@@ -1453,7 +1453,7 @@ class ModelManager extends ComfyDialog {
 
     #init() {
         this.#settingsTab_reload(false);
-        this.#refreshSourceList();
+        //this.#refreshSourceList();
         this.#modelTab_updateModels();
     }
 
@@ -1471,7 +1471,7 @@ class ModelManager extends ComfyDialog {
                         $: (el) => (this.#el.loadSourceBtn = el),
                         onclick: () => this.#refreshSourceList(),
                     }),
-                    $el("input.source-text-area", {
+                    $el("input.plain-text-area", {
                         $: (el) => (this.#el.loadSourceFromInput = el),
                         placeholder: "https://ComfyUI-Model-Manager/index.json",
                     }),
@@ -1718,7 +1718,7 @@ class ModelManager extends ComfyDialog {
 
         if (reloadData) {
             // Is this slow?
-            this.#refreshSourceList();
+            //this.#refreshSourceList();
             this.#modelTab_updateModels();
         }
     }
@@ -1940,11 +1940,11 @@ class ModelManager extends ComfyDialog {
      * @param {String[]} modelTypes
      * @param {DirectoryItem[]} modelDirectories
      * @param {String} sep
+     * @param {int} id
      * @returns {HTMLDivElement}
      */
-    #downloadTab_modelInfo(info, modelTypes, modelDirectories, sep) {
+    #downloadTab_modelInfo(info, modelTypes, modelDirectories, sep, id) {
         // TODO: use passed in info
-        const RADIO_MODEL_PREVIEW_GROUP_NAME = "model-download-info-preview-model";
         const RADIO_MODEL_PREVIEW_DEFAULT = "Default Preview";
         const RADIO_MODEL_PREVIEW_CUSTOM = "Custom Preview Url";
         
@@ -1962,14 +1962,14 @@ class ModelManager extends ComfyDialog {
             filename: null,
         };
         
-        $el("input", {
+        $el("input.search-text-area", {
             $: (el) => (els.saveDirectoryPath = el),
             type: "text",
             placeholder: "/0",
             value: "/0",
         });
         
-        $el("select", {
+        $el("select.model-select-dropdown", {
             $: (el) => (els.modelTypeSelect = el),
         }, (() => {
             const options = [$el("option", { value: "" }, ["-- Model Type --"])];
@@ -1997,171 +1997,207 @@ class ModelManager extends ComfyDialog {
             true,
         );
         
+        const radioGroupName = "model-download-info-preview-model" + "-" + id;
+        const radioGroup = $radioGroup({
+            name: radioGroupName,
+            onchange: (value) => {
+                switch (value) {
+                    case RADIO_MODEL_PREVIEW_DEFAULT:
+                        const bottonStyleDisplay = els.previewImgs.children.length > 1 ? "block" : "none";
+                        els.buttonLeft.style.display = bottonStyleDisplay;
+                        els.buttonRight.style.display = bottonStyleDisplay;
+                        els.modelPreviewContainer.style.display = "block";
+                        els.customPreviewContainer.style.display = "none";
+                        break;
+                    case RADIO_MODEL_PREVIEW_CUSTOM:
+                        els.modelPreviewContainer.style.display = "none";
+                        els.customPreviewContainer.style.display = "flex";
+                        break;
+                    default:
+                        els.modelPreviewContainer.style.display = "none";
+                        els.customPreviewContainer.style.display = "none";
+                        break;
+                }
+            },
+            options: (() => {
+                const radios = [];
+                radios.push({ value: "No Preview" });
+                if (info["images"].length > 0) {
+                    radios.push({ value: RADIO_MODEL_PREVIEW_DEFAULT });
+                }
+                radios.push({ value: RADIO_MODEL_PREVIEW_CUSTOM });
+                return radios;
+            })(),
+        });
+        
         const filepath = info["downloadFilePath"];
-        const modelInfo = $el("details", [
+        const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
-            $el("div", [
-                $el("div", [
-                    $el("button", {
-                        onclick: async (e) => {
-                            const record = {};
-                            record["download"] = info["downloadUrl"];
-                            record["type"] = els.modelTypeSelect.value;
-                            if (record["type"] === "") { return; } // TODO: notify user in app
-                            record["path"] = els.saveDirectoryPath.value;
-                            if (record["path"] === "/") { return; } // TODO: notify user in app
-                            record["name"] = (() => {
-                                const filename = info["fileName"];
-                                const name = els.filename.value;
-                                if (name === "") {
-                                    return filename;
-                                }
-                                const ext = MODEL_EXTENSIONS.find((ext) => {
-                                    return filename.endsWith(ext);
-                                }) ?? "";
-                                return name + ext;
-                            })();
-                            record["image"] = (() => {
-                                const value = document.querySelector(`input[name="${RADIO_MODEL_PREVIEW_GROUP_NAME}"]:checked`).value;
-                                switch (value) {
-                                    case RADIO_MODEL_PREVIEW_DEFAULT:
-                                        const children = els.previewImgs.children;
-                                        for (let i = 0; i < children.length; i++) {
-                                            const child = children[i];
-                                            if (child.style.display !== "none") {
-                                                return child.src;
-                                            }
-                                        }
-                                        return "";
-                                    case RADIO_MODEL_PREVIEW_CUSTOM:
-                                        return els.customPreviewUrl.value;
-                                }
-                                return "";
-                            })();
-                            record["overwrite"] = true; // TODO: add to UI
-                            e.disabled = true;
-                            await request(
-                                "/model-manager/download",
-                                {
-                                    method: "POST",
-                                    body: JSON.stringify(record),
-                                }
-                            ).then(data => {
-                                if (data["success"] !== true) {
-                                    // TODO: notify user in app
-                                    console.error('Failed to download model:', data);
-                                }
-                            }).catch(err => {
-                                // TODO: notify user in app
-                                console.error('Failed to download model:', err);
+            $el("div", {
+                style: { display: "flex", gap: "16px" },
+            }, [
+                $el("div.item", {
+                    $: (el) => (els.modelPreviewContainer = el),
+                    style: { display: "none" },
+                }, [
+                    $el("div", {
+                        $: (el) => (els.previewImgs = el),
+                    }, (() => {
+                        const imgs = info["images"].map((url) => {
+                            return $el("img", {
+                                src: url,
+                                style: { display: "none" },
+                                loading: "lazy",
                             });
-                            e.disabled = false;
-                        },
-                    }, ["Download"]),
-                    els.modelTypeSelect,
-                    $el("div", [
-                        els.saveDirectoryPath,
-                        searchDropdown.element,
+                        });
+                        if (imgs.length > 0) {
+                            imgs[0].style.display = "block";
+                        }
+                        return imgs;
+                    })()),
+                    $el("div.model-preview-overlay", [
+                        $el("button.icon-button.model-preview-button-left", {
+                            $: (el) => (els.buttonLeft = el),
+                            onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, -1),
+                            textContent: "←",
+                        }),
+                        $el("button.icon-button.model-preview-button-right", {
+                            $: (el) => (els.buttonRight = el),
+                            onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, 1),
+                            textContent: "→",
+                        }),
                     ]),
-                    $el("input", {
-                        $: (el) => (els.filename = el),
-                        type: "text",
-                        placeholder: (() => {
-                            const filename = info["fileName"];
-                            // TODO: only remove valid model file extensions
-                            const i = filename.lastIndexOf(".");
-                            return i === - 1 ? filename : filename.substring(0, i);
-                        })(),
-                    }),
                 ]),
-                /*
-                $el("div", (() => {
-                    return Object.entries(info["details"]).filter(([, value]) => {
-                        return value !== undefined && value !== null;
-                    }).map(([key, value]) => {
-                        const el = document.createElement("p");
-                        el.innerText = key + ": " + value;
-                        return el;
-                    });
-                })()),
-                */
-                $el("div.model-preview-select-radio-container", [
-                    $radioGroup({
-                        name: RADIO_MODEL_PREVIEW_GROUP_NAME,
-                        onchange: (value) => {
-                            switch (value) {
-                                case RADIO_MODEL_PREVIEW_DEFAULT:
-                                    const bottonStyleDisplay = els.previewImgs.children.length > 1 ? "block" : "none";
-                                    els.buttonLeft.style.display = bottonStyleDisplay;
-                                    els.buttonRight.style.display = bottonStyleDisplay;
-                                    els.modelPreviewContainer.style.display = "block";
-                                    els.customPreviewContainer.style.display = "none";
-                                    break;
-                                case RADIO_MODEL_PREVIEW_CUSTOM:
-                                    els.modelPreviewContainer.style.display = "none";
-                                    els.customPreviewContainer.style.display = "block";
-                                    break;
-                                default:
-                                    els.modelPreviewContainer.style.display = "none";
-                                    els.customPreviewContainer.style.display = "none";
-                                    break;
-                            }
-                        },
-                        options: (() => {
-                            const radios = [];
-                            radios.push({ value: "No Preview" });
-                            if (info["images"].length > 0) {
-                                radios.push({ value: RADIO_MODEL_PREVIEW_DEFAULT });
-                            }
-                            radios.push({ value: RADIO_MODEL_PREVIEW_CUSTOM });
-                            return radios;
-                        })(),
-                    }),
-                    $el("div", [
-                        $el("div", {
-                            $: (el) => (els.modelPreviewContainer = el),
-                            style: { display: "none" },
-                        }, [
-                            $el("div", {
-                                $: (el) => (els.previewImgs = el),
-                            }, (() => {
-                                const imgs = info["images"].map((url) => {
-                                    return $el("img", {
-                                        src: url,
-                                        style: { display: "none" },
-                                        loading: "lazy",
-                                    });
-                                });
-                                if (imgs.length > 0) {
-                                    imgs[0].style.display = "block";
-                                }
-                                return imgs;
-                            })()),
+                $el("div", [
+                    $el("div", {
+                        style: { "margin-top": "8px" }
+                    }, [
+                        $el("div.model-preview-select-radio-container", [
+                            $el("div.row.tab-header-flex-block", [radioGroup]),
                             $el("div", [
-                                $el("button", {
-                                    $: (el) => (els.buttonLeft = el),
-                                    onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, -1),
-                                }, ["LEFT"]),
-                                $el("button", {
-                                    $: (el) => (els.buttonRight = el),
-                                    onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, 1),
-                                }, ["RIGHT"]),
+                                $el("div.row.tab-header-flex-block", {
+                                    $: (el) => (els.customPreviewContainer = el),
+                                    style: { display: "none" },
+                                }, [
+                                    $el("input.search-text-area", {
+                                        $: (el) => (els.customPreviewUrl = el),
+                                        type: "text",
+                                        placeholder: "https://custom-image-preview.png"
+                                    }),
+                                ]),
                             ]),
                         ]),
-                        $el("div", {
-                            $: (el) => (els.customPreviewContainer = el),
-                            style: { display: "none" },
-                        }, [
-                            $el("input.search-text-area", {
-                                $: (el) => (els.customPreviewUrl = el),
+                        $el("div.row.tab-header-flex-block", [
+                            els.modelTypeSelect,
+                        ]),
+                        $el("div.row.tab-header-flex-block", [
+                            els.saveDirectoryPath,
+                            searchDropdown.element,
+                        ]),
+                        $el("div.row.tab-header-flex-block", [
+                            $el("button.icon-button", {
+                                textContent: "📥︎",
+                                onclick: async (e) => {
+                                    const record = {};
+                                    record["download"] = info["downloadUrl"];
+                                    record["type"] = els.modelTypeSelect.value;
+                                    if (record["type"] === "") { return; } // TODO: notify user in app
+                                    record["path"] = els.saveDirectoryPath.value;
+                                    if (record["path"] === "/") { return; } // TODO: notify user in app
+                                    record["name"] = (() => {
+                                        const filename = info["fileName"];
+                                        const name = els.filename.value;
+                                        if (name === "") {
+                                            return filename;
+                                        }
+                                        const ext = MODEL_EXTENSIONS.find((ext) => {
+                                            return filename.endsWith(ext);
+                                        }) ?? "";
+                                        return name + ext;
+                                    })();
+                                    record["image"] = (() => {
+                                        const value = document.querySelector(`input[name="${radioGroupName}"]:checked`).value;
+                                        switch (value) {
+                                            case RADIO_MODEL_PREVIEW_DEFAULT:
+                                                const children = els.previewImgs.children;
+                                                for (let i = 0; i < children.length; i++) {
+                                                    const child = children[i];
+                                                    if (child.style.display !== "none") {
+                                                        return child.src;
+                                                    }
+                                                }
+                                                return "";
+                                            case RADIO_MODEL_PREVIEW_CUSTOM:
+                                                return els.customPreviewUrl.value;
+                                        }
+                                        return "";
+                                    })();
+                                    record["overwrite"] = false; // TODO: add to UI
+                                    e.target.disabled = true;
+                                    let success = true;
+                                    let resultText = "✔";
+                                    await request(
+                                        "/model-manager/download",
+                                        {
+                                            method: "POST",
+                                            body: JSON.stringify(record),
+                                        }
+                                    ).then(data => {
+                                        if (data["success"] !== true) {
+                                            // TODO: notify user in app
+                                            console.error('Failed to download model:', data);
+                                            success = false;
+                                            resultText = "📥︎";
+                                        }
+                                    }).catch(err => {
+                                        // TODO: notify user in app
+                                        console.error('Failed to download model:', err);
+                                        success = false;
+                                        resultText = "📥︎";
+                                    });
+                                    buttonAlert(e.target, success, "✔", "✖", resultText);
+                                    e.target.disabled = success;
+                                },
+                            }),
+                            $el("input.plain-text-area", {
+                                $: (el) => (els.filename = el),
                                 type: "text",
-                                placeholder: "(preview image url)"
+                                placeholder: (() => {
+                                    const filename = info["fileName"];
+                                    // TODO: only remove valid model file extensions
+                                    const i = filename.lastIndexOf(".");
+                                    return i === - 1 ? filename : filename.substring(0, i);
+                                })(),
                             }),
                         ]),
                     ]),
+                    /*
+                    $el("div", (() => {
+                        return Object.entries(info["details"]).filter(([, value]) => {
+                            return value !== undefined && value !== null;
+                        }).map(([key, value]) => {
+                            const el = document.createElement("p");
+                            el.innerText = key + ": " + value;
+                            return el;
+                        });
+                    })()),
+                    */
                 ]),
             ]),
         ]);
+        
+        if (info["images"].length > 0) {
+            const children = radioGroup.children;
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
+                const radioButton = child.children[0];
+                if (radioButton.value === RADIO_MODEL_PREVIEW_DEFAULT) {
+                    els.modelPreviewContainer.style.display = "block";
+                    radioButton.checked = true;
+                    break;
+                }
+            };
+        }
         
         const modelTypeSelect = els.modelTypeSelect;
         modelTypeSelect.selectedIndex = 0; // reset
@@ -2257,12 +2293,13 @@ class ModelManager extends ComfyDialog {
             return MODEL_EXTENSIONS.find((ext) => {
                 return filename.endsWith(ext);
             }) ?? false;
-        }).map((modelInfo) => {
+        }).map((modelInfo, id) => {
             return this.#downloadTab_modelInfo(
                 modelInfo,
                 modelTypes,
                 this.#data.modelDirectories,
                 this.#sep,
+                id,
             );
         });
         if (modelInfos.length === 0) {
@@ -2279,11 +2316,11 @@ class ModelManager extends ComfyDialog {
      */
     #downloadTab_new() {
         return $el("div", [
-            $el("div", [
+            $el("div.row.tab-header-flex-block", [
                 $el("input.search-text-area", {
                     $: (el) => (this.#el.modelInfoUrl = el),
                     type: "text",
-                    placeholder: "Civitai or HuggingFace model",
+                    placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
                     onkeydown: (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
@@ -2291,13 +2328,16 @@ class ModelManager extends ComfyDialog {
                         }
                     },
                 }),
-                $el("button", {
+                $el("button.icon-button", {
                     onclick: () => this.#downloadTab_search(),
-                }, ["Search"]),
+                    textContent: "🔍︎",
+                }),
             ]),
             $el("div", {
                 $: (el) => (this.#el.modelInfos = el),
-            }),
+            }, [
+                $el("div", ["Input a URL to view download settings."]),
+            ]),
         ]);
     }
 }

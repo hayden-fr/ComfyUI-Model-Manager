@@ -55,7 +55,7 @@
     gap: 16px;
 }
 
-.comfy-grid .item {
+.model-manager .item {
     position: relative;
     width: 230px;
     height: 345px;
@@ -64,10 +64,27 @@
 	border-radius: 8px;
 }
 
-.comfy-grid .item img {
+.model-manager .item img {
     width: 100%;
     height: 100%;
     object-fit: cover;
+}
+
+.model-manager .model-preview-button-left,
+.model-manager .model-preview-button-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    border-radius: 20px;
+}
+
+.model-manager .model-preview-button-right {
+    right: 4px;
+}
+
+.model-manager .model-preview-button-left {
+    left: 4px;
 }
 
 .comfy-grid .model-label {
@@ -99,7 +116,7 @@
     height: 0;
 }
 
-.comfy-grid .item .model-preview-overlay {
+.model-manager .item .model-preview-overlay {
     position: absolute;
     top: 0;
     left: 0;
@@ -306,13 +323,18 @@
 }
 
 .model-manager .row {
-    position: sticky;
+    position: relative;
     padding-top: 2px;
     margin-top: -2px;
     padding-bottom: 18px;
     margin-bottom: 1px;
     top: -1px;
     background-color: var(--comfy-input-bg);
+}
+
+.model-manager [data-name="Install"] .row,
+.model-manager [data-name="Models"] .row {
+    position: sticky;
     z-index: 1;
 }
 
@@ -347,9 +369,15 @@
 }
 
 .model-manager .search-text-area,
-.model-manager .source-text-area,
+.model-manager .plain-text-area,
 .model-manager .model-select-dropdown {
 	flex: 1;
+    min-height: 36px;
+    padding-block: 0;
+}
+
+.model-manager .model-select-dropdown {
+    min-height: 40px;
 }
 
 .model-manager .search-dropdown {
@@ -423,4 +451,13 @@
     overflow: hidden;
 	border-radius: 8px;
     object-fit: cover;
+}
+
+.model-manager [data-name="Download"] summary {
+    padding: 16px;
+}
+
+.model-manager .download-details {
+    border-radius: 16px;
+    padding: 0px 16px 0px 16px;
 }

@@ -12,22 +12,34 @@ Currently it is still missing some features it should have.
 
 ## Fork Improvements
 
+### Download Tab
+
+- Remade download tab.
+  - View multiple models connected to url.
+  - Download preview images.
+- Civitai and HuggingFace API token configurable in `server_settings.yaml`.
+
+### Models Tab
+
 - Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
   - Add `/` at the start of the search bar to see auto-complete suggestions.
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Sort for models (Date Created, Date Modified, Name).
+
+### ComfyUI Node Graph
+
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left, top and bottom toggleable sidebar modes.
 - Drag a model onto the graph to add a new node.
 - Drag a model onto an existing node to set the model field.
 - Drag an embedding onto a text area to add it to the end.
-- Increased supported preview image types.
+
+### Settings Tab
+
 - Correctly change colors using ComfyUI's theme colors.
-- Simplified UI.
-- Civitai and HuggingFace API token configurable in `server_settings.yaml`.
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
   - Text to always search.
@@ -89,11 +101,3 @@ Currently it is still missing some features it should have.
 ### Sidebar
 
 - &#9744; Drag sidebar width/height dynamically.
-
-### Directory Browser and Downloading tab
-
-(NOTE: It is a impossible to put a model automatically in the correct folder if model type information is not given or ambigious. To fully solve this requires making a file browser where files can be moved around.)
-
-- &#9744; Replace Install tab with Downloading tab (more practical IMO).
-- &#9744; Download a model from a url.
-- &#9744; Choose save path/directory to download within vaild model directories. (Alert Yes/No if need to create new dirs?)
