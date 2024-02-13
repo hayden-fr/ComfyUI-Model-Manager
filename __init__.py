@@ -391,8 +391,7 @@ def download_file(url, filename, overwrite):
     if not overwrite and os.path.isfile(filename):
         raise Exception("File already exists!")
 
-    # TODO: clear any previous failed partial download file
-    dl_filename = filename + ".download"
+    filename_temp = filename + ".download"
 
     def_headers = {
         "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
@@ -411,8 +410,8 @@ def download_file(url, filename, overwrite):
         raise Exception("Unable to download")
 
     downloaded_size = 0
-    if rh.status_code == 200 and os.path.exists(dl_filename):
-        downloaded_size = os.path.getsize(dl_filename)
+    if rh.status_code == 200 and os.path.exists(filename_temp):
+        downloaded_size = os.path.getsize(filename_temp)
 
     headers = {"Range": "bytes=%d-" % downloaded_size}
     headers["User-Agent"] = def_headers["User-Agent"]
@@ -439,16 +438,14 @@ def download_file(url, filename, overwrite):
         # Civitai download link
         pass
 
-    print("temp file is " + dl_filename)
     total_size = int(rh.headers.get("Content-Length", 0)) # TODO: pass in total size earlier
 
-    basename, ext = os.path.splitext(filename)
-    print("Start download " + basename)
+    print("Download file: " + filename)
     if total_size != 0:
         print("Download file size: " + str(total_size))
 
     mode = "wb" if overwrite else "ab"
-    with open(dl_filename, mode) as f:
+    with open(filename_temp, mode) as f:
         for chunk in r.iter_content(chunk_size=1024):
             if chunk is not None:
                 downloaded_size += len(chunk)
@@ -472,13 +469,12 @@ def download_file(url, filename, overwrite):
     print()
     if overwrite and os.path.isfile(filename):
         os.remove(filename)
-    os.rename(dl_filename, filename)
+    os.rename(filename_temp, filename)
 
 
 @server.PromptServer.instance.routes.post("/model-manager/download")
 async def download_model(request):
     body = await request.json()
-    json.dump(body, sys.stdout, indent=4)
     
     overwrite = body.get("overwrite", False)
     
