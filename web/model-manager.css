@@ -359,6 +359,7 @@
     max-height: 30vh;
     overflow: auto;
     border-radius: 10px;
+    z-index: 1;
 }
 
 .search-dropdown:empty {

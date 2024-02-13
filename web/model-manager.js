@@ -55,6 +55,9 @@ const MODEL_SORT_DATE_CREATED = "dateCreated";
 const MODEL_SORT_DATE_MODIFIED = "dateModified";
 const MODEL_SORT_DATE_NAME = "name";
 
+const MODEL_EXTENSIONS = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"]; // TODO: ask server for?
+const IMAGE_EXTENSIONS = [".png", ".webp", ".gif"]; // TODO: ask server for?
+
 /**
  * Tries to return the related ComfyUI model directory if unambigious.
  *
@@ -194,8 +197,11 @@ async function civitai_getFilteredInfo(stringUrl) {
         }
     }
     else if (urlPath.startsWith('/models')) {
-        const idStart = urlPath.indexOf("/", 1) + 1;
-        const idEnd = urlPath.indexOf("/", idStart);
+        const idStart = urlPath.indexOf("models/") + "models/".length;
+        const idEnd = (() => {
+            const idEnd = urlPath.indexOf("/", idStart);
+            return idEnd === -1 ? urlPath.length : idEnd;
+        })();
         const modelId = urlPath.substring(idStart, idEnd);
         if (parseInt(modelId, 10) == NaN) {
             return {};
@@ -209,7 +215,9 @@ async function civitai_getFilteredInfo(stringUrl) {
         const modelVersionInfos = modelInfo["modelVersions"];
         for (let i = 0; i < modelVersionInfos.length; i++) {
             const versionInfo = modelVersionInfos[i];
-            if (modelVersionId  instanceof String && modelVersionId != versionInfo["id"]) { continue; }
+            if (!Number.isNaN(modelVersionId)) {
+                if (modelVersionId != versionInfo["id"]) {continue; }
+            }
             const filesInfo = civitai_getModelFilesInfo(versionInfo);
             modelVersions.push(filesInfo);
         }
@@ -303,12 +311,11 @@ async function huggingFace_getFilteredInfo(stringUrl) {
     //const modelInfo = await requestInfo(modelId + branch); // this only gives you the files at the given branch path...
     // oid: SHA-1?, lfs.oid: SHA-256
     
-    const validModelExtensions = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"]; // TODO: ask server for?
     const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
     const modelFiles = modelInfo["siblings"].filter((sib) => {
         const filename = sib["rfilename"];
-        for (let i = 0; i < validModelExtensions.length; i++) {
-            if (filename.endsWith(validModelExtensions[i])) {
+        for (let i = 0; i < MODEL_EXTENSIONS.length; i++) {
+            if (filename.endsWith(MODEL_EXTENSIONS[i])) {
                 return filename.startsWith(clippedFilePath);
             }
         }
@@ -321,11 +328,10 @@ async function huggingFace_getFilteredInfo(stringUrl) {
         return {};
     }
     
-    const validImageExtensions = [".png", ".webp", ".gif"]; // TODO: ask server for?
     const imageFiles = modelInfo["siblings"].filter((sib) => {
         const filename = sib["rfilename"];
-        for (let i = 0; i < validImageExtensions.length; i++) {
-            if (filename.endsWith(validImageExtensions[i])) {
+        for (let i = 0; i < IMAGE_EXTENSIONS.length; i++) {
+            if (filename.endsWith(IMAGE_EXTENSIONS[i])) {
                 return filename.startsWith(filePath);
             }
         }
@@ -335,7 +341,7 @@ async function huggingFace_getFilteredInfo(stringUrl) {
         return filename;
     });
     
-    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
+    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch.replace("/tree", "");
     return {
         "baseDownloadUrl": baseDownloadUrl,
         "modelFiles": modelFiles,
@@ -353,6 +359,9 @@ async function huggingFace_getFilteredInfo(stringUrl) {
 class DirectoryDropdown {
     /** @type {HTMLDivElement} */
     element = undefined;
+    
+    /** @type {Boolean} */
+    showDirectoriesOnly = false;
 
     /** @type {HTMLInputElement} */
     #input = undefined;
@@ -373,8 +382,9 @@ class DirectoryDropdown {
      * @param {Function} [updateCallback= () => {}]
      * @param {Function} [submitCallback= () => {}]
      * @param {String} [sep="/"]
+     * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/") {
+    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/", showDirectoriesOnly = false) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -386,6 +396,7 @@ class DirectoryDropdown {
         this.#updateDropdown = updateDropdown;
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
+        this.showDirectoriesOnly = showDirectoriesOnly;
         
         input.addEventListener("input", () => updateDropdown());
         input.addEventListener("focus", () => updateDropdown());
@@ -554,6 +565,7 @@ class DirectoryDropdown {
         const updateDropdown = this.#updateDropdown;
         const updateCallback = this.#updateCallback;
         const submitCallback = this.#submitCallback;
+        const showDirectoriesOnly = this.showDirectoriesOnly;
 
         const filter = input.value;
         if (filter[0] !== sep) {
@@ -631,12 +643,12 @@ class DirectoryDropdown {
                 const grandChildCount = child["childCount"];
                 const isDir = grandChildCount !== undefined && grandChildCount !== null && grandChildCount > 0;
                 const itemName = child["name"];
-                if (itemName.startsWith(lastWord)) {
+                if (itemName.startsWith(lastWord) && (!showDirectoriesOnly || (showDirectoriesOnly && isDir))) {
                     options.push(itemName + (isDir ? "/" : ""));
                 }
             }
         }
-        else {
+        else if (!showDirectoriesOnly) {
             const filename = item["name"];
             if (filename.startsWith(lastWord)) {
                 options.push(filename);
@@ -1597,6 +1609,7 @@ class ModelManager extends ComfyDialog {
             this.#modelTab_updatePreviousModelFilter,
             this.#modelTab_updateModelGrid,
             this.#sep,
+            false,
         );
         this.#modelContentFilterDirectoryDropdown = searchDropdown;
 
@@ -1949,10 +1962,6 @@ class ModelManager extends ComfyDialog {
             filename: null,
         };
         
-        const datas = {
-            cachedUrl: "",
-        };
-        
         $el("input", {
             $: (el) => (els.saveDirectoryPath = el),
             type: "text",
@@ -1985,6 +1994,7 @@ class ModelManager extends ComfyDialog {
             () => {},
             () => {},
             sep,
+            true,
         );
         
         const filepath = info["downloadFilePath"];
@@ -1993,12 +2003,24 @@ class ModelManager extends ComfyDialog {
             $el("div", [
                 $el("div", [
                     $el("button", {
-                        onclick: (e) => {
-                            const url = datas.cachedUrl;
-                            const modelType = els.modelTypeSelect.value; // TODO: cannot be empty string or invalid selection
-                            const path = els.saveDirectoryPath.value; // TODO: server: root must be valid
-                            const filename = els.filename.value; // note: does not include file extension
-                            const imgUrl = (() => {
+                        onclick: async (e) => {
+                            const record = {};
+                            record["download"] = info["downloadUrl"];
+                            record["type"] = els.modelTypeSelect.value;
+                            if (record["type"] === "") { return; } // TODO: notify user in app
+                            record["path"] = els.saveDirectoryPath.value;
+                            record["name"] = (() => {
+                                const filename = info["fileName"];
+                                const name = els.filename.value;
+                                if (name === "") {
+                                    return filename;
+                                }
+                                const ext = MODEL_EXTENSIONS.find((ext) => {
+                                    return filename.endsWith(ext);
+                                }) ?? "";
+                                return name + ext;
+                            })();
+                            record["image"] = (() => {
                                 const value = document.querySelector(`input[name="${RADIO_MODEL_PREVIEW_GROUP_NAME}"]:checked`).value;
                                 switch (value) {
                                     case RADIO_MODEL_PREVIEW_DEFAULT:
@@ -2015,9 +2037,24 @@ class ModelManager extends ComfyDialog {
                                 }
                                 return "";
                             })();
-                            // TODO: lock downloading
-                            // TODO: send download info to server
-                            // TODO: unlock downloading
+                            record["overwrite"] = true; // TODO: add to UI
+                            e.disabled = true;
+                            await request(
+                                "/model-manager/download",
+                                {
+                                    method: "POST",
+                                    body: JSON.stringify(record),
+                                }
+                            ).then(data => {
+                                if (data["success"] !== true) {
+                                    // TODO: notify user in app
+                                    console.error('Failed to download model:', data);
+                                }
+                            }).catch(err => {
+                                // TODO: notify user in app
+                                console.error('Failed to download model:', err);
+                            });
+                            e.disabled = false;
                         },
                     }, ["Download"]),
                     els.modelTypeSelect,
@@ -2198,7 +2235,7 @@ class ModelManager extends ComfyDialog {
                         "images": [], // TODO: ambiguous?
                         "fileName": filename,
                         "modelType": "",
-                        "downloadUrl": baseDownloadUrl + "/" + file,
+                        "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
                         "downloadFilePath": file.substring(0, indexSep + 1),
                         "details": {
                             "fileSizeKB": undefined, // TODO: too hard?
@@ -2214,7 +2251,12 @@ class ModelManager extends ComfyDialog {
         })();
         
         const modelTypes = Object.keys(this.#data.models);
-        const modelInfosHtml = modelInfos.map((modelInfo) => {
+        const modelInfosHtml = modelInfos.filter((modelInfo) => {
+            const filename = modelInfo["fileName"];
+            return MODEL_EXTENSIONS.find((ext) => {
+                return filename.endsWith(ext);
+            }) ?? false;
+        }).map((modelInfo) => {
             return this.#downloadTab_modelInfo(
                 modelInfo,
                 modelTypes,
