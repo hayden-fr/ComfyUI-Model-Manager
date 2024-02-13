@@ -457,3 +457,7 @@
 .model-manager [data-name="Download"] summary {
     padding: 16px;
 }
+
+.model-manager [data-name="Download"] .download-settings {
+    flex: 1;
+}

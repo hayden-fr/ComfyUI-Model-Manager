@@ -56,7 +56,7 @@ const MODEL_SORT_DATE_MODIFIED = "dateModified";
 const MODEL_SORT_DATE_NAME = "name";
 
 const MODEL_EXTENSIONS = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"]; // TODO: ask server for?
-const IMAGE_EXTENSIONS = [".png", ".webp", ".gif"]; // TODO: ask server for?
+const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
 
 /**
  * Tries to return the related ComfyUI model directory if unambigious.
@@ -271,36 +271,25 @@ async function huggingFace_getFilteredInfo(stringUrl) {
     const modelId = urlPath.substring(i0, i2);
     const urlPathEnd = urlPath.substring(i2);
     
-    let branch = null;
-    if (urlPathEnd.startsWith("/resolve")) {
-        branch = "/resolve";
-    }
-    else if (urlPathEnd.startsWith("/blob")) {
-        branch = "/blob";
-    }
-    else if (urlPathEnd.startsWith("/tree")) {
-        branch = "/tree";
-    }
+    const isValidBranch = (
+        urlPathEnd.startsWith("/resolve") ||
+        urlPathEnd.startsWith("/blob") ||
+        urlPathEnd.startsWith("/tree")
+    );
     
+    let branch = "/main";
     let filePath = "";
-    if (branch == null) {
-        branch = "/tree/main";
-    }
-    else {
+    if (isValidBranch) {
         const i0 = branch.length;
         const i1 = urlPathEnd.indexOf("/", i0 + 1);
         if (i1 == -1) {
-            if (i0 == urlPathEnd.length) {
-                // ends with '/tree' (invalid?)
-                branch = "/tree/main";
-            }
-            else {
+            if (i0 != urlPathEnd.length) {
                 // ends with branch
-                branch = "/tree" + urlPathEnd.substring(i0);
+                branch = urlPathEnd.substring(i0);
             }
         }
         else {
-            branch = "/tree" + urlPathEnd.substring(i0, i1);
+            branch = urlPathEnd.substring(i0, i1);
             if (urlPathEnd.length - 1 > i1) {
                 filePath = urlPathEnd.substring(i1);
             }
@@ -308,9 +297,9 @@ async function huggingFace_getFilteredInfo(stringUrl) {
     }
     
     const modelInfo = await huggingFace_requestInfo(modelId);
-    //const modelInfo = await requestInfo(modelId + branch); // this only gives you the files at the given branch path...
+    //const modelInfo = await requestInfo(modelId + "/tree" + branch); // this only gives you the files at the given branch path...
     // oid: SHA-1?, lfs.oid: SHA-256
-    
+
     const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
     const modelFiles = modelInfo["siblings"].filter((sib) => {
         const filename = sib["rfilename"];
@@ -328,24 +317,24 @@ async function huggingFace_getFilteredInfo(stringUrl) {
         return {};
     }
     
-    const imageFiles = modelInfo["siblings"].filter((sib) => {
+    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
+    
+    const images = modelInfo["siblings"].filter((sib) => {
         const filename = sib["rfilename"];
         for (let i = 0; i < IMAGE_EXTENSIONS.length; i++) {
             if (filename.endsWith(IMAGE_EXTENSIONS[i])) {
-                return filename.startsWith(filePath);
+                return filename.startsWith(clippedFilePath);
             }
         }
         return false;
     }).map((sib) => {
-        const filename = sib["rfilename"];
-        return filename;
+        return baseDownloadUrl + "/" + sib["rfilename"];
     });
     
-    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch.replace("/tree", "");
     return {
         "baseDownloadUrl": baseDownloadUrl,
         "modelFiles": modelFiles,
-        "imageFiles": imageFiles,
+        "images": images,
     };
 }
 
@@ -432,11 +421,13 @@ class DirectoryDropdown {
                         updateDropdown();
                         //updateCallback();
                         //submitCallback();
+                        /*
                         const options = dropdown.children;
                         if (options.length > 0) {
                             // arrow key navigation
                             options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                         }
+                        */
                     }
                 }
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
@@ -464,6 +455,7 @@ class DirectoryDropdown {
                             updateDropdown();
                             //updateCallback();
                             //submitCallback();
+                            /*
                             const options = dropdown.children;
                             let isSelected = false;
                             for (let i = 0; i < options.length; i++) {
@@ -481,6 +473,7 @@ class DirectoryDropdown {
                                     options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
                                 }
                             }
+                            */
                         }
                     }
                 }
@@ -1673,8 +1666,9 @@ class ModelManager extends ComfyDialog {
      */
     #downloadTab_modelInfo(info, modelTypes, modelDirectories, sep, id) {
         // TODO: use passed in info
+        const RADIO_MODEL_PREVIEW_NONE = "No Preview";
         const RADIO_MODEL_PREVIEW_DEFAULT = "Default Preview";
-        const RADIO_MODEL_PREVIEW_CUSTOM = "Custom Preview Url";
+        const RADIO_MODEL_PREVIEW_CUSTOM = "Custom Preview";
         
         const els = {
             modelPreviewContainer: null,
@@ -1749,7 +1743,7 @@ class ModelManager extends ComfyDialog {
             },
             options: (() => {
                 const radios = [];
-                radios.push({ value: "No Preview" });
+                radios.push({ value: RADIO_MODEL_PREVIEW_NONE });
                 if (info["images"].length > 0) {
                     radios.push({ value: RADIO_MODEL_PREVIEW_DEFAULT });
                 }
@@ -1800,7 +1794,7 @@ class ModelManager extends ComfyDialog {
                         }),
                     ]),
                 ]),
-                $el("div", [
+                $el("div.download-settings", [
                     $el("div", {
                         style: { "margin-top": "8px" }
                     }, [
@@ -2001,7 +1995,7 @@ class ModelManager extends ComfyDialog {
                     const indexSep = file.lastIndexOf("/");
                     const filename = file.substring(indexSep + 1);
                     return {
-                        "images": [], // TODO: ambiguous?
+                        "images": hfInfo["images"],
                         "fileName": filename,
                         "modelType": "",
                         "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
