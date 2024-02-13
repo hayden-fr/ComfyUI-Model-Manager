@@ -61,35 +61,41 @@ const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; //
 /**
  * Tries to return the related ComfyUI model directory if unambigious.
  *
- * @param {string} modelType - Civitai model type.
- * @param {string} [fileType] - Civitai file type. Relevant for "Diffusers".
+ * @param {string | undefined} modelType - Model type.
+ * @param {string | undefined} [fileType] - File type. Relevant for "Diffusers".
  *
- * @returns {(string|null)} Logical base directory name for model type. May be null if the directory is ambiguous or not a model type.
+ * @returns {(string | null)} Logical base directory name for model type. May be null if the directory is ambiguous or not a model type.
  */
-function civitai_comfyUiDirectory(modelType, fileType) {
-    if (fileType == "Diffusers") { return "diffusers"; } // TODO: is this correct?
+function modelTypeToComfyUiDirectory(modelType, fileType) {
+    if (fileType !== undefined && fileType !== null) {
+        const f = fileType.toLowerCase();
+        if (f == "diffusers") { return "diffusers"; } // TODO: is this correct?
+    }
 
-    // TODO: somehow allow for SERVER to set dir?
-    // TODO: allow user to choose EXISTING folder override/null? (style_models, HuggingFace) (use an object/map instead so settings can be dynamically set)
-    if (modelType == "AestheticGradient") { return null; }
-    else if (modelType == "Checkpoint") { return "checkpoints"; } // TODO: what about VAE?
-    //else if (modelType == "") { return "clip"; }
-    //else if (modelType == "") { return "clip_vision"; }
-    else if (modelType == "Controlnet") { return "controlnet"; }
-    //else if (modelType == "Controlnet") { return "style_models"; } // are these controlnets? (TI-Adapter)
-    //else if (modelType == "") { return "gligen"; }
-    else if (modelType == "Hypernetwork") { return "hypernetworks"; }
-    else if (modelType == "LORA") { return "loras"; }
-    else if (modelType == "LoCon") { return "loras"; }
-    else if (modelType == "MotionModule") { return null; }
-    else if (modelType == "Other") { return null; }
-    else if (modelType == "Pose") { return null; }
-    else if (modelType == "TextualInversion") { return "embeddings"; }
-    //else if (modelType == "") { return "unet"; }
-    else if (modelType == "Upscaler") { return "upscale_models"; }
-    else if (modelType == "VAE") { return "vae"; }
-    else if (modelType == "Wildcards") { return null; }
-    else if (modelType == "Workflows") { return null; }
+    if (modelType !== undefined && modelType !== null) {
+        const m = modelType.toLowerCase();
+        // TODO: somehow allow for SERVER to set dir?
+        // TODO: allow user to choose EXISTING folder override/null? (style_models, HuggingFace) (use an object/map instead so settings can be dynamically set)
+        if (m == "aestheticGradient") { return null; }
+        else if (m == "checkpoint" || m == "checkpoints") { return "checkpoints"; }
+        //else if (m == "") { return "clip"; }
+        //else if (m == "") { return "clip_vision"; }
+        else if (m == "controlnet") { return "controlnet"; }
+        //else if (m == "Controlnet") { return "style_models"; } // are these controlnets? (TI-Adapter)
+        //else if (m == "") { return "gligen"; }
+        else if (m == "hypernetwork" || m == "hypernetworks") { return "hypernetworks"; }
+        else if (m == "lora" || m == "loras") { return "loras"; }
+        else if (m == "locon") { return "loras"; }
+        else if (m == "motionmodule") { return null; }
+        else if (m == "other") { return null; }
+        else if (m == "pose") { return null; }
+        else if (m == "textualinversion" || m == "embedding" || m == "embeddings") { return "embeddings"; }
+        //else if (m == "") { return "unet"; }
+        else if (m == "upscaler" || m == "upscale_model" || m == "upscale_models") { return "upscale_models"; }
+        else if (m == "vae") { return "vae"; }
+        else if (m == "wildcard" || m == "wildcards") { return null; }
+        else if (m == "workflow" || m == "workflows") { return null; }
+    }
     return null;
 }
 
@@ -1928,8 +1934,8 @@ class ModelManager extends ComfyDialog {
         const modelTypeSelect = els.modelTypeSelect;
         modelTypeSelect.selectedIndex = 0; // reset
         const comfyUIModelType = (
-            civitai_comfyUiDirectory(info["details"]["fileType"]) ??
-            civitai_comfyUiDirectory(info["modelType"]) ??
+            modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            modelTypeToComfyUiDirectory(info["modelType"]) ??
             null
         );
         if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
@@ -2007,8 +2013,17 @@ class ModelManager extends ComfyDialog {
                 });
             }
             if (urlText.endsWith(".json")) {
-                // TODO: support old index model files
-                return [];
+                const indexInfo = await request(urlText).catch(() => []);
+                return indexInfo.map((file) => {
+                    return {
+                        "images": [],
+                        "fileName": file["name"],
+                        "modelType": modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                        "downloadUrl": file["download"],
+                        "downloadFilePath": "",
+                        "details": {},
+                    };
+                });
             }
             return [];
         })();
