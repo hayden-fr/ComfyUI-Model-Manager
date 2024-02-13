@@ -298,7 +298,7 @@
 .model-manager .comfy-tabs-body > div {
     position: relative;
     height: 100%;
-    width: 90%;
+    width: auto;
     padding: 0 16px;
     overflow-x: auto;
 }

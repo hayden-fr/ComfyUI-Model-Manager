@@ -16,7 +16,8 @@ Currently it is still missing some features it should have.
 
 - Remade download tab.
   - View multiple models connected to url.
-  - Download preview images.
+  - Select download directory.
+  - Optionally download default or custom preivew image.
 - Civitai and HuggingFace API token configurable in `server_settings.yaml`.
 
 ### Models Tab
@@ -65,6 +66,7 @@ Currently it is still missing some features it should have.
 - &#9744; Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - &#9744; Radio buttons to swap between downloaded and server view.
 - &#9744; Delete model with warning popup.
+- &#9744; Set preview image.
 
 ### Settings
 
@@ -101,3 +103,7 @@ Currently it is still missing some features it should have.
 ### Sidebar
 
 - &#9744; Drag sidebar width/height dynamically.
+
+### Downloading
+
+- &#9744; Add back support for downloading from and `index.json` file.
