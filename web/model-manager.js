@@ -857,136 +857,6 @@ function $tab(name, el) {
     return $el("div", { dataset: { name } }, el);
 }
 
-class SourceList {
-    /**
-     * @typedef Column
-     * @prop {string} title
-     * @prop {string} dataIndex
-     * @prop {number} width
-     * @prop {string} align
-     * @prop {Function} render
-     */
-
-    /** @type {Column[]} */
-    #columns = [];
-
-    /** @type {Record<string, any>[]} */
-    #dataSource = [];
-
-    /** @type {HTMLDivElement} */
-    #tbody = null;
-
-    /**
-     * @param {Column[]} columns
-     */
-    constructor(columns) {
-        this.#columns = columns;
-
-        const colgroup = $el(
-            "colgroup",
-            columns.map((item) => {
-                return $el("col", {
-                    style: { width: `${item.width}px` },
-                });
-            })
-        );
-
-        const listTitle = $el(
-            "tr",
-            columns.map((item) => {
-                return $el("th", [item.title ?? ""]);
-            })
-        );
-
-        this.element = $el("table.comfy-table", [
-            colgroup.cloneNode(true),
-            $el("thead.table-head", [listTitle]),
-            $el("tbody.table-body", { $: (el) => (this.#tbody = el) }),
-        ]);
-    }
-
-    /**
-     * @param {Array} dataSource
-     */
-    setData(dataSource) {
-        this.#dataSource = dataSource;
-        this.#updateList();
-    }
-
-    /**
-     * @returns {Array}
-     */
-    getData() {
-        return this.#dataSource;
-    }
-
-    #updateList() {
-        this.#tbody.innerHTML = null;
-        this.#tbody.append.apply(
-            this.#tbody,
-            this.#dataSource.map((row, index) => {
-                const cells = this.#columns.map((item) => {
-                    const dataIndex = item.dataIndex;
-                    const cellValue = row[dataIndex] ?? "";
-                    const content = item.render
-                        ? item.render(cellValue, row, index)
-                        : cellValue ?? "-";
-
-                    const style = { textAlign: item.align };
-                    return $el("td", { style }, [content]);
-                });
-                return $el("tr", cells);
-            })
-        );
-    }
-
-    /**
-     * @param {Array} list
-     * @param {string} searchString
-     * @param {string} installedType
-     */
-    filterList(list, searchString, installedType) {
-        /** @type {string[]} */
-        const keywords = searchString
-            .replace("*", " ")
-            .split(/(-?".*?"|[^\s"]+)+/g)
-            .map((item) => item
-                .trim()
-                .replace(/(?:'|")+/g, "")
-                .toLowerCase())
-            .filter(Boolean);
-
-        // TODO: handle /directory keywords seperately/differently
-
-        let fields = ["type", "name", "base", "description"];
-        const regexSHA256 = /^[a-f0-9]{64}$/gi;
-        const newList = list.filter((element) => {
-            if (installedType !== "Filter: All") {
-                if ((installedType === "Downloaded" && !element["installed"]) || 
-                    (installedType === "Not Downloaded" && element["installed"])) {
-                    return false;
-                }
-            }
-            const text = fields
-                .reduce((memo, field) => memo + " " + element[field], "")
-                .toLowerCase();
-            return keywords.reduce((memo, target) => {
-                const excludeTarget = target[0] === "-";
-                if (excludeTarget && target.length === 1) { return memo; }
-                const filteredTarget = excludeTarget ? target.slice(1) : target;
-                if (element["SHA256"] !== undefined && regexSHA256.test(filteredTarget)) {
-                    return memo && excludeTarget !== (filteredTarget === element["SHA256"]);
-                }
-                else {
-                    return memo && excludeTarget !== text.includes(filteredTarget);
-                }
-            }, true);
-        });
-
-        this.setData(newList);
-    }
-}
-
 class ModelGrid {
     /**
      * @param {Array} list
@@ -1352,11 +1222,6 @@ function $radioGroup(attr) {
 
 class ModelManager extends ComfyDialog {
     #el = {
-        /** @type {HTMLButtonElement} */ loadSourceBtn: null,
-        /** @type {HTMLInputElement} */ loadSourceFromInput: null,
-        /** @type {HTMLSelectElement} */ sourceInstalledFilter: null,
-        /** @type {HTMLInputElement} */ sourceContentFilter: null,
-        
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
 
@@ -1386,7 +1251,6 @@ class ModelManager extends ComfyDialog {
     };
 
     #data = {
-        /** @type {Array} */ sources: [],
         /** @type {Object} */ models: {},
         /** @type {DirectoryItem[]} */ modelDirectories: [],
         /** @type {Array} */ previousModelFilters: [],
@@ -1395,9 +1259,6 @@ class ModelManager extends ComfyDialog {
 
     /** @type {string} */
     #sep = "/";
-
-    /** @type {SourceList} */
-    #sourceList = null;
 
     constructor() {
         super();
@@ -1440,7 +1301,6 @@ class ModelManager extends ComfyDialog {
                     ),
                     $tabs([
                         $tab("Download", [this.#downloadTab_new()]),
-                        //$tab("Install", this.#createSourceInstall()),
                         $tab("Models", this.#modelTab_new()),
                         $tab("Settings", [this.#settingsTab_new()]),
                     ]),
@@ -1453,138 +1313,7 @@ class ModelManager extends ComfyDialog {
 
     #init() {
         this.#settingsTab_reload(false);
-        //this.#refreshSourceList();
         this.#modelTab_updateModels();
-    }
-
-    /**
-     * @returns {HTMLDivElement[]}
-     */
-    #createSourceInstall() {
-        this.#createSourceList();
-        return [
-            $el("div.row.tab-header", [
-                $el("div.row.tab-header-flex-block", [
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "⟳",
-                        $: (el) => (this.#el.loadSourceBtn = el),
-                        onclick: () => this.#refreshSourceList(),
-                    }),
-                    $el("input.plain-text-area", {
-                        $: (el) => (this.#el.loadSourceFromInput = el),
-                        placeholder: "https://ComfyUI-Model-Manager/index.json",
-                    }),
-                ]),
-                $el("div.row.tab-header-flex-block", [
-                    $el("input.search-text-area", {
-                        $: (el) => (this.#el.sourceContentFilter = el),
-                        placeholder: "example: \"sd_xl\" -vae",
-                        onkeydown: (e) => e.key === "Enter" && this.#filterSourceList(),
-                    }),
-                    $el("select",
-                        {
-                            $: (el) => (this.#el.sourceInstalledFilter = el),
-                            style: { width: 0 },
-                            onchange: () => this.#filterSourceList(),
-                        },
-                        [
-                            $el("option", ["Filter: All"]),
-                            $el("option", ["Downloaded"]),
-                            $el("option", ["Not Downloaded"]),
-                        ]
-                    ),
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "🔍︎",
-                        onclick: () => this.#filterSourceList(),
-                    }),
-                ]),
-            ]),
-            this.#sourceList.element,
-        ];
-    }
-
-    /**
-     * @returns {HTMLElement}
-     */
-    #createSourceList() {
-        const sourceList = new SourceList([
-            {
-                title: "Type",
-                dataIndex: "type",
-                width: "120",
-                align: "center",
-            },
-            {
-                title: "Base",
-                dataIndex: "base",
-                width: "120",
-                align: "center",
-            },
-            {
-                title: "Name",
-                dataIndex: "name",
-                width: "280",
-                render: (value, record) => {
-                    const href = record.page;
-                    return $el("a", { target: "_blank", href }, [value]);
-                },
-            },
-            {
-                title: "Description",
-                dataIndex: "description",
-            },
-            {
-                title: "Download",
-                width: "150",
-                render: (_, record) => {
-                    const installed = record.installed;
-                    return $el("button.block", {
-                        type: "button",
-                        disabled: installed,
-                        textContent: installed ? "✓︎" : "📥︎",
-                        onclick: async (e) => {
-                            e.disabled = true;
-                            const response = await request(
-                                "/model-manager/download",
-                                {
-                                    method: "POST",
-                                    body: JSON.stringify(record),
-                                }
-                            );
-                            e.disabled = false;
-                        },
-                    });
-                },
-            },
-        ]);
-        this.#sourceList = sourceList;
-        return sourceList.element;
-    }
-
-    async #refreshSourceList() {
-        this.#el.loadSourceBtn.disabled = true;
-
-        const source = this.#el.loadSourceFromInput.value;
-        const uri = (source === "https://ComfyUI-Model-Manager/index.json") || (source === "") ? "local" : source;
-        const dataSource = await request(
-            `/model-manager/source?uri=${uri}`
-        ).catch(() => []);
-        this.#data.sources = dataSource;
-        this.#sourceList.setData(dataSource);
-        this.#el.sourceInstalledFilter.value = "Filter: All";
-        this.#el.sourceContentFilter.value = "";
-
-        this.#el.loadSourceBtn.disabled = false;
-    }
-
-    #filterSourceList() {
-        this.#sourceList.filterList(
-            this.#data.sources, 
-            this.#el.sourceContentFilter.value, 
-            this.#el.sourceInstalledFilter.value
-        );
     }
 
     /** @type {DirectoryDropdown} */
@@ -1718,7 +1447,6 @@ class ModelManager extends ComfyDialog {
 
         if (reloadData) {
             // Is this slow?
-            //this.#refreshSourceList();
             this.#modelTab_updateModels();
         }
     }
@@ -2034,7 +1762,7 @@ class ModelManager extends ComfyDialog {
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
             $el("div", {
-                style: { display: "flex", gap: "16px" },
+                style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
             }, [
                 $el("div.item", {
                     $: (el) => (els.modelPreviewContainer = el),
@@ -2042,6 +1770,10 @@ class ModelManager extends ComfyDialog {
                 }, [
                     $el("div", {
                         $: (el) => (els.previewImgs = el),
+                        style: {
+                            width: "100%",
+                            height: "100%",
+                        },
                     }, (() => {
                         const imgs = info["images"].map((url) => {
                             return $el("img", {

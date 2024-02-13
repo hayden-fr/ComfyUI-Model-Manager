@@ -298,6 +298,7 @@
 .model-manager .comfy-tabs-body > div {
     position: relative;
     height: 100%;
+    width: 90%;
     padding: 0 16px;
     overflow-x: auto;
 }
@@ -455,9 +456,4 @@
 
 .model-manager [data-name="Download"] summary {
     padding: 16px;
-}
-
-.model-manager .download-details {
-    border-radius: 16px;
-    padding: 0px 16px 0px 16px;
 }
