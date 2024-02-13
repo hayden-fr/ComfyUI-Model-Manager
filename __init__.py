@@ -2,7 +2,6 @@ import os
 import pathlib
 import sys
 import copy
-import hashlib
 import importlib
 import re
 
@@ -24,8 +23,6 @@ config_loader_spec.loader.exec_module(config_loader)
 
 comfyui_model_uri = os.path.join(os.getcwd(), "models")
 extension_uri = os.path.join(os.getcwd(), "custom_nodes" + os.path.sep + "ComfyUI-Model-Manager")
-index_uri = os.path.join(extension_uri, "index.json")
-#checksum_cache_uri = os.path.join(extension_uri, "checksum_cache.txt")
 no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
@@ -33,8 +30,6 @@ server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
 image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")
 #video_extensions = (".avi", ".mp4", ".webm") # TODO: Requires ffmpeg or cv2. Cache preview frame?
-
-#hash_buffer_size = 4096
 
 _folder_names_and_paths = None # dict[str, tuple[list[str], list[str]]]
 def folder_paths_folder_names_and_paths(refresh = False):
@@ -182,87 +177,6 @@ async def img_preview(request):
         image_data = img_file.read()
 
     return web.Response(body=image_data, content_type="image/" + image_extension)
-
-#def calculate_sha256(file_path):
-#    try:
-#        with open(file_path, "rb") as f:
-#            sha256 = hashlib.sha256()
-#            while True:
-#                data = f.read(hash_buffer_size)
-#                if not data:
-#                    break
-#                sha256.update(data)
-#        return sha256.hexdigest()
-#    except:
-#        return ""
-
-@server.PromptServer.instance.routes.get("/model-manager/source")
-async def load_source_from(request):
-    uri = request.query.get("uri", "local")
-    if uri == "local":
-        with open(index_uri) as file:
-            dataSource = json.load(file)
-    else:
-        response = requests.get(uri)
-        dataSource = response.json()
-
-    model_types = os.listdir(comfyui_model_uri)
-    model_types.remove("configs")
-    sourceSorted = {}
-    for model_type in model_types:
-        sourceSorted[model_type] = []
-    for item in dataSource:
-        item_model_type = model_type_to_dir_name(item.get("type"))
-        sourceSorted[item_model_type].append(item)
-        item["installed"] = False
-
-    #checksum_cache = []
-    #if os.path.exists(checksum_cache_uri):
-    #    with open(checksum_cache_uri, "r") as file:
-    #        checksum_cache = file.read().splitlines()
-    #else:
-    #    with open(checksum_cache_uri, "w") as file:
-    #        pass
-    #print(checksum_cache)
-
-    for model_type in model_types:
-        for model_base_path in folder_paths_get_folder_paths(model_type):
-            if not os.path.exists(model_base_path): # Bug in main code?
-                continue
-            for cwd, _subdirs, files in os.walk(model_base_path):
-                for file in files:
-                    source_type = sourceSorted[model_type]
-                    for iItem in range(len(source_type)-1,-1,-1):
-                        item = source_type[iItem]
-
-                        # TODO: Make hashing optional (because it is slow to compute).
-                        if file != item.get("name"):
-                            continue
-
-                        #file_path = os.path.join(cwd, file)
-                        #file_size = int(item.get("size") or 0)
-                        #if os.path.getsize(file_path) != file_size:
-                        #    continue
-                        #
-                        #checksum = item.get("SHA256")
-                        #if checksum == "" or checksum == None:
-                        #    continue
-                        # BUG: Model always hashed if same size but different hash.
-                        # TODO: Change code to save list (NOT dict) with absolute model path and checksum on each line
-                        #if checksum not in checksum_cache:
-                        #    sha256 = calculate_sha256(file_path) # TODO: Make checksum optional!
-                        #    checksum_cache.append(sha256)
-                        #    print(f"{file}: calc:{sha256}, real:{checksum}")
-                        #    if sha256 != checksum:
-                        #        continue
-
-                        item["installed"] = True
-                        end_swap_and_pop(source_type, iItem)
-
-    #with open(checksum_cache_uri, "w") as file:
-    #    file.writelines(checksum + '\n' for checksum in checksum_cache) # because python is a mess
-
-    return web.json_response(dataSource)
 
 
 @server.PromptServer.instance.routes.get("/model-manager/models")
