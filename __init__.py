@@ -321,7 +321,6 @@ def download_file(url, filename, overwrite):
             def_headers["Authorization"] = f"Bearer {api_key}"
 
     rh = requests.get(url=url, stream=True, verify=False, headers=def_headers, proxies=None, allow_redirects=False)
-    print(rh.status_code)
     if not rh.ok:
         raise Exception("Unable to download")
 
@@ -333,12 +332,10 @@ def download_file(url, filename, overwrite):
     headers["User-Agent"] = def_headers["User-Agent"]
 
     r = requests.get(url=url, stream=True, verify=False, headers=headers, proxies=None, allow_redirects=False)
-    print(r.status_code)
     if rh.status_code == 307 and r.status_code == 307:
         # Civitai redirect
         redirect_url = r.content.decode("utf-8")
         if not redirect_url.startswith("http"):
-            print(redirect_url)
             # Civitai requires login (NSFW or user-required)
             # TODO: inform user WHY download failed
             raise Exception("Unable to download!")
@@ -428,7 +425,6 @@ async def download_model(request):
     download_uri = body.get("download")
     if download_uri is None:
         result["invalid"] = "download"
-        print(download_uri)
         return web.json_response(result)
 
     name = body.get("name")
