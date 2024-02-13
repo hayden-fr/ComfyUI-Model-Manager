@@ -314,12 +314,14 @@ def download_file(url, filename, overwrite):
         api_key = server_settings["civitai_api_key"]
         if (api_key != ""):
             def_headers["Authorization"] = f"Bearer {api_key}"
+            url = url + f"?token={api_key}"
     elif url.startswith("https://huggingface.co/"):
         api_key = server_settings["huggingface_api_key"]
         if api_key != "":
             def_headers["Authorization"] = f"Bearer {api_key}"
 
     rh = requests.get(url=url, stream=True, verify=False, headers=def_headers, proxies=None, allow_redirects=False)
+    print(rh.status_code)
     if not rh.ok:
         raise Exception("Unable to download")
 
@@ -331,10 +333,12 @@ def download_file(url, filename, overwrite):
     headers["User-Agent"] = def_headers["User-Agent"]
 
     r = requests.get(url=url, stream=True, verify=False, headers=headers, proxies=None, allow_redirects=False)
+    print(r.status_code)
     if rh.status_code == 307 and r.status_code == 307:
         # Civitai redirect
         redirect_url = r.content.decode("utf-8")
         if not redirect_url.startswith("http"):
+            print(redirect_url)
             # Civitai requires login (NSFW or user-required)
             # TODO: inform user WHY download failed
             raise Exception("Unable to download!")
@@ -389,22 +393,29 @@ def download_file(url, filename, overwrite):
 @server.PromptServer.instance.routes.post("/model-manager/download")
 async def download_model(request):
     body = await request.json()
+    result = {
+        "success": False,
+        "invalid": None,
+    }
     
     overwrite = body.get("overwrite", False)
     
     model_type = body.get("type")
     model_path_type = model_type_to_dir_name(model_type)
     if model_path_type is None or model_path_type == "":
-        return web.json_response({"success": False})
+        result["invalid"] = "type"
+        return web.json_response(result)
     model_path = body.get("path", "/0")
     model_path = model_path.replace("/", os.path.sep)
     regex_result = re.search(r'\d+', model_path)
     if regex_result is None:
-        return web.json_response({"success": False})
+        result["invalid"] = "type"
+        return web.json_response(result)
     model_path_index = int(regex_result.group())
     paths = folder_paths_get_folder_paths(model_path_type)
     if model_path_index < 0 or model_path_index >= len(paths):
-        return web.json_response({"success": False})
+        result["invalid"] = "path"
+        return web.json_response(result)
     model_path_span = regex_result.span()
     directory = os.path.join(
         comfyui_model_uri, 
@@ -416,7 +427,9 @@ async def download_model(request):
 
     download_uri = body.get("download")
     if download_uri is None:
-        return web.json_response({"success": False})
+        result["invalid"] = "download"
+        print(download_uri)
+        return web.json_response(result)
 
     name = body.get("name")
     model_extension = None
@@ -425,15 +438,18 @@ async def download_model(request):
             model_extension = ext
             break
     if model_extension is None:
-        return web.json_response({"success": False})
+        result["invalid"] = "name"
+        return web.json_response(result)
     file_name = os.path.join(directory, name)
     try:
         download_file(download_uri, file_name, overwrite)
     except:
-        return web.json_response({"success": False})
+        result["invalid"] = "download"
+        return web.json_response(result)
 
     image_uri = body.get("image")
     if image_uri is not None and image_uri != "":
+        # TODO: doesn't work for https://civitai.com/images/...
         image_extension = None
         for ext in image_extensions:
             if image_uri.endswith(ext):
@@ -449,7 +465,8 @@ async def download_model(request):
             except Exception as e:
                 print(e, file=sys.stderr, flush=True)
 
-    return web.json_response({"success": True})
+    result["success"] = True
+    return web.json_response(result)
 
 WEB_DIRECTORY = "web"
 NODE_CLASS_MAPPINGS = {}

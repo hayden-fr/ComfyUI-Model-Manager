@@ -5,8 +5,8 @@ Download and browse models in ComfyUI.
 *(Viewing metadata and deleting are WIP.)*
 
 <div>
-  <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="45%"/>
   <img src="demo-tab-download.png" alt="Model Manager Demo Screenshot" width="45%"/>
+  <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="45%"/>
 </div>
 
 # Fork

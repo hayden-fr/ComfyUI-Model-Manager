@@ -2077,7 +2077,7 @@ class ModelManager extends ComfyDialog {
             $el("div", {
                 $: (el) => (this.#el.modelInfos = el),
             }, [
-                $el("div", ["Input a URL to view download settings."]),
+                $el("div", ["Input a URL to select a model to download."]),
             ]),
         ]);
     }
