@@ -125,13 +125,21 @@
     background-color: rgba(0, 0, 0, 0);
 }
 
-.comfy-grid .model-preview-top-right {
+.comfy-grid .model-preview-top-right,
+.comfy-grid .model-preview-top-left {
     position: absolute;
     display: flex;
     flex-direction: column;
     gap: 8px;
     top: 8px;
+}
+
+.comfy-grid .model-preview-top-right {
     right: 8px;
+}
+
+.comfy-grid .model-preview-top-left {
+    left: 8px;
 }
 
 .comfy-grid .model-button {
@@ -460,4 +468,29 @@
 
 .model-manager [data-name="Download"] .download-settings {
     flex: 1;
+}
+
+.model-manager .model-info-view {
+    background-color: var(--comfy-menu-bg);
+    display: none;
+    height: 100%;
+    overflow-wrap: break-word;
+    width: 100%;
+}
+
+.model-manager .model-info-container {
+    background-color: var(--bg-color);
+    border-radius: 16px;
+    color: var(--fg-color);
+    margin-top: 8px;
+    max-height: 90%;
+    padding: 16px;
+    overflow: auto;
+    width: auto;
+}
+
+.model-manager .no-select {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
 }

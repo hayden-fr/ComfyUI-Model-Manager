@@ -1,5 +1,6 @@
 import os
 import pathlib
+from datetime import datetime
 import sys
 import copy
 import importlib
@@ -66,6 +67,29 @@ def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Mi
         return paths[folder_name][1]
     model_extensions = copy.deepcopy(fallback_model_extensions)
     return model_extensions
+
+
+def search_path_to_system_path(model_path, model_path_type):
+    # TODO: return model type (since it is bakedi into the search path anyways; simplifies other code)
+    model_path = model_path.replace("/", os.path.sep)
+    regex_result = re.search(r'\d+', model_path)
+    if regex_result is None:
+        return None
+    try:
+        model_path_index = int(regex_result.group())
+    except:
+        return None
+    paths = folder_paths_get_folder_paths(model_path_type)
+    if model_path_index < 0 or model_path_index >= len(paths):
+        return None
+    model_path_span = regex_result.span()
+    return os.path.join(
+        comfyui_model_uri, 
+        (
+            paths[model_path_index] + 
+            model_path[model_path_span[1]:]
+        )
+    )
 
 
 def get_safetensor_header(path):
@@ -148,7 +172,7 @@ async def save_ui_settings(request):
     })
 
 
-@server.PromptServer.instance.routes.get("/model-manager/image-preview")
+@server.PromptServer.instance.routes.get("/model-manager/image/preview")
 async def img_preview(request):
     uri = request.query.get("uri")
 
@@ -179,7 +203,7 @@ async def img_preview(request):
     return web.Response(body=image_data, content_type="image/" + image_extension)
 
 
-@server.PromptServer.instance.routes.get("/model-manager/models")
+@server.PromptServer.instance.routes.get("/model-manager/models/list")
 async def load_download_models(request):
     model_types = os.listdir(comfyui_model_uri)
     model_types.remove("configs")
@@ -221,11 +245,10 @@ async def load_download_models(request):
 
         model_items = []
         for model, image, base_path_index, rel_path, date_modified, date_created in file_infos:
-            # TODO: Stop sending redundant path information
             item = {
                 "name": model,
-                "searchPath": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # TODO: Remove hack
-                "path": os.path.join(rel_path, model),
+                "path": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # relative logical path
+                #"systemPath": os.path.join(rel_path, model), # relative system path (less information than "search path")
                 "dateModified": date_modified,
                 "dateCreated": date_created,
                 #"dateLastUsed": "", # TODO: track server-side, send increment client-side
@@ -293,7 +316,7 @@ def linear_directory_hierarchy(refresh = False):
     return dir_list
 
 
-@server.PromptServer.instance.routes.get("/model-manager/model-directory-list")
+@server.PromptServer.instance.routes.get("/model-manager/models/directory-list")
 async def directory_list(request):
     #body = await request.json()
     dir_list = linear_directory_hierarchy(True)
@@ -387,7 +410,84 @@ def download_file(url, filename, overwrite):
     os.rename(filename_temp, filename)
 
 
-@server.PromptServer.instance.routes.post("/model-manager/download")
+@server.PromptServer.instance.routes.get("/model-manager/model/info")
+async def get_model_info(request):
+    model_path = request.query.get("path", None)
+    if model_path is None:
+        return web.json_response({})
+    model_path = urllib.parse.unquote(model_path)
+
+    model_type = request.query.get("type") # TODO: in the searchPath?
+    if model_type is None:
+        return web.json_response({})
+    model_type = urllib.parse.unquote(model_type)
+
+    model_path_type = model_type_to_dir_name(model_type)
+    file = search_path_to_system_path(model_path, model_path_type)
+    if file is None:
+        return web.json_response({})
+
+    info = {}
+    path, name = os.path.split(model_path)
+    info["File Name"] = name
+    info["File Directory"] = path
+    info["File Size"] = os.path.getsize(file)
+    stats = pathlib.Path(file).stat()
+    date_format = "%Y/%m/%d %H:%M:%S"
+    info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
+    info["Date Modified"] = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
+
+    header = get_safetensor_header(file)
+    metadata = header.get("__metadata__", None)
+    if metadata is not None:
+        info["Base Model"] = metadata.get("ss_sd_model_name", "")
+        info["Clip Skip"] = metadata.get("ss_clip_skip", "")
+        info["Hash"] = metadata.get("sshs_model_hash", "")
+        info["Output Name"] = metadata.get("ss_output_name", "")
+
+        img_buckets = metadata.get("ss_bucket_info", "{}")
+        if type(img_buckets) is str:
+            img_buckets = json.loads(img_buckets)
+        resolutions = {}
+        if img_buckets is not None:
+            buckets = img_buckets.get("buckets", {})
+            for resolution in buckets.values():
+                dim = resolution["resolution"]
+                x, y = dim[0], dim[1]
+                count = resolution["count"]
+                resolutions[str(x) + "x" + str(y)] = count
+        resolutions = list(resolutions.items())
+        resolutions.sort(key=lambda x: x[1], reverse=True)
+        info["Bucket Resolutions"] = resolutions
+
+        dir_tags = metadata.get("ss_tag_frequency", "{}")
+        if type(dir_tags) is str:
+            dir_tags = json.loads(dir_tags)
+        tags = {}
+        for train_tags in dir_tags.values():
+            for tag, count in train_tags.items():
+                tags[tag] = tags.get(tag, 0) + count
+        tags = list(tags.items())
+        tags.sort(key=lambda x: x[1], reverse=True)
+        info["Tags"] = tags
+
+    file_name, _ = os.path.splitext(file)
+    txt_file = file_name + ".txt"
+    description = ""
+    if os.path.isfile(txt_file):
+        with open(txt_file, 'r', encoding="utf-8") as f:
+            description = f.read()
+    info["Description"] = description
+
+    return web.json_response(info)
+
+
+@server.PromptServer.instance.routes.get("/model-manager/system-separator")
+async def get_system_separator(request):
+    return web.json_response(os.path.sep)
+
+
+@server.PromptServer.instance.routes.post("/model-manager/model/download")
 async def download_model(request):
     body = await request.json()
     result = {
@@ -403,24 +503,10 @@ async def download_model(request):
         result["invalid"] = "type"
         return web.json_response(result)
     model_path = body.get("path", "/0")
-    model_path = model_path.replace("/", os.path.sep)
-    regex_result = re.search(r'\d+', model_path)
-    if regex_result is None:
-        result["invalid"] = "type"
-        return web.json_response(result)
-    model_path_index = int(regex_result.group())
-    paths = folder_paths_get_folder_paths(model_path_type)
-    if model_path_index < 0 or model_path_index >= len(paths):
+    directory = search_path_to_system_path(model_path, model_path_type)
+    if directory is None:
         result["invalid"] = "path"
         return web.json_response(result)
-    model_path_span = regex_result.span()
-    directory = os.path.join(
-        comfyui_model_uri, 
-        (
-            paths[model_path_index] + 
-            model_path[model_path_span[1]:]
-        )
-    )
 
     download_uri = body.get("download")
     if download_uri is None:
@@ -463,6 +549,52 @@ async def download_model(request):
 
     result["success"] = True
     return web.json_response(result)
+
+
+@server.PromptServer.instance.routes.post("/model-manager/model/delete")
+async def delete_model(request):
+    result = { "success": False }
+
+    model_path = request.query.get("path", None)
+    if model_path is None:
+        return web.json_response(result)
+    model_path = urllib.parse.unquote(model_path)
+
+    model_type = request.query.get("type") # TODO: in the searchPath?
+    if model_type is None:
+        return web.json_response(result)
+    model_type = urllib.parse.unquote(model_type)
+
+    model_path_type = model_type_to_dir_name(model_type)
+    file = search_path_to_system_path(model_path, model_path_type)
+    if file is None:
+        return web.json_response(result)
+
+    is_model = None
+    for ext in folder_paths_get_supported_pt_extensions(model_type):
+        if file.endswith(ext):
+            is_model = True
+            break
+    if not is_model:
+        return web.json_response(result)
+
+    if os.path.isfile(file):
+        os.remove(file)
+        result["success"] = True
+
+        path_and_name, _ = os.path.splitext(file)
+
+        for img_ext in image_extensions:
+            image_file = path_and_name + img_ext
+            if os.path.isfile(image_file):
+                os.remove(image_file)
+
+        txt_file = path_and_name + ".txt"
+        if os.path.isfile(txt_file):
+            os.remove(txt_file)
+
+    return web.json_response(result)
+
 
 WEB_DIRECTORY = "web"
 NODE_CLASS_MAPPINGS = {}

@@ -55,7 +55,7 @@ const MODEL_SORT_DATE_CREATED = "dateCreated";
 const MODEL_SORT_DATE_MODIFIED = "dateModified";
 const MODEL_SORT_DATE_NAME = "name";
 
-const MODEL_EXTENSIONS = [".ckpt", ".pt", ".bin", ".pth", ".safetensors"]; // TODO: ask server for?
+const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
 
 /**
@@ -174,10 +174,10 @@ function civitai_getModelFilesInfo(modelVersionInfo, type = null, fp = null, siz
  */
 async function civitai_getFilteredInfo(stringUrl) {
     const url = new URL(stringUrl);
-    if (url.hostname != 'civitai.com') { return {}; }
-    if (url.pathname == '/') { return {} }
+    if (url.hostname != "civitai.com") { return {}; }
+    if (url.pathname == "/") { return {} }
     const urlPath = url.pathname;
-    if (urlPath.startsWith('/api')) {
+    if (urlPath.startsWith("/api")) {
         const idEnd = urlPath.length - (urlPath.at(-1) == "/" ? 1 : 0);
         const idStart = urlPath.lastIndexOf("/", idEnd - 1) + 1;
         const modelVersionId = urlPath.substring(idStart, idEnd);
@@ -260,8 +260,8 @@ async function huggingFace_requestInfo(id, apiPath = "models") {
  */
 async function huggingFace_getFilteredInfo(stringUrl) {
     const url = new URL(stringUrl);
-    if (url.hostname != 'huggingface.co') { return {}; }
-    if (url.pathname == '/') { return {} }
+    if (url.hostname != "huggingface.co") { return {}; }
+    if (url.pathname == "/") { return {} }
     const urlPath = url.pathname;
     const i0 = 1;
     const i1 = urlPath.indexOf("/", i0);
@@ -376,10 +376,10 @@ class DirectoryDropdown {
      * @param {Function} updateDropdown
      * @param {Function} [updateCallback= () => {}]
      * @param {Function} [submitCallback= () => {}]
-     * @param {String} [sep="/"]
+     * @param {String} [searchSeparator="/"]
      * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, sep = "/", showDirectoriesOnly = false) {
+    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, searchSeparator = "/", showDirectoriesOnly = false) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -423,7 +423,7 @@ class DirectoryDropdown {
                         e.stopPropagation();
                         e.preventDefault(); // prevent cursor move
                         const input = e.target;
-                        DirectoryDropdown.selectionToInput(input, selection, sep);
+                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
                         updateDropdown();
                         //updateCallback();
                         //submitCallback();
@@ -439,11 +439,11 @@ class DirectoryDropdown {
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
                     const input = e.target;
                     const oldFilterText = input.value;
-                    const iSep = oldFilterText.lastIndexOf(sep, oldFilterText.length - 2);
+                    const iSep = oldFilterText.lastIndexOf(searchSeparator, oldFilterText.length - 2);
                     const newFilterText = oldFilterText.substring(0, iSep + 1);
                     if (oldFilterText !== newFilterText) {
                         const delta = oldFilterText.substring(iSep + 1);
-                        let isMatch = delta[delta.length-1] === sep;
+                        let isMatch = delta[delta.length-1] === searchSeparator;
                         if (!isMatch) {
                             const options = dropdown.children;
                             for (let i = 0; i < options.length; i++) {
@@ -488,7 +488,7 @@ class DirectoryDropdown {
                     const input = e.target
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
-                        DirectoryDropdown.selectionToInput(input, selection, sep);
+                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
                         updateDropdown();
                         updateCallback();
                     }
@@ -542,23 +542,23 @@ class DirectoryDropdown {
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
-     * @param {String} [sep="/"]
+     * @param {String} searchSeparator
      */
-    static selectionToInput(input, selection, sep) {
+    static selectionToInput(input, selection, searchSeparator) {
         selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
         const selectedText = selection.innerText;
         const oldFilterText = input.value;
-        const iSep = oldFilterText.lastIndexOf(sep);
+        const iSep = oldFilterText.lastIndexOf(searchSeparator);
         const previousPath = oldFilterText.substring(0, iSep + 1);
         input.value = previousPath + selectedText;
     }
     
     /**
      * @param {DirectoryItem[]} directories
-     * @param {string} sep
+     * @param {string} searchSeparator
      * @param {string} [modelType = ""]
      */
-    update(directories, sep, modelType = "") {
+    update(directories, searchSeparator, modelType = "") {
         const dropdown = this.element;
         const input = this.#input;
         const updateDropdown = this.#updateDropdown;
@@ -567,7 +567,7 @@ class DirectoryDropdown {
         const showDirectoriesOnly = this.showDirectoriesOnly;
 
         const filter = input.value;
-        if (filter[0] !== sep) {
+        if (filter[0] !== searchSeparator) {
             dropdown.style.display = "none";
             return;
         }
@@ -590,7 +590,7 @@ class DirectoryDropdown {
         // TODO: directories === undefined?
         let indexLastWord = 1;
         while (true) {
-            const indexNextWord = filter.indexOf(sep, indexLastWord);
+            const indexNextWord = filter.indexOf(searchSeparator, indexLastWord);
             if (indexNextWord === -1) {
                 // end of filter
                 break;
@@ -643,7 +643,7 @@ class DirectoryDropdown {
                 const isDir = grandChildCount !== undefined && grandChildCount !== null && grandChildCount > 0;
                 const itemName = child["name"];
                 if (itemName.startsWith(lastWord) && (!showDirectoriesOnly || (showDirectoriesOnly && isDir))) {
-                    options.push(itemName + (isDir ? "/" : ""));
+                    options.push(itemName + (isDir ? searchSeparator : ""));
                 }
             }
         }
@@ -680,7 +680,7 @@ class DirectoryDropdown {
         const selection_submit = (e) => {
             e.stopPropagation();
             const selection = e.target;
-            DirectoryDropdown.selectionToInput(input, selection, sep);
+            DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
             updateDropdown();
             updateCallback();e.target
             submitCallback();
@@ -730,6 +730,16 @@ function pathToFileString(path) {
 }
 
 /**
+ * @param {string} path
+ * @returns {string}
+ */
+function searchPathToSystemPath(path, searchSeparator, systemSeparator) {
+    const i1 = path.indexOf(searchSeparator, 1);
+    const i2 = path.indexOf(searchSeparator, i1 + 1);
+    return path.slice(i2 + 1).replaceAll(searchSeparator, systemSeparator);
+}
+
+/**
  * @param {string} file
  * @returns {string | undefined}
  */
@@ -764,6 +774,9 @@ function insertEmbeddingIntoText(text, file, removeExtension) {
  * @param {string} [resetText=""]
  */
 function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
+    if (element === undefined || element === null) {
+        return;
+    }
     const name = success ? "button-success" : "button-failure";
     element.classList.add(name);
     if (successText != "" && failureText != "") {
@@ -775,7 +788,7 @@ function buttonAlert(element, success, successText = "", failureText = "", reset
         if (innerHTML != "") {
             element.innerHTML = innerHTML;
         }
-    }, 500, element, name, resetText);
+    }, 1000, element, name, resetText);
 }
 
 class Tabs {
@@ -874,7 +887,7 @@ class ModelGrid {
             .filter(Boolean);
 
         const regexSHA256 = /^[a-f0-9]{64}$/gi;
-        const fields = ["name", "searchPath"]; // TODO: Remove "searchPath" hack.
+        const fields = ["name", "path"];
         return list.filter((element) => {
             const text = fields
                 .reduce((memo, field) => memo + " " + element[field], "")
@@ -1063,9 +1076,12 @@ class ModelGrid {
      * @param {Array} models
      * @param {string} modelType
      * @param {Object.<HTMLInputElement>} settingsElements
+     * @param {String} searchSeparator
+     * @param {String} systemSeparator
+     * @param {Function} modelInfoCallback
      * @returns {HTMLElement[]}
      */
-    static #generateInnerHtml(models, modelType, settingsElements) {
+    static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, modelInfoCallback) {
         // TODO: seperate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
@@ -1078,14 +1094,21 @@ class ModelGrid {
         if (models.length > 0) {
             return models.map((item) => {
                 const uri = item.post ?? "no-post";
-                const imgUrl = `/model-manager/image-preview?uri=${uri}`;
+                const imgUrl = `/model-manager/image/preview?uri=${uri}`;
+                const searchPath = item.path;
+                const path = searchPathToSystemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
                 if (showAddButton) {
                     buttons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "⧉︎",
-                            onclick: (e) => ModelGrid.#copyModelToClipboard(e, modelType, item.path, removeEmbeddingExtension),
+                            onclick: (e) => ModelGrid.#copyModelToClipboard(
+                                e, 
+                                modelType, 
+                                path, 
+                                removeEmbeddingExtension
+                            ),
                             draggable: false,
                         })
                     );
@@ -1095,12 +1118,24 @@ class ModelGrid {
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "✚",
-                            onclick: (e) => ModelGrid.#addModel(e, modelType, item.path, removeEmbeddingExtension, addOffset),
+                            onclick: (e) => ModelGrid.#addModel(
+                                e, 
+                                modelType, 
+                                path, 
+                                removeEmbeddingExtension, 
+                                addOffset
+                            ),
                             draggable: false,
                         })
                     );
                 }
-                const dragAdd = (e) => ModelGrid.#dragAddModel(e, modelType, item.path, removeEmbeddingExtension, strictDragToAdd);
+                const dragAdd = (e) => ModelGrid.#dragAddModel(
+                    e, 
+                    modelType, 
+                    path, 
+                    removeEmbeddingExtension, 
+                    strictDragToAdd
+                );
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
                         src: imgUrl,
@@ -1115,6 +1150,16 @@ class ModelGrid {
                     },
                         buttons
                     ),
+                    $el("div.model-preview-top-left", {
+                        draggable: false,
+                    }, [
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "ⓘ",
+                            onclick: async() => modelInfoCallback(modelType, searchPath),
+                            draggable: false,
+                        }),
+                    ]),
                     $el("div.model-label", {
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
@@ -1138,8 +1183,11 @@ class ModelGrid {
      * @param {boolean} reverseSort
      * @param {Array} previousModelFilters
      * @param {HTMLInputElement} modelFilter
+     * @param {String} searchSeparator
+     * @param {String} systemSeparator
+     * @param {Function} modelInfoCallback
      */
-    static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter) {
+    static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, searchSeparator, systemSeparator, modelInfoCallback) {
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -1173,7 +1221,14 @@ class ModelGrid {
         ModelGrid.#sort(modelList, sortBy, reverseSort);
 
         modelGrid.innerHTML = "";
-        const modelGridModels = ModelGrid.#generateInnerHtml(modelList, modelType, settings);
+        const modelGridModels = ModelGrid.#generateInnerHtml(
+            modelList, 
+            modelType, 
+            settings, 
+            searchSeparator, 
+            systemSeparator,
+            modelInfoCallback,
+        );
         modelGrid.append.apply(modelGrid, modelGridModels);
     }
 }
@@ -1221,6 +1276,8 @@ function $radioGroup(attr) {
 
 class ModelManager extends ComfyDialog {
     #el = {
+        /** @type {HTMLDivElement} */ modelInfoView: null,
+        /** @type {HTMLDivElement} */ modelInfoContainer: null,
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
 
@@ -1257,7 +1314,10 @@ class ModelManager extends ComfyDialog {
     };
 
     /** @type {string} */
-    #sep = "/";
+    #searchSeparator = "/";
+
+    /** @type {string} */
+    #systemSeparator = null;
 
     constructor() {
         super();
@@ -1268,6 +1328,53 @@ class ModelManager extends ComfyDialog {
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
+                    $el("div.model-info-view", {
+                        $: (el) => (this.#el.modelInfoView = el),
+                    }, [
+                        $el("div", {
+                            style: {
+                                display: "flex",
+                                gap: "8px",
+                            },
+                        }, [
+                            $el("button.icon-button", {
+                                textContent: "🗑︎",
+                                onclick: async(e) => {
+                                    const affirmation = "delete";
+                                    const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY?\n\nThis includes all image or text files.");
+                                    let deleted = false;
+                                    if (confirmation === affirmation) {
+                                        const container = this.#el.modelInfoContainer;
+                                        const path = encodeURIComponent(container.dataset.path);
+                                        const type = encodeURIComponent(this.#el.modelTypeSelect.value);
+                                        await request(
+                                            `/model-manager/model/delete?path=${path}&type=${type}`,
+                                            {
+                                                method: "POST",
+                                            }
+                                        )
+                                        .then((result) => {
+                                            if (result["success"]) 
+                                            {
+                                                container.innerHTML = "";
+                                                this.#el.modelInfoView.style.display = "none";
+                                                this.#modelTab_updateModels();
+                                                deleted = true;
+                                            }
+                                        })
+                                        .catch(err => {});
+                                    }
+                                    if (!deleted) {
+                                        buttonAlert(e.target, false);
+                                    }
+                                },
+                            }),
+                        ]),
+                        $el("div.model-info-container", {
+                            $: (el) => (this.#el.modelInfoContainer = el),
+                            "data-path": "",
+                        }),
+                    ]),
                     $el("div.topbar-buttons",
                         [
                             $el("div.sidebar-buttons",
@@ -1294,7 +1401,15 @@ class ModelManager extends ComfyDialog {
                             ]),
                             $el("button.icon-button", {
                                 textContent: "✖",
-                                onclick: () => this.close(),
+                                onclick: () => {
+                                    const infoView = this.#el.modelInfoView;
+                                    if (infoView.style.display === "none") {
+                                        this.close();
+                                    }
+                                    else {
+                                        infoView.style.display = "none";
+                                    }
+                                },
                             }),
                         ]
                     ),
@@ -1336,7 +1451,7 @@ class ModelManager extends ComfyDialog {
             this.#modelTab_updateDirectoryDropdown,
             this.#modelTab_updatePreviousModelFilter,
             this.#modelTab_updateModelGrid,
-            this.#sep,
+            this.#searchSeparator,
             false,
         );
         this.#modelContentFilterDirectoryDropdown = searchDropdown;
@@ -1398,13 +1513,17 @@ class ModelManager extends ComfyDialog {
             sortBy,
             reverseSort,
             this.#data.previousModelFilters,
-            this.#el.modelContentFilter
+            this.#el.modelContentFilter,
+            this.#searchSeparator,
+            this.#systemSeparator,
+            this.#modelTab_showModelInfo,
         );
     }
 
     async #modelTab_updateModels() {
-        this.#data.models = await request("/model-manager/models");
-        const newModelDirectories = await request("/model-manager/model-directory-list");
+        this.#systemSeparator = await request("/model-manager/system-separator");
+        this.#data.models = await request("/model-manager/models/list");
+        const newModelDirectories = await request("/model-manager/models/directory-list");
         this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // note: do NOT create a new array
         this.#modelTab_updateModelGrid();
     }
@@ -1418,10 +1537,67 @@ class ModelManager extends ComfyDialog {
     #modelTab_updateDirectoryDropdown = () => {
         this.#modelContentFilterDirectoryDropdown.update(
             this.#data.modelDirectories,
-            this.#sep,
+            this.#searchSeparator,
             this.#el.modelTypeSelect.value,
         );
         this.#modelTab_updatePreviousModelFilter();
+    }
+
+    /**
+     * @param {string} modelType
+     * @param {string} searchPath
+     */
+    #modelTab_showModelInfo = async(modelType, searchPath) => {
+        const type = encodeURIComponent(modelType);
+        const path = encodeURIComponent(searchPath);
+        const info = await request(`/model-manager/model/info?path=${path}&type=${type}`)
+        .catch(err => {
+            console.log(err);
+            return null;
+        });
+        if (info === null) {
+            return;
+        }
+        const infoHtml = this.#el.modelInfoContainer;
+        infoHtml.innerHTML = "";
+        infoHtml.dataset.path = searchPath;
+        const innerHtml = [];
+        const filename = info["File Name"];
+        if (filename !== undefined && filename !== null && filename !== "") {
+            innerHtml.push($el("h1", [filename]));
+        }
+        for (const [key, value] of Object.entries(info)) {
+            if (value === undefined || value === null || value === "") {
+                continue;
+            }
+            
+            if (Array.isArray(value)) {
+                if (value.length > 0) {
+                    innerHtml.push($el("h2", [key + ":"]));
+                    
+                    let text = "<p>";
+                    for (let i = 0; i < value.length; i++) {
+                        const v = value[i];
+                        const tag = v[0];
+                        const count = v[1];
+                        text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
+                        if (i !== value.length - 1) {
+                            text += ", ";
+                        }
+                    }
+                    text += "</p>";
+                    const div = $el("div");
+                    div.innerHTML = text;
+                    innerHtml.push(div);
+                }
+            }
+            else {
+                innerHtml.push($el("p", [key + ": " + value]));
+            }
+        }
+        infoHtml.append.apply(infoHtml, innerHtml);
+        
+        this.#el.modelInfoView.style.display = "block";
     }
 
     /**
@@ -1482,7 +1658,9 @@ class ModelManager extends ComfyDialog {
                 method: "POST",
                 body: JSON.stringify({ "settings": settings }),
             }
-        );
+        ).catch((err) => {
+            return { "success": false };
+        });
         const success = data["success"];
         if (success) {
             const settings = data["settings"];
@@ -1636,7 +1814,7 @@ class ModelManager extends ComfyDialog {
             modelManager.classList.add(newSidebarState);
         }
     }
-    
+
     /**
      * @param {HTMLDivElement} previewImageContainer
      * @param {Event} e 
@@ -1661,16 +1839,16 @@ class ModelManager extends ComfyDialog {
         else if (currentIndex < 0) { currentIndex = children.length - 1; }
         children[currentIndex].style.display = "block";
     }
-    
+
     /**
      * @param {Object} info
      * @param {String[]} modelTypes
      * @param {DirectoryItem[]} modelDirectories
-     * @param {String} sep
+     * @param {String} searchSeparator
      * @param {int} id
      * @returns {HTMLDivElement}
      */
-    #downloadTab_modelInfo(info, modelTypes, modelDirectories, sep, id) {
+    #downloadTab_modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
         // TODO: use passed in info
         const RADIO_MODEL_PREVIEW_NONE = "No Preview";
         const RADIO_MODEL_PREVIEW_DEFAULT = "Default Preview";
@@ -1715,13 +1893,13 @@ class ModelManager extends ComfyDialog {
                 if (modelType === "") { return; }
                 searchDropdown.update(
                     modelDirectories,
-                    sep,
+                    searchSeparator,
                     modelType,
                 );
             },
             () => {},
             () => {},
-            sep,
+            searchSeparator,
             true,
         );
         
@@ -1869,7 +2047,7 @@ class ModelManager extends ComfyDialog {
                                     let success = true;
                                     let resultText = "✔";
                                     await request(
-                                        "/model-manager/download",
+                                        "/model-manager/model/download",
                                         {
                                             method: "POST",
                                             body: JSON.stringify(record),
@@ -1951,7 +2129,7 @@ class ModelManager extends ComfyDialog {
         
         return modelInfo;
     }
-    
+
     async #downloadTab_search() {
         const infosHtml = this.#el.modelInfos;
         infosHtml.innerHTML = "";
@@ -2039,7 +2217,7 @@ class ModelManager extends ComfyDialog {
                 modelInfo,
                 modelTypes,
                 this.#data.modelDirectories,
-                this.#sep,
+                this.#searchSeparator,
                 id,
             );
         });
