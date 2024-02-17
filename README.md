@@ -1,21 +1,15 @@
 # comfyui-model-manager
 
-Download and browse models in ComfyUI.
-
-*(Viewing metadata and deleting are WIP.)*
+Download, browse and delete models in ComfyUI.
 
 <div>
   <img src="demo-tab-download.png" alt="Model Manager Demo Screenshot" width="45%"/>
   <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="45%"/>
 </div>
 
-# Fork
-
 ## About this fork
 
 I made this fork because the original repo was inactive and missing many things I needed to make ComfyUI more usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
-
-Currently it is still missing a way to view/download model metadata and delete a model.
 
 ## Fork Improvements
 
@@ -35,6 +29,7 @@ Currently it is still missing a way to view/download model metadata and delete a
   - Add `/` at the start of the search bar to see auto-complete suggestions.
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Sort for models (Date Created, Date Modified, Name).
+- View model metadata, including training tags and bucket resolutions.
 
 ### ComfyUI Node Graph
 
@@ -68,17 +63,15 @@ Currently it is still missing a way to view/download model metadata and delete a
 
 ### Model info window/panel (server load/send on demand)
 
-- Info icon `ⓘ` button to view.
+- Set preview image.
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
-- Delete model with warning popup.
-- Set preview image.
 
 ### Settings
 
 - Exclude hidden folders with a `.` prefix.
 - Enable optional checksum to detect if a model is already downloaded.
-- Sidebar width.
+- Sidebar width/height.
 
 ### Search filtering and sort
 
