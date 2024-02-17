@@ -15,10 +15,9 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Download Tab
 
-- Remade download tab.
-  - View multiple models connected to url.
-  - Select download directory.
-  - Optionally download default or custom preivew image.
+- View multiple models associated to a url.
+- Select download directory.
+- Optionally download default or custom preview image.
 - Civitai and HuggingFace API token configurable in `server_settings.yaml`.
 
 ### Models Tab
@@ -42,13 +41,13 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Settings Tab
 
-- Correctly change colors using ComfyUI's theme colors.
+- Change colors using ComfyUI's theme colors.
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
   - Text to always search.
   - Show/Hide add embedding extension.
 
-## TODO:
+## TODO
 
 ### Code
 
@@ -63,6 +62,7 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Model info window/panel (server load/send on demand)
 
+- Move a model to a different directory.
 - Set preview image.
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
