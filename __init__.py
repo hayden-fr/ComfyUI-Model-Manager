@@ -70,27 +70,42 @@ def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Mi
     return model_extensions
 
 
-def search_path_to_system_path(model_path, model_path_type):
-    # TODO: return model type (since it is bakedi into the search path anyways; simplifies other code)
-    model_path = model_path.replace("/", os.path.sep)
-    regex_result = re.search(r'\d+', model_path)
-    if regex_result is None:
-        return None
-    try:
-        model_path_index = int(regex_result.group())
-    except:
-        return None
+def search_path_to_system_path(model_path):
+    sep = os.path.sep
+    model_path = os.path.normpath(model_path.replace("/", sep))
+
+    isep0 = 0 if model_path[0] == sep else -1
+
+    isep1 = model_path.find(sep, isep0 + 1)
+    if isep1 == -1 or isep1 == len(model_path):
+        return (None, None)
+
+    isep2 = model_path.find(sep, isep1 + 1)
+    if isep2 == -1 or isep2 - isep1 == 1:
+        isep2 = len(model_path)
+
+    model_path_type = model_path[isep0 + 1:isep1]
     paths = folder_paths_get_folder_paths(model_path_type)
+    if len(paths) == 0:
+        return (None, None)
+
+    model_path_index = model_path[isep1 + 1:isep2]
+    try:
+        model_path_index = int(model_path_index)
+    except:
+        return (None, None)
     if model_path_index < 0 or model_path_index >= len(paths):
-        return None
-    model_path_span = regex_result.span()
-    return os.path.join(
-        comfyui_model_uri, 
-        (
-            paths[model_path_index] + 
-            model_path[model_path_span[1]:]
-        )
+        return (None, None)
+
+    system_path = os.path.normpath(
+        paths[model_path_index] + 
+        sep + 
+        model_path[isep2:]
     )
+
+    return (system_path, model_path_type)
+    
+print()
 
 
 def get_safetensor_header(path):
@@ -418,13 +433,7 @@ async def get_model_info(request):
         return web.json_response({})
     model_path = urllib.parse.unquote(model_path)
 
-    model_type = request.query.get("type") # TODO: in the searchPath?
-    if model_type is None:
-        return web.json_response({})
-    model_type = urllib.parse.unquote(model_type)
-
-    model_path_type = model_type_to_dir_name(model_type)
-    file = search_path_to_system_path(model_path, model_path_type)
+    file, _ = search_path_to_system_path(model_path)
     if file is None:
         return web.json_response({})
 
@@ -496,16 +505,11 @@ async def download_model(request):
         "success": False,
         "invalid": None,
     }
-    
+
     overwrite = body.get("overwrite", False)
-    
-    model_type = body.get("type")
-    model_path_type = model_type_to_dir_name(model_type)
-    if model_path_type is None or model_path_type == "":
-        result["invalid"] = "type"
-        return web.json_response(result)
+
     model_path = body.get("path", "/0")
-    directory = search_path_to_system_path(model_path, model_path_type)
+    directory, model_type = search_path_to_system_path(model_path)
     if directory is None:
         result["invalid"] = "path"
         return web.json_response(result)
@@ -556,14 +560,11 @@ async def download_model(request):
 @server.PromptServer.instance.routes.post("/model-manager/model/move")
 async def move_model(request):
     body = await request.json()
-    model_type = body.get("type", None)
-    if model_type is None:
-        return web.json_response({ "success": False })
 
     old_file = body.get("oldFile", None)
     if old_file is None:
         return web.json_response({ "success": False })
-    old_file = search_path_to_system_path(old_file, model_type)
+    old_file, _ = search_path_to_system_path(old_file)
     if not os.path.isfile(old_file):
         return web.json_response({ "success": False })
     _, filename = os.path.split(old_file)
@@ -571,7 +572,7 @@ async def move_model(request):
     new_path = body.get("newDirectory", None)
     if new_path is None:
         return web.json_response({ "success": False })
-    new_path = search_path_to_system_path(new_path, model_type)
+    new_path, _ = search_path_to_system_path(new_path)
     if not os.path.isdir(new_path):
         return web.json_response({ "success": False })
 
@@ -604,13 +605,7 @@ async def delete_model(request):
         return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
-    model_type = request.query.get("type") # TODO: in the searchPath?
-    if model_type is None:
-        return web.json_response(result)
-    model_type = urllib.parse.unquote(model_type)
-
-    model_path_type = model_type_to_dir_name(model_type)
-    file = search_path_to_system_path(model_path, model_path_type)
+    file, model_type = search_path_to_system_path(model_path)
     if file is None:
         return web.json_response(result)
 

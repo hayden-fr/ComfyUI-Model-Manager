@@ -640,7 +640,7 @@ class DirectoryDropdown {
             for (let i = 0; i < items.length; i++) {
                 const child = items[i];
                 const grandChildCount = child["childCount"];
-                const isDir = grandChildCount !== undefined && grandChildCount !== null && grandChildCount > 0;
+                const isDir = grandChildCount !== undefined && grandChildCount !== null;
                 const itemName = child["name"];
                 if (itemName.startsWith(lastWord) && (!showDirectoriesOnly || (showDirectoriesOnly && isDir))) {
                     options.push(itemName + (isDir ? searchSeparator : ""));
@@ -1156,7 +1156,7 @@ class ModelGrid {
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "ⓘ",
-                            onclick: async() => modelInfoCallback(modelType, searchPath),
+                            onclick: async() => modelInfoCallback(searchPath),
                             draggable: false,
                         }),
                     ]),
@@ -1366,9 +1366,8 @@ class ModelManager extends ComfyDialog {
                                     if (confirmation === affirmation) {
                                         const container = this.#el.modelInfoContainer;
                                         const path = encodeURIComponent(container.dataset.path);
-                                        const type = encodeURIComponent(this.#el.modelTypeSelect.value);
                                         await request(
-                                            `/model-manager/model/delete?path=${path}&type=${type}`,
+                                            `/model-manager/model/delete?path=${path}`,
                                             {
                                                 method: "POST",
                                             }
@@ -1402,18 +1401,14 @@ class ModelManager extends ComfyDialog {
                                     textContent: "Move",
                                     onclick: async(e) => {
                                         const container = this.#el.modelInfoContainer;
-                                        const path = container.dataset.path;
-                                        const type = this.#el.modelTypeSelect.value;
-                                        const destination = moveDestination.value;
                                         let moved = false;
                                         await request(
                                             `/model-manager/model/move`,
                                             {
                                                 method: "POST",
                                                 body: JSON.stringify({
-                                                    "type": type,
-                                                    "oldFile": path,
-                                                    "newDirectory": destination,
+                                                    "oldFile": container.dataset.path,
+                                                    "newDirectory": moveDestination.value,
                                                 }),
                                             }
                                         )
@@ -1608,13 +1603,11 @@ class ModelManager extends ComfyDialog {
     }
 
     /**
-     * @param {string} modelType
      * @param {string} searchPath
      */
-    #modelTab_showModelInfo = async(modelType, searchPath) => {
-        const type = encodeURIComponent(modelType);
+    #modelTab_showModelInfo = async(searchPath) => {
         const path = encodeURIComponent(searchPath);
-        const info = await request(`/model-manager/model/info?path=${path}&type=${type}`)
+        const info = await request(`/model-manager/model/info?path=${path}`)
         .catch(err => {
             console.log(err);
             return null;
@@ -1936,8 +1929,8 @@ class ModelManager extends ComfyDialog {
         $el("input.search-text-area", {
             $: (el) => (els.saveDirectoryPath = el),
             type: "text",
-            placeholder: "/0",
-            value: "/0",
+            placeholder: this.#searchSeparator + "0",
+            value: this.#searchSeparator + "0",
         });
         
         $el("select.model-select-dropdown", {
@@ -2075,10 +2068,11 @@ class ModelManager extends ComfyDialog {
                                 onclick: async (e) => {
                                     const record = {};
                                     record["download"] = info["downloadUrl"];
-                                    record["type"] = els.modelTypeSelect.value;
-                                    if (record["type"] === "") { return; } // TODO: notify user in app
-                                    record["path"] = els.saveDirectoryPath.value;
-                                    if (record["path"] === "/") { return; } // TODO: notify user in app
+                                    record["path"] = (
+                                        els.modelTypeSelect.value + 
+                                        this.#searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
+                                        els.saveDirectoryPath.value
+                                    );
                                     record["name"] = (() => {
                                         const filename = info["fileName"];
                                         const name = els.filename.value;
