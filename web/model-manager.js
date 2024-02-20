@@ -1094,7 +1094,7 @@ class ModelGrid {
         if (models.length > 0) {
             return models.map((item) => {
                 const uri = item.post ?? "no-post";
-                const imgUrl = `/model-manager/image/preview?uri=${uri}`;
+                const imgUrl = `/model-manager/preview/get?uri=${uri}`;
                 const searchPath = item.path;
                 const path = searchPathToSystemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
@@ -1284,7 +1284,7 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
         /** @type {HTMLSelectElement} */ modelSortSelect: null,
-        /** @type {HTMLDivElement} */ searchDirectoryDropdown: null,
+        /** @type {HTMLDivElement} */ //searchDirectoryDropdown: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
 
         /** @type {HTMLDivElement} */ sidebarButtons: null,
@@ -1321,6 +1321,25 @@ class ModelManager extends ComfyDialog {
 
     constructor() {
         super();
+
+        const moveDestination = $el("input.search-text-area", {
+            placeholder: "/",
+        });
+        let searchDropdown = null;
+        searchDropdown = new DirectoryDropdown(
+            moveDestination,
+            () => {
+                searchDropdown.update(
+                    this.#data.modelDirectories,
+                    this.#searchSeparator,
+                );
+            },
+            () => {},
+            () => {},
+            this.#searchSeparator,
+            true,
+        );
+
         this.element = $el(
             "div.comfy-modal.model-manager",
             {
@@ -1330,6 +1349,7 @@ class ModelManager extends ComfyDialog {
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
                     $el("div.model-info-view", {
                         $: (el) => (this.#el.modelInfoView = el),
+                        style: { display: "none" },
                     }, [
                         $el("div", {
                             style: {
@@ -1341,7 +1361,7 @@ class ModelManager extends ComfyDialog {
                                 textContent: "🗑︎",
                                 onclick: async(e) => {
                                     const affirmation = "delete";
-                                    const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY?\n\nThis includes all image or text files.");
+                                    const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
                                     let deleted = false;
                                     if (confirmation === affirmation) {
                                         const container = this.#el.modelInfoContainer;
@@ -1369,6 +1389,50 @@ class ModelManager extends ComfyDialog {
                                     }
                                 },
                             }),
+                        ]),
+                        $el("div.row.tab-header", {
+                            display: "block",
+                        }, [
+                            $el("div.row.tab-header-flex-block", [
+                                $el("div.search-models", [
+                                    moveDestination,
+                                    searchDropdown.element,
+                                ]),
+                                $el("button", {
+                                    textContent: "Move",
+                                    onclick: async(e) => {
+                                        const container = this.#el.modelInfoContainer;
+                                        const path = container.dataset.path;
+                                        const type = this.#el.modelTypeSelect.value;
+                                        const destination = moveDestination.value;
+                                        let moved = false;
+                                        await request(
+                                            `/model-manager/model/move`,
+                                            {
+                                                method: "POST",
+                                                body: JSON.stringify({
+                                                    "type": type,
+                                                    "oldFile": path,
+                                                    "newDirectory": destination,
+                                                }),
+                                            }
+                                        )
+                                        .then((result) => {
+                                            if (result["success"]) 
+                                            {
+                                                container.innerHTML = "";
+                                                this.#el.modelInfoView.style.display = "none";
+                                                this.#modelTab_updateModels();
+                                                moved = true;
+                                            }
+                                        })
+                                        .catch(err => {});
+                                        if (!moved) {
+                                            buttonAlert(e.target, false);
+                                        }
+                                    },
+                                }),
+                            ]),
                         ]),
                         $el("div.model-info-container", {
                             $: (el) => (this.#el.modelInfoContainer = el),
@@ -1597,7 +1661,8 @@ class ModelManager extends ComfyDialog {
         }
         infoHtml.append.apply(infoHtml, innerHtml);
         
-        this.#el.modelInfoView.style.display = "block";
+        this.#el.modelInfoView.removeAttribute("style"); // remove "display: none"
+        // TODO: set default value of dropdown and value to model type?
     }
 
     /**
@@ -2234,7 +2299,7 @@ class ModelManager extends ComfyDialog {
      * @returns {HTMLElement}
      */
     #downloadTab_new() {
-        return $el("div", [
+        return $el("div.tab-header", [
             $el("div.row.tab-header-flex-block", [
                 $el("input.search-text-area", {
                     $: (el) => (this.#el.modelInfoUrl = el),
@@ -2252,7 +2317,7 @@ class ModelManager extends ComfyDialog {
                     textContent: "🔍︎",
                 }),
             ]),
-            $el("div", {
+            $el("div.download-model-infos", {
                 $: (el) => (this.#el.modelInfos = el),
             }, [
                 $el("div", ["Input a URL to select a model to download."]),

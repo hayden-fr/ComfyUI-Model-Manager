@@ -1,5 +1,6 @@
 import os
 import pathlib
+import shutil
 from datetime import datetime
 import sys
 import copy
@@ -172,8 +173,8 @@ async def save_ui_settings(request):
     })
 
 
-@server.PromptServer.instance.routes.get("/model-manager/image/preview")
-async def img_preview(request):
+@server.PromptServer.instance.routes.get("/model-manager/preview/get")
+async def get_model_preview(request):
     uri = request.query.get("uri")
 
     image_path = no_preview_image
@@ -337,7 +338,7 @@ def download_file(url, filename, overwrite):
         api_key = server_settings["civitai_api_key"]
         if (api_key != ""):
             def_headers["Authorization"] = f"Bearer {api_key}"
-            url = url + f"?token={api_key}"
+            url = url + f"?token={api_key}" # TODO: Authorization didn't work in the header
     elif url.startswith("https://huggingface.co/"):
         api_key = server_settings["huggingface_api_key"]
         if api_key != "":
@@ -445,6 +446,15 @@ async def get_model_info(request):
         info["Hash"] = metadata.get("sshs_model_hash", "")
         info["Output Name"] = metadata.get("ss_output_name", "")
 
+    file_name, _ = os.path.splitext(file)
+    txt_file = file_name + ".txt"
+    description = ""
+    if os.path.isfile(txt_file):
+        with open(txt_file, 'r', encoding="utf-8") as f:
+            description = f.read()
+    info["Description"] = description
+
+    if metadata is not None:
         img_buckets = metadata.get("ss_bucket_info", "{}")
         if type(img_buckets) is str:
             img_buckets = json.loads(img_buckets)
@@ -470,14 +480,6 @@ async def get_model_info(request):
         tags = list(tags.items())
         tags.sort(key=lambda x: x[1], reverse=True)
         info["Tags"] = tags
-
-    file_name, _ = os.path.splitext(file)
-    txt_file = file_name + ".txt"
-    description = ""
-    if os.path.isfile(txt_file):
-        with open(txt_file, 'r', encoding="utf-8") as f:
-            description = f.read()
-    info["Description"] = description
 
     return web.json_response(info)
 
@@ -531,16 +533,16 @@ async def download_model(request):
 
     image_uri = body.get("image")
     if image_uri is not None and image_uri != "":
-        # TODO: doesn't work for https://civitai.com/images/...
-        image_extension = None
+        image_extension = None # TODO: doesn't work for https://civitai.com/images/...
         for ext in image_extensions:
             if image_uri.endswith(ext):
                 image_extension = ext
                 break
         if image_extension is not None:
+            file_path_without_extension = name[:len(name) - len(model_extension)]
             image_name = os.path.join(
                 directory,
-                (name[:len(name) - len(model_extension)]) + image_extension
+                file_path_without_extension + image_extension
             )
             try:
                 download_file(image_uri, image_name, overwrite)
@@ -549,6 +551,48 @@ async def download_model(request):
 
     result["success"] = True
     return web.json_response(result)
+
+
+@server.PromptServer.instance.routes.post("/model-manager/model/move")
+async def move_model(request):
+    body = await request.json()
+    model_type = body.get("type", None)
+    if model_type is None:
+        return web.json_response({ "success": False })
+
+    old_file = body.get("oldFile", None)
+    if old_file is None:
+        return web.json_response({ "success": False })
+    old_file = search_path_to_system_path(old_file, model_type)
+    if not os.path.isfile(old_file):
+        return web.json_response({ "success": False })
+    _, filename = os.path.split(old_file)
+
+    new_path = body.get("newDirectory", None)
+    if new_path is None:
+        return web.json_response({ "success": False })
+    new_path = search_path_to_system_path(new_path, model_type)
+    if not os.path.isdir(new_path):
+        return web.json_response({ "success": False })
+
+    new_file = os.path.join(new_path, filename)
+    try:
+        shutil.move(old_file, new_file)
+    except:
+        return web.json_response({ "success": False })
+
+    old_file_without_extension, _ = os.path.splitext(old_file)
+    new_file_without_extension, _ = os.path.splitext(new_file)
+
+    for extension in image_extensions + (".txt",):
+        old_file = old_file_without_extension + extension
+        if os.path.isfile(old_file):
+            try:
+                shutil.move(old_file, new_file_without_extension + extension)
+            except Exception as e:
+                print(e, file=sys.stderr, flush=True)
+
+    return web.json_response({ "success": True })
 
 
 @server.PromptServer.instance.routes.post("/model-manager/model/delete")

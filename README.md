@@ -28,7 +28,11 @@ I made this fork because the original repo was inactive and missing many things 
   - Add `/` at the start of the search bar to see auto-complete suggestions.
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Sort for models (Date Created, Date Modified, Name).
+
+### Model Info
+
 - View model metadata, including training tags and bucket resolutions.
+- Delete or move a model.
 
 ### ComfyUI Node Graph
 
@@ -62,7 +66,6 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Model info window/panel (server load/send on demand)
 
-- Move a model to a different directory.
 - Set preview image.
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
