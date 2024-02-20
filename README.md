@@ -33,6 +33,7 @@ I made this fork because the original repo was inactive and missing many things 
 
 - View model metadata, including training tags and bucket resolutions.
 - Delete or move a model.
+- Read, edit and save notes in a `.txt` file beside the model.
 
 ### ComfyUI Node Graph
 

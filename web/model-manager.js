@@ -1386,22 +1386,25 @@ class ModelManager extends ComfyDialog {
                                     if (confirmation === affirmation) {
                                         const container = this.#el.modelInfoContainer;
                                         const path = encodeURIComponent(container.dataset.path);
-                                        await request(
+                                        deleted = await request(
                                             `/model-manager/model/delete?path=${path}`,
                                             {
                                                 method: "POST",
                                             }
                                         )
                                         .then((result) => {
-                                            if (result["success"]) 
+                                            const deleted = result["success"];
+                                            if (deleted) 
                                             {
                                                 container.innerHTML = "";
                                                 this.#el.modelInfoView.style.display = "none";
                                                 this.#modelTab_updateModels();
-                                                deleted = true;
                                             }
+                                            return deleted;
                                         })
-                                        .catch(err => {});
+                                        .catch(err => {
+                                            return false;
+                                        });
                                     }
                                     if (!deleted) {
                                         buttonAlert(e.target, false);
@@ -1421,8 +1424,7 @@ class ModelManager extends ComfyDialog {
                                     textContent: "Move",
                                     onclick: async(e) => {
                                         const container = this.#el.modelInfoContainer;
-                                        let moved = false;
-                                        await request(
+                                        const moved = await request(
                                             `/model-manager/model/move`,
                                             {
                                                 method: "POST",
@@ -1433,15 +1435,18 @@ class ModelManager extends ComfyDialog {
                                             }
                                         )
                                         .then((result) => {
-                                            if (result["success"]) 
+                                            const moved = result["success"];
+                                            if (moved) 
                                             {
                                                 container.innerHTML = "";
                                                 this.#el.modelInfoView.style.display = "none";
                                                 this.#modelTab_updateModels();
-                                                moved = true;
                                             }
+                                            return moved;
                                         })
-                                        .catch(err => {});
+                                        .catch(err => {
+                                            return false;
+                                        });
                                         if (!moved) {
                                             buttonAlert(e.target, false);
                                         }
@@ -1644,7 +1649,7 @@ class ModelManager extends ComfyDialog {
             innerHtml.push($el("h1", [filename]));
         }
         for (const [key, value] of Object.entries(info)) {
-            if (value === undefined || value === null || value === "") {
+            if (value === undefined || value === null) {
                 continue;
             }
             
@@ -1669,7 +1674,38 @@ class ModelManager extends ComfyDialog {
                 }
             }
             else {
-                innerHtml.push($el("p", [key + ": " + value]));
+                if (key === "Notes") {
+                    innerHtml.push($el("h2", [key + ":"]));
+                    const noteArea = $el("textarea.comfy-multiline-input", {
+                        value: value, 
+                        rows: 5,
+                    });
+                    innerHtml.push(noteArea);
+                    innerHtml.push($el("button", {
+                        textContent: "Save Notes",
+                        onclick: (e) => {
+                            const saved = request(
+                                "/model-manager/notes/save",
+                                {
+                                    method: "POST",
+                                    body: JSON.stringify({
+                                        "path": this.#el.modelInfoContainer.dataset.path,
+                                        "notes": noteArea.value,
+                                    }),
+                                }
+                            ).then((result) => {
+                                return result["success"];
+                            })
+                            .catch((err) => {
+                                return false;
+                            });
+                            buttonAlert(e.target, saved);
+                        },
+                    }));
+                }
+                else {
+                    innerHtml.push($el("p", [key + ": " + value]));
+                }
             }
         }
         infoHtml.append.apply(infoHtml, innerHtml);
@@ -2106,27 +2142,21 @@ class ModelManager extends ComfyDialog {
                                     })();
                                     record["overwrite"] = this.#el.modelInfoOverwrite.checked;
                                     e.target.disabled = true;
-                                    let success = true;
-                                    let resultText = "✔";
-                                    await request(
+                                    const [success, resultText] = await request(
                                         "/model-manager/model/download",
                                         {
                                             method: "POST",
                                             body: JSON.stringify(record),
                                         }
                                     ).then(data => {
-                                        if (data["success"] !== true) {
-                                            // TODO: notify user in app
-                                            console.error('Failed to download model:', data);
-                                            success = false;
-                                            resultText = "📥︎";
-                                        }
+                                        const success = data["success"];
+                                        return [success, success ? "✔" : "📥︎"];
                                     }).catch(err => {
-                                        // TODO: notify user in app
-                                        console.error('Failed to download model:', err);
-                                        success = false;
-                                        resultText = "📥︎";
+                                        return [false, "📥︎"];
                                     });
+                                    if (success) {
+                                        this.#modelTab_updateModels();
+                                    }
                                     buttonAlert(e.target, success, "✔", "✖", resultText);
                                     e.target.disabled = success;
                                 },

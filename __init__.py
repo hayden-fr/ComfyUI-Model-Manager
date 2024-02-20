@@ -457,11 +457,11 @@ async def get_model_info(request):
 
     file_name, _ = os.path.splitext(file)
     txt_file = file_name + ".txt"
-    description = ""
+    notes = ""
     if os.path.isfile(txt_file):
         with open(txt_file, 'r', encoding="utf-8") as f:
-            description = f.read()
-    info["Description"] = description
+            notes = f.read()
+    info["Notes"] = notes
 
     if metadata is not None:
         img_buckets = metadata.get("ss_bucket_info", "{}")
@@ -633,6 +633,33 @@ async def delete_model(request):
             os.remove(txt_file)
 
     return web.json_response(result)
+
+
+@server.PromptServer.instance.routes.post("/model-manager/notes/save")
+async def set_notes(request):
+    body = await request.json()
+
+    text = body.get("notes", None)
+    if type(text) is not str:
+        return web.json_response({ "success": False })
+
+    model_path = body.get("path", None)
+    if type(model_path) is not str:
+        return web.json_response({ "success": False })
+    model_path, _ = search_path_to_system_path(model_path)
+    file_path_without_extension, _ = os.path.splitext(model_path)
+    filename = os.path.normpath(file_path_without_extension + ".txt")
+    if text.isspace() or text == "":
+        if os.path.exists(filename):
+            os.remove(filename)
+    else:
+        try:
+            with open(filename, "w") as f:
+                f.write(text)
+        except:
+            web.json_response({ "success": False })
+
+    return web.json_response({ "success": True })
 
 
 WEB_DIRECTORY = "web"
