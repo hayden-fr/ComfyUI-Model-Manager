@@ -869,6 +869,25 @@ function $tab(name, el) {
     return $el("div", { dataset: { name } }, el);
 }
 
+/**
+ * @returns {HTMLLabelElement}
+ */
+function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
+    const text = x.textContent;
+    const input = $el("input", {
+        type: "checkbox", 
+        checked: x.checked ?? false, 
+    });
+    const label = $el("label", [
+        input, 
+        text === "" || text === undefined || text === null ? "" : " " + text,
+    ]);
+    if (x.$ !== undefined){
+        x.$(input);
+    }
+    return label;
+}
+
 class ModelGrid {
     /**
      * @param {Array} list
@@ -1279,6 +1298,7 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLDivElement} */ modelInfoView: null,
         /** @type {HTMLDivElement} */ modelInfoContainer: null,
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
+        /** @type {HTMLDivElement} */ modelInfoOverwrite: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
 
         /** @type {HTMLDivElement} */ modelGrid: null,
@@ -1666,15 +1686,16 @@ class ModelManager extends ComfyDialog {
         const el = this.#el.settings;
         for (const [key, value] of Object.entries(settings)) {
             const setting = el[key];
-            if (setting) {
-                const type = setting.type;
-                switch (type) {
-                    case "checkbox": setting.checked = Boolean(value); break;
-                    case "range": setting.value = parseFloat(value); break;
-                    case "textarea": setting.value = value; break;
-                    case "number": setting.value = parseInt(value); break;
-                    default: console.warn("Unknown settings input type!");
-                }
+            if (setting === undefined || setting === null) {
+                continue;
+            }
+            const type = setting.type;
+            switch (type) {
+                case "checkbox": setting.checked = Boolean(value); break;
+                case "range": setting.value = parseFloat(value); break;
+                case "textarea": setting.value = value; break;
+                case "number": setting.value = parseInt(value); break;
+                default: console.warn("Unknown settings input type!");
             }
         }
 
@@ -1783,49 +1804,31 @@ class ModelManager extends ComfyDialog {
                     }),
                 ]),
             ]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-persistent-search"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Persistent search text across model types"]),
-            ]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-show-label-extensions"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Show model file extension in labels"]),
-            ]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-show-add-button"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Show add button"]),
-            ]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-show-copy-button"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Show copy button"]),
-            ]),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-persistent-search"] = el),
+                textContent: "Persistent search text across model types",
+            }),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-show-label-extensions"] = el),
+                textContent: "Show model file extension in labels",
+            }),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-show-add-button"] = el),
+                textContent: "Show add button",
+            }),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-show-copy-button"] = el),
+                textContent: "Show copy button",
+            }),
             $el("h2", ["Model Add"]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-add-embedding-extension"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Add extension to embedding"]),
-            ]),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-add-drag-strict-on-field"] = el),
-                    type: "checkbox",
-                }),
-                $el("p", ["Strict dragging model onto a node's model field to add"]),
-            ]),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-add-embedding-extension"] = el),
+                textContent: "Add extension to embedding",
+            }),
+            $checkbox({
+                $: (el) => (this.#el.settings["model-add-drag-strict-on-field"] = el),
+                textContent: "Strict dragging model onto a node's model field to add",
+            }),
             $el("div", [
                 $el("input", {
                     $: (el) => (this.#el.settings["model-add-offset"] = el),
@@ -2101,7 +2104,7 @@ class ModelManager extends ComfyDialog {
                                         }
                                         return "";
                                     })();
-                                    record["overwrite"] = false; // TODO: add to UI
+                                    record["overwrite"] = this.#el.modelInfoOverwrite.checked;
                                     e.target.disabled = true;
                                     let success = true;
                                     let resultText = "✔";
@@ -2192,7 +2195,7 @@ class ModelManager extends ComfyDialog {
     async #downloadTab_search() {
         const infosHtml = this.#el.modelInfos;
         infosHtml.innerHTML = "";
-        
+
         const urlText = this.#el.modelInfoUrl.value;
         const modelInfos = await (async () => {
             if (urlText.startsWith("https://civitai.com")) {
@@ -2283,8 +2286,15 @@ class ModelManager extends ComfyDialog {
         if (modelInfos.length === 0) {
             modelInfosHtml.push($el("div", ["No results found."]));
         }
-        else if (modelInfos.length === 1) {
-            modelInfosHtml[0].open = true;
+        else {
+            if (modelInfos.length === 1) {
+                modelInfosHtml[0].open = true;
+            }
+            const label = $checkbox({
+                $: (el) => { this.#el.modelInfoOverwrite = el; },
+                textContent: "Overwrite Existing Files",
+            });
+            modelInfosHtml.unshift(label);
         }
         infosHtml.append.apply(infosHtml, modelInfosHtml);
     }

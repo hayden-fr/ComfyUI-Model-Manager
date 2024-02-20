@@ -420,11 +420,13 @@
 }
 
 /* model manager settings */
-.model-manager .model-manager-settings > div {
+.model-manager .model-manager-settings > div,
+.model-manager .model-manager-settings > label {
     display: flex;
     flex-direction: row;
     align-items: center;
     gap: 8px;
+    margin: 16px 0;
 }
 
 .model-manager .model-manager-settings button {
