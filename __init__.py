@@ -654,7 +654,7 @@ async def set_notes(request):
             os.remove(filename)
     else:
         try:
-            with open(filename, "w") as f:
+            with open(filename, "w", encoding="utf-8") as f:
                 f.write(text)
         except:
             web.json_response({ "success": False })
