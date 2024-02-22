@@ -19,10 +19,10 @@ function debounce(callback, delay) {
 
 /**
  * @param {string} url
- * @param {any} options
+ * @param {any} [options=undefined]
  * @returns {Promise}
  */
-function request(url, options) {
+function request(url, options = undefined) {
     return new Promise((resolve, reject) => {
         api.fetchApi(url, options)
             .then((response) => response.json())
@@ -57,6 +57,22 @@ const MODEL_SORT_DATE_NAME = "name";
 
 const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
+
+/**
+ * @param {string | undefined} [searchPath=undefined]
+ * @param {string | undefined} [dateImageModified=undefined]
+ *
+ * @returns {string}
+ */
+function imageUri(imageSearchPath = undefined, dateImageModified = undefined) {
+    const path = imageSearchPath ?? "no-preview";
+    const date = dateImageModified;
+    let uri = `/model-manager/preview/get?uri=${path}`;
+    if (date !== undefined && date !== null) {
+        uri += `&v=${date}`;
+    }
+    return uri;
+}
 
 /**
  * Tries to return the related ComfyUI model directory if unambigious.
@@ -1112,8 +1128,7 @@ class ModelGrid {
         const removeEmbeddingExtension = !settingsElements["model-add-embedding-extension"].checked;
         if (models.length > 0) {
             return models.map((item) => {
-                const uri = item.post ?? "no-post";
-                const imgUrl = `/model-manager/preview/get?uri=${uri}`;
+                const previewInfo = item.preview;
                 const searchPath = item.path;
                 const path = searchPathToSystemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
@@ -1157,7 +1172,7 @@ class ModelGrid {
                 );
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
-                        src: imgUrl,
+                        src: imageUri(previewInfo?.path, previewInfo?.dateModified),
                         draggable: false,
                     }),
                     $el("div.model-preview-overlay", {
@@ -1293,6 +1308,284 @@ function $radioGroup(attr) {
     return $el("div.comfy-radio-group", radioGroup);
 }
 
+/**
+ * @param {HTMLDivElement} previewImageContainer
+ * @param {Event} e 
+ * @param {1 | -1} step 
+ */
+function updateRadioPreview(previewImageContainer, step) {
+    const children = previewImageContainer.children;
+    if (children.length === 0) {
+        return;
+    }
+    let currentIndex = -step;
+    for (let i = 0; i < children.length; i++) {
+        const previewImage = children[i];
+        const display = previewImage.style.display;
+        if (display !== "none") {
+            currentIndex = i;
+        }
+        previewImage.style.display = "none";
+    }
+    currentIndex = currentIndex + step;
+    if (currentIndex >= children.length) { currentIndex = 0; }
+    else if (currentIndex < 0) { currentIndex = children.length - 1; }
+    children[currentIndex].style.display = "block";
+}
+
+/**
+ * @param {String} uniqueName
+ * @param {String[]} defaultPreviews
+ * @returns {[]}
+ */
+function radioGroupImageSelect(uniqueName, defaultPreviews, defaultChanges=false) {
+    const defaultImageCount = defaultPreviews.length;
+    
+    const el_defaultUri = $el("div", {
+        style: { display: "none" },
+        "data-noimage": imageUri(),
+    });
+    
+    const el_noImage = $el("img", {
+        src: imageUri(),
+        style: {
+            display: defaultImageCount === 0 ? "block" : "none",
+        },
+        loading: "lazy",
+    });
+    
+    const el_defaultImages = $el("div", {
+        style: {
+            width: "100%",
+            height: "100%",
+        },
+    }, (() => {
+        const imgs = defaultPreviews.map((url) => {
+            return $el("img", {
+                src: url,
+                style: { display: "none" },
+                loading: "lazy",
+                onerror: (e) => {
+                    e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                },
+            });
+        });
+        if (imgs.length > 0) {
+            imgs[0].style.display = "block";
+        }
+        return imgs;
+    })());
+    
+    const el_uploadImage = $el("img", {
+        src: imageUri(),
+        style: { display : "none" },
+        onerror: (e) => {
+            e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+        },
+    });
+    const el_uploadFile = $el("input", {
+        type: "file",
+        accept: IMAGE_EXTENSIONS.join(", "),
+        onchange: (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                el_uploadImage.src = URL.createObjectURL(file);
+            }
+            else {
+                el_uploadImage.src = el_defaultUri.dataset.noimage;
+            }
+        },
+    });
+    const el_upload = $el("div", {
+        style: { display: "none" },
+    }, [
+        el_uploadFile,
+    ]);
+    
+    const el_urlImage = $el("img", {
+        src: imageUri(),
+        style: { display: "none" },
+        onerror: (e) => {
+            e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+        },
+    });
+    const el_customUrl = $el("input.search-text-area", {
+        type: "text",
+        placeholder: "https://custom-image-preview.png",
+    });
+    const el_custom = $el("div.row.tab-header-flex-block", {
+        style: { display: "none" },
+    }, [
+        el_customUrl,
+        $el("button.icon-button", {
+            textContent: "🔍︎",
+            onclick: (e) => {
+                el_urlImage.src = el_customUrl.value;
+            },
+        }),
+    ]);
+    
+    const el_previewButtons = $el("div.model-preview-overlay", {
+        style: {
+            display: el_defaultImages.children.length > 1 ? "block" : "none",
+        },
+    }, [
+        $el("button.icon-button.model-preview-button-left", {
+            textContent: "←",
+            onclick: () => updateRadioPreview(el_defaultImages, -1),
+        }),
+        $el("button.icon-button.model-preview-button-right", {
+            textContent: "→",
+            onclick: () => updateRadioPreview(el_defaultImages, 1),
+        }),
+    ]);
+    const previews = [
+        el_noImage,
+        el_defaultImages,
+        el_urlImage,
+        el_uploadImage,
+    ];
+    const el_preview = $el("div.item", [
+        $el("div", {
+                style: {
+                    "width": "100%",
+                    "height": "100%",
+                },
+            }, 
+            previews,
+        ),
+        el_previewButtons,
+    ]);
+    
+    const PREVIEW_NONE = "No Preview";
+    const PREVIEW_DEFAULT = "Default";
+    const PREVIEW_URL = "URL";
+    const PREVIEW_UPLOAD = "Upload";
+    
+    const el_radioButtons = $radioGroup({
+        name: uniqueName,
+        onchange: (value) => {
+            el_custom.style.display = "none";
+            el_upload.style.display = "none";
+            
+            el_defaultImages.style.display = "none";
+            el_previewButtons.style.display = "none";
+            
+            el_noImage.style.display = "none";
+            el_uploadImage.style.display = "none";
+            el_urlImage.style.display = "none";
+            
+            switch (value) {
+                case PREVIEW_NONE:
+                default:
+                    el_noImage.style.display = "block";
+                    break;
+                case PREVIEW_DEFAULT:
+                    el_defaultImages.style.display = "block";
+                    el_previewButtons.style.display = el_defaultImages.children.length > 1 ? "block" : "none";
+                    break;
+                case PREVIEW_URL:
+                    el_custom.style.display = "flex";
+                    el_urlImage.style.display = "block";
+                    break;
+                case PREVIEW_UPLOAD:
+                    el_upload.style.display = "flex";
+                    el_uploadImage.style.display = "block";
+                    break;
+            }
+        },
+        options: (() => {
+            const radios = [];
+            radios.push({ value: PREVIEW_NONE });
+            if (defaultImageCount > 0) {
+                radios.push({ value: PREVIEW_DEFAULT });
+            }
+            radios.push({ value: PREVIEW_URL });
+            radios.push({ value: PREVIEW_UPLOAD })
+            return radios;
+        })(),
+    });
+    
+    if (defaultImageCount > 0) {
+        const children = el_radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === PREVIEW_DEFAULT) {
+                radioButton.checked = true;
+                break;
+            }
+        };
+    }
+    
+    const resetModelInfoPreview = () => {
+        let noimage = el_defaultUri.dataset.noimage;
+        previews.forEach((el) => {
+            el.style.display = "none";
+            if (el_noImage !== el) {
+                if (el.nodeName === "IMG") {
+                    el.src = noimage;
+                }
+                else {
+                    el.children[0].src = noimage;
+                }
+            }
+            else {
+                el.src = imageUri();
+            }
+        });
+        const children = el_radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === PREVIEW_DEFAULT) {
+                el_defaultImages.style.display = "block";
+                radioButton.checked = true;
+                break;
+            }
+        };
+        el_uploadFile.value = "";
+        el_customUrl.value = "";
+        el_upload.style.display = "none";
+        el_custom.style.display = "none";
+    };
+    
+    const getImage = () => {
+        const value = document.querySelector(`input[name="${uniqueName}"]:checked`).value;
+        switch (value) {
+            case PREVIEW_DEFAULT:
+                if (defaultImageCount === 0) {
+                    return "";
+                }
+                const children = el_defaultImages.children;
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (child.style.display !== "none") {
+                        return child.src;
+                    }
+                }
+                return "";
+            case PREVIEW_URL:
+                return el_customUrl.value;
+            case PREVIEW_UPLOAD:
+                return el_uploadFile.files[0] ?? "";
+            case PREVIEW_NONE:
+                return imageUri();
+        }
+        return "";
+    };
+    
+    const el_radioGroup = $el("div.model-preview-select-radio-container", [
+        $el("div.row.tab-header-flex-block", [el_radioButtons]),
+        $el("div", [
+            el_custom,
+            el_upload,
+        ]),
+    ]);
+    
+    return [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview];
+}
+
 class ModelManager extends ComfyDialog {
     #el = {
         /** @type {HTMLDivElement} */ modelInfoView: null,
@@ -1300,6 +1593,8 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
         /** @type {HTMLDivElement} */ modelInfoOverwrite: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
+        modelInfoPreview: null,
+        modelInfoDefaultUri: null,
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
@@ -1339,6 +1634,8 @@ class ModelManager extends ComfyDialog {
     /** @type {string} */
     #systemSeparator = null;
 
+    #resetModelInfoPreview = () => {};
+
     constructor() {
         super();
 
@@ -1359,7 +1656,17 @@ class ModelManager extends ComfyDialog {
             this.#searchSeparator,
             true,
         );
-
+        
+        const [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview] = radioGroupImageSelect(
+            "model-info-preview-model-FYUIKMNVB", 
+            [imageUri()],
+        );
+        el_preview.style.display = "flex";
+        this.#el.modelInfoRadioGroup = el_radioGroup;
+        this.#el.modelInfoPreview = el_preview;
+        this.#el.modelInfoDefaultUri = el_defaultUri;
+        this.#resetModelInfoPreview = resetModelInfoPreview;
+        
         this.element = $el(
             "div.comfy-modal.model-manager",
             {
@@ -1402,7 +1709,7 @@ class ModelManager extends ComfyDialog {
                                             }
                                             return deleted;
                                         })
-                                        .catch(err => {
+                                        .catch((err) => {
                                             return false;
                                         });
                                     }
@@ -1633,7 +1940,7 @@ class ModelManager extends ComfyDialog {
     #modelTab_showModelInfo = async(searchPath) => {
         const path = encodeURIComponent(searchPath);
         const info = await request(`/model-manager/model/info?path=${path}`)
-        .catch(err => {
+        .catch((err) => {
             console.log(err);
             return null;
         });
@@ -1648,66 +1955,152 @@ class ModelManager extends ComfyDialog {
         if (filename !== undefined && filename !== null && filename !== "") {
             innerHtml.push($el("h1", [filename]));
         }
-        for (const [key, value] of Object.entries(info)) {
-            if (value === undefined || value === null) {
-                continue;
-            }
-            
-            if (Array.isArray(value)) {
-                if (value.length > 0) {
-                    innerHtml.push($el("h2", [key + ":"]));
-                    
-                    let text = "<p>";
-                    for (let i = 0; i < value.length; i++) {
-                        const v = value[i];
-                        const tag = v[0];
-                        const count = v[1];
-                        text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
-                        if (i !== value.length - 1) {
-                            text += ", ";
+        
+        if (info["Preview"]) {
+            const imagePath = info["Preview"]["path"];
+            const imageDateModified = info["Preview"]["dateModified"];
+            this.#el.modelInfoDefaultUri.dataset.noimage = imageUri(imagePath, imageDateModified);
+            this.#resetModelInfoPreview();
+        }
+        
+        innerHtml.push($el("div", [
+            this.#el.modelInfoPreview,
+            $el("div.row.tab-header", [
+                $el("div.row.tab-header-flex-block", [
+                    $el("button", {
+                        textContent: "Set as Preview",
+                        onclick: async(e) => {
+                            const confirmation = window.confirm("Change preview image PERMANENTLY?");
+                            let updatedPreview = false;
+                            if (confirmation) {
+                                e.target.disabled = true;
+                                const container = this.#el.modelInfoContainer;
+                                const path = container.dataset.path;
+                                const imageUrl = getImage();
+                                if (imageUrl === imageUri()) {
+                                    const encodedPath = encodeURIComponent(path);
+                                    updatedPreview = await request(
+                                        `/model-manager/preview/delete?path=${encodedPath}`,
+                                        {
+                                            method: "POST",
+                                            body: JSON.stringify({}),
+                                        }
+                                    )
+                                    .then((result) => {
+                                        return result["success"];
+                                    })
+                                    .catch((err) => {
+                                        return false;
+                                    });
+                                }
+                                else {
+                                    const formData = new FormData();
+                                    formData.append("path", path);
+                                    const image = imageUrl[0] == "/" ? "" : imageUrl;
+                                    formData.append("image", image);
+                                    updatedPreview = await request(
+                                        `/model-manager/preview/set`,
+                                        {
+                                            method: "POST",
+                                            body: formData,
+                                        }
+                                    )
+                                    .then((result) => {
+                                        return result["success"];
+                                    })
+                                    .catch((err) => {
+                                        return false;
+                                    });
+                                }
+                                if (updatedPreview) {
+                                    this.#modelTab_updateModels();
+                                    this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
+                                    this.#resetModelInfoPreview();
+                                    this.#el.modelInfoView.style.display = "none";
+                                }
+                                
+                                e.target.disabled = false;
+                            }
+                            buttonAlert(e.target, updatedPreview);
+                        },
+                    }),
+                ]),
+                $el("div.row.tab-header-flex-block", [
+                    this.#el.modelInfoRadioGroup,
+                ]),
+            ]),
+            $el("div", 
+                (() => {
+                    const elements = [];
+                    for (const [key, value] of Object.entries(info)) {
+                        if (value === undefined || value === null) {
+                            continue;
+                        }
+                        
+                        if (Array.isArray(value)) {
+                            if (value.length > 0) {
+                                elements.push($el("h2", [key + ":"]));
+                                
+                                let text = "<p>";
+                                for (let i = 0; i < value.length; i++) {
+                                    const v = value[i];
+                                    const tag = v[0];
+                                    const count = v[1];
+                                    text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
+                                    if (i !== value.length - 1) {
+                                        text += ", ";
+                                    }
+                                }
+                                text += "</p>";
+                                const div = $el("div");
+                                div.innerHTML = text;
+                                elements.push(div);
+                            }
+                        }
+                        else {
+                            if (key === "Notes") {
+                                elements.push($el("h2", [key + ":"]));
+                                const noteArea = $el("textarea.comfy-multiline-input", {
+                                    value: value, 
+                                    rows: 5,
+                                });
+                                elements.push(noteArea);
+                                elements.push($el("button", {
+                                    textContent: "Save Notes",
+                                    onclick: (e) => {
+                                        const saved = request(
+                                            "/model-manager/notes/save",
+                                            {
+                                                method: "POST",
+                                                body: JSON.stringify({
+                                                    "path": this.#el.modelInfoContainer.dataset.path,
+                                                    "notes": noteArea.value,
+                                                }),
+                                            }
+                                        ).then((result) => {
+                                            return result["success"];
+                                        })
+                                        .catch((err) => {
+                                            return false;
+                                        });
+                                        buttonAlert(e.target, saved);
+                                    },
+                                }));
+                            }
+                            else if (key === "Preview") {
+                                //
+                            }
+                            else {
+                                if (value !== "") {
+                                    elements.push($el("p", [key + ": " + value]));
+                                }
+                            }
                         }
                     }
-                    text += "</p>";
-                    const div = $el("div");
-                    div.innerHTML = text;
-                    innerHtml.push(div);
-                }
-            }
-            else {
-                if (key === "Notes") {
-                    innerHtml.push($el("h2", [key + ":"]));
-                    const noteArea = $el("textarea.comfy-multiline-input", {
-                        value: value, 
-                        rows: 5,
-                    });
-                    innerHtml.push(noteArea);
-                    innerHtml.push($el("button", {
-                        textContent: "Save Notes",
-                        onclick: (e) => {
-                            const saved = request(
-                                "/model-manager/notes/save",
-                                {
-                                    method: "POST",
-                                    body: JSON.stringify({
-                                        "path": this.#el.modelInfoContainer.dataset.path,
-                                        "notes": noteArea.value,
-                                    }),
-                                }
-                            ).then((result) => {
-                                return result["success"];
-                            })
-                            .catch((err) => {
-                                return false;
-                            });
-                            buttonAlert(e.target, saved);
-                        },
-                    }));
-                }
-                else {
-                    innerHtml.push($el("p", [key + ": " + value]));
-                }
-            }
-        }
+                    return elements;
+                })(),
+            ),
+        ]));
         infoHtml.append.apply(infoHtml, innerHtml);
         
         this.#el.modelInfoView.removeAttribute("style"); // remove "display: none"
@@ -1913,31 +2306,6 @@ class ModelManager extends ComfyDialog {
     }
 
     /**
-     * @param {HTMLDivElement} previewImageContainer
-     * @param {Event} e 
-     * @param {1 | -1} step 
-     */
-    static #downloadTab_updatePreview(previewImageContainer, step) {
-        const children = previewImageContainer.children;
-        if (children.length === 0) {
-            return;
-        }
-        let currentIndex = -step;
-        for (let i = 0; i < children.length; i++) {
-            const previewImage = children[i];
-            const display = previewImage.style.display;
-            if (display !== "none") {
-                currentIndex = i;
-            }
-            previewImage.style.display = "none";
-        }
-        currentIndex = currentIndex + step;
-        if (currentIndex >= children.length) { currentIndex = 0; }
-        else if (currentIndex < 0) { currentIndex = children.length - 1; }
-        children[currentIndex].style.display = "block";
-    }
-
-    /**
      * @param {Object} info
      * @param {String[]} modelTypes
      * @param {DirectoryItem[]} modelDirectories
@@ -1946,35 +2314,12 @@ class ModelManager extends ComfyDialog {
      * @returns {HTMLDivElement}
      */
     #downloadTab_modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
-        // TODO: use passed in info
-        const RADIO_MODEL_PREVIEW_NONE = "No Preview";
-        const RADIO_MODEL_PREVIEW_DEFAULT = "Default Preview";
-        const RADIO_MODEL_PREVIEW_CUSTOM = "Custom Preview";
+        const [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview] = radioGroupImageSelect(
+            "model-download-info-preview-model" + "-" + id,
+            info["images"],
+        );
         
-        const els = {
-            modelPreviewContainer: null,
-            previewImgs: null,
-            buttonLeft: null,
-            buttonRight: null,
-            
-            customPreviewContainer: null,
-            customPreviewUrl: null,
-            
-            modelTypeSelect: null,
-            saveDirectoryPath: null,
-            filename: null,
-        };
-        
-        $el("input.search-text-area", {
-            $: (el) => (els.saveDirectoryPath = el),
-            type: "text",
-            placeholder: this.#searchSeparator + "0",
-            value: this.#searchSeparator + "0",
-        });
-        
-        $el("select.model-select-dropdown", {
-            $: (el) => (els.modelTypeSelect = el),
-        }, (() => {
+        const el_modelTypeSelect = $el("select.model-select-dropdown", (() => {
             const options = [$el("option", { value: "" }, ["-- Model Type --"])];
             modelTypes.forEach((modelType) => {
                 options.push($el("option", { value: modelType }, [modelType]));
@@ -1982,11 +2327,16 @@ class ModelManager extends ComfyDialog {
             return options;
         })());
         
+        const el_saveDirectoryPath = $el("input.search-text-area", {
+            type: "text",
+            placeholder: this.#searchSeparator + "0",
+            value: this.#searchSeparator + "0",
+        });
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
-            els.saveDirectoryPath,
+            el_saveDirectoryPath,
             () => {
-                const modelType = els.modelTypeSelect.value;
+                const modelType = el_modelTypeSelect.value;
                 if (modelType === "") { return; }
                 searchDropdown.update(
                     modelDirectories,
@@ -2000,36 +2350,13 @@ class ModelManager extends ComfyDialog {
             true,
         );
         
-        const radioGroupName = "model-download-info-preview-model" + "-" + id;
-        const radioGroup = $radioGroup({
-            name: radioGroupName,
-            onchange: (value) => {
-                switch (value) {
-                    case RADIO_MODEL_PREVIEW_DEFAULT:
-                        const bottonStyleDisplay = els.previewImgs.children.length > 1 ? "block" : "none";
-                        els.buttonLeft.style.display = bottonStyleDisplay;
-                        els.buttonRight.style.display = bottonStyleDisplay;
-                        els.modelPreviewContainer.style.display = "block";
-                        els.customPreviewContainer.style.display = "none";
-                        break;
-                    case RADIO_MODEL_PREVIEW_CUSTOM:
-                        els.modelPreviewContainer.style.display = "none";
-                        els.customPreviewContainer.style.display = "flex";
-                        break;
-                    default:
-                        els.modelPreviewContainer.style.display = "none";
-                        els.customPreviewContainer.style.display = "none";
-                        break;
-                }
-            },
-            options: (() => {
-                const radios = [];
-                radios.push({ value: RADIO_MODEL_PREVIEW_NONE });
-                if (info["images"].length > 0) {
-                    radios.push({ value: RADIO_MODEL_PREVIEW_DEFAULT });
-                }
-                radios.push({ value: RADIO_MODEL_PREVIEW_CUSTOM });
-                return radios;
+        const el_filename = $el("input.plain-text-area", {
+            type: "text",
+            placeholder: (() => {
+                const filename = info["fileName"];
+                // TODO: only remove valid model file extensions
+                const i = filename.lastIndexOf(".");
+                return i === - 1 ? filename : filename.substring(0, i);
             })(),
         });
         
@@ -2039,82 +2366,32 @@ class ModelManager extends ComfyDialog {
             $el("div", {
                 style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
             }, [
-                $el("div.item", {
-                    $: (el) => (els.modelPreviewContainer = el),
-                    style: { display: "none" },
-                }, [
-                    $el("div", {
-                        $: (el) => (els.previewImgs = el),
-                        style: {
-                            width: "100%",
-                            height: "100%",
-                        },
-                    }, (() => {
-                        const imgs = info["images"].map((url) => {
-                            return $el("img", {
-                                src: url,
-                                style: { display: "none" },
-                                loading: "lazy",
-                            });
-                        });
-                        if (imgs.length > 0) {
-                            imgs[0].style.display = "block";
-                        }
-                        return imgs;
-                    })()),
-                    $el("div.model-preview-overlay", [
-                        $el("button.icon-button.model-preview-button-left", {
-                            $: (el) => (els.buttonLeft = el),
-                            onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, -1),
-                            textContent: "←",
-                        }),
-                        $el("button.icon-button.model-preview-button-right", {
-                            $: (el) => (els.buttonRight = el),
-                            onclick: () => ModelManager.#downloadTab_updatePreview(els.previewImgs, 1),
-                            textContent: "→",
-                        }),
-                    ]),
-                ]),
+                el_preview,
                 $el("div.download-settings", [
                     $el("div", {
                         style: { "margin-top": "8px" }
                     }, [
-                        $el("div.model-preview-select-radio-container", [
-                            $el("div.row.tab-header-flex-block", [radioGroup]),
-                            $el("div", [
-                                $el("div.row.tab-header-flex-block", {
-                                    $: (el) => (els.customPreviewContainer = el),
-                                    style: { display: "none" },
-                                }, [
-                                    $el("input.search-text-area", {
-                                        $: (el) => (els.customPreviewUrl = el),
-                                        type: "text",
-                                        placeholder: "https://custom-image-preview.png"
-                                    }),
-                                ]),
-                            ]),
+                        $el("div.row.tab-header-flex-block", [
+                            el_modelTypeSelect,
                         ]),
                         $el("div.row.tab-header-flex-block", [
-                            els.modelTypeSelect,
-                        ]),
-                        $el("div.row.tab-header-flex-block", [
-                            els.saveDirectoryPath,
+                            el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
                         $el("div.row.tab-header-flex-block", [
                             $el("button.icon-button", {
                                 textContent: "📥︎",
                                 onclick: async (e) => {
-                                    const record = {};
-                                    record["download"] = info["downloadUrl"];
-                                    record["path"] = (
-                                        els.modelTypeSelect.value + 
+                                    const formData = new FormData();
+                                    formData.append("download", info["downloadUrl"]);
+                                    formData.append("path",
+                                        el_modelTypeSelect.value + 
                                         this.#searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
-                                        els.saveDirectoryPath.value
+                                        el_saveDirectoryPath.value
                                     );
-                                    record["name"] = (() => {
+                                    formData.append("name", (() => {
                                         const filename = info["fileName"];
-                                        const name = els.filename.value;
+                                        const name = el_filename.value;
                                         if (name === "") {
                                             return filename;
                                         }
@@ -2122,36 +2399,23 @@ class ModelManager extends ComfyDialog {
                                             return filename.endsWith(ext);
                                         }) ?? "";
                                         return name + ext;
-                                    })();
-                                    record["image"] = (() => {
-                                        const value = document.querySelector(`input[name="${radioGroupName}"]:checked`).value;
-                                        switch (value) {
-                                            case RADIO_MODEL_PREVIEW_DEFAULT:
-                                                const children = els.previewImgs.children;
-                                                for (let i = 0; i < children.length; i++) {
-                                                    const child = children[i];
-                                                    if (child.style.display !== "none") {
-                                                        return child.src;
-                                                    }
-                                                }
-                                                return "";
-                                            case RADIO_MODEL_PREVIEW_CUSTOM:
-                                                return els.customPreviewUrl.value;
-                                        }
-                                        return "";
-                                    })();
-                                    record["overwrite"] = this.#el.modelInfoOverwrite.checked;
+                                    })());
+                                    formData.append("image", getImage());
+                                    formData.append("overwrite", this.#el.modelInfoOverwrite.checked);
                                     e.target.disabled = true;
                                     const [success, resultText] = await request(
                                         "/model-manager/model/download",
                                         {
                                             method: "POST",
-                                            body: JSON.stringify(record),
+                                            body: formData,
                                         }
-                                    ).then(data => {
+                                    ).then((data) => {
                                         const success = data["success"];
+                                        if (!success) {
+                                            console.warn(data["invalid"]);
+                                        }
                                         return [success, success ? "✔" : "📥︎"];
-                                    }).catch(err => {
+                                    }).catch((err) => {
                                         return [false, "📥︎"];
                                     });
                                     if (success) {
@@ -2161,59 +2425,26 @@ class ModelManager extends ComfyDialog {
                                     e.target.disabled = success;
                                 },
                             }),
-                            $el("input.plain-text-area", {
-                                $: (el) => (els.filename = el),
-                                type: "text",
-                                placeholder: (() => {
-                                    const filename = info["fileName"];
-                                    // TODO: only remove valid model file extensions
-                                    const i = filename.lastIndexOf(".");
-                                    return i === - 1 ? filename : filename.substring(0, i);
-                                })(),
-                            }),
+                            el_filename,
                         ]),
+                        el_radioGroup,
                     ]),
-                    /*
-                    $el("div", (() => {
-                        return Object.entries(info["details"]).filter(([, value]) => {
-                            return value !== undefined && value !== null;
-                        }).map(([key, value]) => {
-                            const el = document.createElement("p");
-                            el.innerText = key + ": " + value;
-                            return el;
-                        });
-                    })()),
-                    */
                 ]),
             ]),
         ]);
         
-        if (info["images"].length > 0) {
-            const children = radioGroup.children;
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                const radioButton = child.children[0];
-                if (radioButton.value === RADIO_MODEL_PREVIEW_DEFAULT) {
-                    els.modelPreviewContainer.style.display = "block";
-                    radioButton.checked = true;
-                    break;
-                }
-            };
-        }
-        
-        const modelTypeSelect = els.modelTypeSelect;
-        modelTypeSelect.selectedIndex = 0; // reset
+        el_modelTypeSelect.selectedIndex = 0; // reset
         const comfyUIModelType = (
             modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
             modelTypeToComfyUiDirectory(info["modelType"]) ??
             null
         );
         if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
-            const modelTypeOptions = modelTypeSelect.children;
+            const modelTypeOptions = el_modelTypeSelect.children;
             for (let i = 0; i < modelTypeOptions.length; i++) {
                 const option = modelTypeOptions[i];
                 if (option.value === comfyUIModelType) {
-                    modelTypeSelect.selectedIndex = i;
+                    el_modelTypeSelect.selectedIndex = i;
                     break;
                 }
             }

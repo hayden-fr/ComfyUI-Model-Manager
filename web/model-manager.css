@@ -159,6 +159,7 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+    min-width: 0;
 }
 
 .comfy-radio {
@@ -358,6 +359,7 @@
 
 .model-manager .tab-header-flex-block {
 	width: 100%;
+    min-width: 0;
 }
 
 .model-manager .search-models {
@@ -377,6 +379,7 @@
 	flex: 1;
     min-height: 36px;
     padding-block: 0;
+    min-width: 36px;
 }
 
 .model-manager .model-select-dropdown {
@@ -450,6 +453,15 @@
     resize: vertical;
 }
 
+.model-preview-select-radio-container {
+    min-width: 0;
+    flex: 1;
+}
+
+.model-manager input[type="file"] {
+	flex: 1;
+}
+
 .model-preview-select-radio-container img {
     position: relative;
     width: 230px;
@@ -485,7 +497,6 @@
     background-color: var(--bg-color);
     border-radius: 16px;
     color: var(--fg-color);
-    margin-top: 8px;
     padding: 16px;
     width: auto;
 }
