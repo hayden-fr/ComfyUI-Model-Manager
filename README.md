@@ -34,7 +34,7 @@ I made this fork because the original repo was inactive and missing many things 
 - View model metadata, including training tags and bucket resolutions.
 - Delete or move a model.
 - Read, edit and save notes in a `.txt` file beside the model.
-- Change or remove preview image.
+- Change or remove preview image with a file upload or a url.
 
 ### ComfyUI Node Graph
 
@@ -66,9 +66,8 @@ I made this fork because the original repo was inactive and missing many things 
 
 - Copy model path?
 
-### Model info window/panel (server load/send on demand)
+### Download Model Info
 
-- Set preview image.
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
 
