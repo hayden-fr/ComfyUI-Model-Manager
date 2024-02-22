@@ -651,10 +651,14 @@ async def move_model(request):
     if new_path is None:
         return web.json_response({ "success": False })
     new_path, _ = search_path_to_system_path(new_path)
+    if new_path is None:
+        return web.json_response({ "success": False })
     if not os.path.isdir(new_path):
         return web.json_response({ "success": False })
 
     new_file = os.path.join(new_path, filename)
+    if old_file == new_file:
+        return web.json_response({ "success": False })
     try:
         shutil.move(old_file, new_file)
     except ValueError as e:

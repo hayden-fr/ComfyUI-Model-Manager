@@ -721,7 +721,7 @@ class DirectoryDropdown {
         dropdown.append.apply(dropdown, innerHtml);
         // TODO: handle when dropdown is near the bottom of the window
         const inputRect = input.getBoundingClientRect();
-        dropdown.style.minWidth = inputRect.width + "px";
+        dropdown.style.width = inputRect.width + "px";
         dropdown.style.top = (input.offsetTop + inputRect.height) + "px";
         dropdown.style.left = input.offsetLeft + "px";
         dropdown.style.display = "block";
@@ -1338,7 +1338,7 @@ function updateRadioPreview(previewImageContainer, step) {
  * @param {String[]} defaultPreviews
  * @returns {[]}
  */
-function radioGroupImageSelect(uniqueName, defaultPreviews, defaultChanges=false) {
+function radioGroupImageSelect(uniqueName, defaultPreviews) {
     const defaultImageCount = defaultPreviews.length;
     
     const el_defaultUri = $el("div", {
@@ -1457,10 +1457,10 @@ function radioGroupImageSelect(uniqueName, defaultPreviews, defaultChanges=false
         el_previewButtons,
     ]);
     
-    const PREVIEW_NONE = "No Preview";
     const PREVIEW_DEFAULT = "Default";
-    const PREVIEW_URL = "URL";
     const PREVIEW_UPLOAD = "Upload";
+    const PREVIEW_URL = "URL";
+    const PREVIEW_NONE = "No Preview";
     
     const el_radioButtons = $radioGroup({
         name: uniqueName,
@@ -1476,35 +1476,47 @@ function radioGroupImageSelect(uniqueName, defaultPreviews, defaultChanges=false
             el_urlImage.style.display = "none";
             
             switch (value) {
-                case PREVIEW_NONE:
-                default:
-                    el_noImage.style.display = "block";
-                    break;
                 case PREVIEW_DEFAULT:
                     el_defaultImages.style.display = "block";
                     el_previewButtons.style.display = el_defaultImages.children.length > 1 ? "block" : "none";
-                    break;
-                case PREVIEW_URL:
-                    el_custom.style.display = "flex";
-                    el_urlImage.style.display = "block";
                     break;
                 case PREVIEW_UPLOAD:
                     el_upload.style.display = "flex";
                     el_uploadImage.style.display = "block";
                     break;
+                case PREVIEW_URL:
+                    el_custom.style.display = "flex";
+                    el_urlImage.style.display = "block";
+                    break;
+                case PREVIEW_NONE:
+                default:
+                    el_noImage.style.display = "block";
+                    break;
             }
         },
         options: (() => {
             const radios = [];
-            radios.push({ value: PREVIEW_NONE });
             if (defaultImageCount > 0) {
                 radios.push({ value: PREVIEW_DEFAULT });
             }
-            radios.push({ value: PREVIEW_URL });
             radios.push({ value: PREVIEW_UPLOAD })
+            radios.push({ value: PREVIEW_URL });
+            radios.push({ value: PREVIEW_NONE });
             return radios;
         })(),
     });
+    
+    const defaultIsChecked = () => {
+        const children = el_radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === PREVIEW_DEFAULT) {
+                return radioButton.checked;
+            }
+        };
+        return false;
+    }
     
     if (defaultImageCount > 0) {
         const children = el_radioButtons.children;
@@ -1583,7 +1595,8 @@ function radioGroupImageSelect(uniqueName, defaultPreviews, defaultChanges=false
         ]),
     ]);
     
-    return [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview];
+    // TODO: make this an object?
+    return [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked];
 }
 
 class ModelManager extends ComfyDialog {
@@ -1593,8 +1606,10 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
         /** @type {HTMLDivElement} */ modelInfoOverwrite: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
+        modelInfoRadioGroup: null,
         modelInfoPreview: null,
         modelInfoDefaultUri: null,
+        setAsPreviewButton: null,
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
@@ -1635,6 +1650,7 @@ class ModelManager extends ComfyDialog {
     #systemSeparator = null;
 
     #resetModelInfoPreview = () => {};
+    #modelInfoDefaultIsChecked = () => { return false; };
 
     constructor() {
         super();
@@ -1657,7 +1673,7 @@ class ModelManager extends ComfyDialog {
             true,
         );
         
-        const [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview] = radioGroupImageSelect(
+        const [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked] = radioGroupImageSelect(
             "model-info-preview-model-FYUIKMNVB", 
             [imageUri()],
         );
@@ -1666,6 +1682,70 @@ class ModelManager extends ComfyDialog {
         this.#el.modelInfoPreview = el_preview;
         this.#el.modelInfoDefaultUri = el_defaultUri;
         this.#resetModelInfoPreview = resetModelInfoPreview;
+        this.#modelInfoDefaultIsChecked = defaultIsChecked;
+        
+        const setAsPreviewButton = $el("button", {
+            $: (el) => (this.#el.setAsPreviewButton = el),
+            textContent: "Set as Preview",
+            onclick: async(e) => {
+                const confirmation = window.confirm("Change preview image PERMANENTLY?");
+                let updatedPreview = false;
+                if (confirmation) {
+                    e.target.disabled = true;
+                    const container = this.#el.modelInfoContainer;
+                    const path = container.dataset.path;
+                    const imageUrl = getImage();
+                    if (imageUrl === imageUri()) {
+                        const encodedPath = encodeURIComponent(path);
+                        updatedPreview = await request(
+                            `/model-manager/preview/delete?path=${encodedPath}`,
+                            {
+                                method: "POST",
+                                body: JSON.stringify({}),
+                            }
+                        )
+                        .then((result) => {
+                            return result["success"];
+                        })
+                        .catch((err) => {
+                            return false;
+                        });
+                    }
+                    else {
+                        const formData = new FormData();
+                        formData.append("path", path);
+                        const image = imageUrl[0] == "/" ? "" : imageUrl;
+                        formData.append("image", image);
+                        updatedPreview = await request(
+                            `/model-manager/preview/set`,
+                            {
+                                method: "POST",
+                                body: formData,
+                            }
+                        )
+                        .then((result) => {
+                            return result["success"];
+                        })
+                        .catch((err) => {
+                            return false;
+                        });
+                    }
+                    if (updatedPreview) {
+                        this.#modelTab_updateModels();
+                        this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
+                        this.#resetModelInfoPreview();
+                        this.#el.modelInfoView.style.display = "none";
+                    }
+                    
+                    e.target.disabled = false;
+                }
+                buttonAlert(e.target, updatedPreview);
+            },
+        });
+        
+        el_radioButtons.addEventListener("change", (e) => {
+            setAsPreviewButton.style.display = defaultIsChecked() ? "none" : "block";
+        });
         
         this.element = $el(
             "div.comfy-modal.model-manager",
@@ -1678,51 +1758,44 @@ class ModelManager extends ComfyDialog {
                         $: (el) => (this.#el.modelInfoView = el),
                         style: { display: "none" },
                     }, [
-                        $el("div", {
-                            style: {
-                                display: "flex",
-                                gap: "8px",
-                            },
-                        }, [
-                            $el("button.icon-button", {
-                                textContent: "🗑︎",
-                                onclick: async(e) => {
-                                    const affirmation = "delete";
-                                    const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
-                                    let deleted = false;
-                                    if (confirmation === affirmation) {
-                                        const container = this.#el.modelInfoContainer;
-                                        const path = encodeURIComponent(container.dataset.path);
-                                        deleted = await request(
-                                            `/model-manager/model/delete?path=${path}`,
-                                            {
-                                                method: "POST",
-                                            }
-                                        )
-                                        .then((result) => {
-                                            const deleted = result["success"];
-                                            if (deleted) 
-                                            {
-                                                container.innerHTML = "";
-                                                this.#el.modelInfoView.style.display = "none";
-                                                this.#modelTab_updateModels();
-                                            }
-                                            return deleted;
-                                        })
-                                        .catch((err) => {
-                                            return false;
-                                        });
-                                    }
-                                    if (!deleted) {
-                                        buttonAlert(e.target, false);
-                                    }
-                                },
-                            }),
-                        ]),
                         $el("div.row.tab-header", {
                             display: "block",
                         }, [
                             $el("div.row.tab-header-flex-block", [
+                                $el("button.icon-button", {
+                                    textContent: "🗑︎",
+                                    onclick: async(e) => {
+                                        const affirmation = "delete";
+                                        const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
+                                        let deleted = false;
+                                        if (confirmation === affirmation) {
+                                            const container = this.#el.modelInfoContainer;
+                                            const path = encodeURIComponent(container.dataset.path);
+                                            deleted = await request(
+                                                `/model-manager/model/delete?path=${path}`,
+                                                {
+                                                    method: "POST",
+                                                }
+                                            )
+                                            .then((result) => {
+                                                const deleted = result["success"];
+                                                if (deleted) 
+                                                {
+                                                    container.innerHTML = "";
+                                                    this.#el.modelInfoView.style.display = "none";
+                                                    this.#modelTab_updateModels();
+                                                }
+                                                return deleted;
+                                            })
+                                            .catch((err) => {
+                                                return false;
+                                            });
+                                        }
+                                        if (!deleted) {
+                                            buttonAlert(e.target, false);
+                                        }
+                                    },
+                                }),
                                 $el("div.search-models", [
                                     moveDestination,
                                     searchDropdown.element,
@@ -1730,33 +1803,36 @@ class ModelManager extends ComfyDialog {
                                 $el("button", {
                                     textContent: "Move",
                                     onclick: async(e) => {
-                                        const container = this.#el.modelInfoContainer;
-                                        const moved = await request(
-                                            `/model-manager/model/move`,
-                                            {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    "oldFile": container.dataset.path,
-                                                    "newDirectory": moveDestination.value,
-                                                }),
-                                            }
-                                        )
-                                        .then((result) => {
-                                            const moved = result["success"];
-                                            if (moved) 
-                                            {
-                                                container.innerHTML = "";
-                                                this.#el.modelInfoView.style.display = "none";
-                                                this.#modelTab_updateModels();
-                                            }
-                                            return moved;
-                                        })
-                                        .catch(err => {
-                                            return false;
-                                        });
-                                        if (!moved) {
-                                            buttonAlert(e.target, false);
+                                        const confirmation = window.confirm("Move this file?");
+                                        let moved = false;
+                                        if (confirmation) {
+                                            const container = this.#el.modelInfoContainer;
+                                            moved = await request(
+                                                `/model-manager/model/move`,
+                                                {
+                                                    method: "POST",
+                                                    body: JSON.stringify({
+                                                        "oldFile": container.dataset.path,
+                                                        "newDirectory": moveDestination.value,
+                                                    }),
+                                                }
+                                            )
+                                            .then((result) => {
+                                                const moved = result["success"];
+                                                if (moved) 
+                                                {
+                                                    moveDestination.value = "";
+                                                    container.innerHTML = "";
+                                                    this.#el.modelInfoView.style.display = "none";
+                                                    this.#modelTab_updateModels();
+                                                }
+                                                return moved;
+                                            })
+                                            .catch(err => {
+                                                return false;
+                                            });
                                         }
+                                        buttonAlert(e.target, moved);
                                     },
                                 }),
                             ]),
@@ -1960,73 +2036,23 @@ class ModelManager extends ComfyDialog {
             const imagePath = info["Preview"]["path"];
             const imageDateModified = info["Preview"]["dateModified"];
             this.#el.modelInfoDefaultUri.dataset.noimage = imageUri(imagePath, imageDateModified);
-            this.#resetModelInfoPreview();
         }
+        else {
+            this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
+        }
+        this.#resetModelInfoPreview();
+        
+        const setAsPreviewButton = this.#el.setAsPreviewButton;
+        setAsPreviewButton.style.display = this.#modelInfoDefaultIsChecked() ? "none" : "block";
         
         innerHtml.push($el("div", [
             this.#el.modelInfoPreview,
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
-                    $el("button", {
-                        textContent: "Set as Preview",
-                        onclick: async(e) => {
-                            const confirmation = window.confirm("Change preview image PERMANENTLY?");
-                            let updatedPreview = false;
-                            if (confirmation) {
-                                e.target.disabled = true;
-                                const container = this.#el.modelInfoContainer;
-                                const path = container.dataset.path;
-                                const imageUrl = getImage();
-                                if (imageUrl === imageUri()) {
-                                    const encodedPath = encodeURIComponent(path);
-                                    updatedPreview = await request(
-                                        `/model-manager/preview/delete?path=${encodedPath}`,
-                                        {
-                                            method: "POST",
-                                            body: JSON.stringify({}),
-                                        }
-                                    )
-                                    .then((result) => {
-                                        return result["success"];
-                                    })
-                                    .catch((err) => {
-                                        return false;
-                                    });
-                                }
-                                else {
-                                    const formData = new FormData();
-                                    formData.append("path", path);
-                                    const image = imageUrl[0] == "/" ? "" : imageUrl;
-                                    formData.append("image", image);
-                                    updatedPreview = await request(
-                                        `/model-manager/preview/set`,
-                                        {
-                                            method: "POST",
-                                            body: formData,
-                                        }
-                                    )
-                                    .then((result) => {
-                                        return result["success"];
-                                    })
-                                    .catch((err) => {
-                                        return false;
-                                    });
-                                }
-                                if (updatedPreview) {
-                                    this.#modelTab_updateModels();
-                                    this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
-                                    this.#resetModelInfoPreview();
-                                    this.#el.modelInfoView.style.display = "none";
-                                }
-                                
-                                e.target.disabled = false;
-                            }
-                            buttonAlert(e.target, updatedPreview);
-                        },
-                    }),
+                    this.#el.modelInfoRadioGroup,
                 ]),
                 $el("div.row.tab-header-flex-block", [
-                    this.#el.modelInfoRadioGroup,
+                    setAsPreviewButton,
                 ]),
             ]),
             $el("div", 
@@ -2314,7 +2340,7 @@ class ModelManager extends ComfyDialog {
      * @returns {HTMLDivElement}
      */
     #downloadTab_modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
-        const [el_radioGroup, el_preview, getImage, el_defaultUri, resetModelInfoPreview] = radioGroupImageSelect(
+        const [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked] = radioGroupImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
         );

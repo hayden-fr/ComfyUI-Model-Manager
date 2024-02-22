@@ -366,6 +366,7 @@
     display: flex;
     flex-direction: row;
     flex: 1;
+    min-width: 0;
 }
 
 .model-manager .model-select-dropdown {
@@ -403,9 +404,15 @@
 
 .model-manager .search-dropdown > p {
     margin: 0;
-    padding-left: 20px;
-    padding-top: 0.85em;
-    padding-bottom: 0.85em;
+    padding: 0.85em 20px;
+    min-width: 0;
+}
+.model-manager .search-dropdown > p {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+.model-manager .search-dropdown > p::-webkit-scrollbar { 
+    display: none;  /* Safari and Chrome */
 }
 
 .model-manager .search-dropdown > p.search-dropdown-selected {
