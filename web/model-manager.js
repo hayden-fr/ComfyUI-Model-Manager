@@ -121,11 +121,17 @@ function modelTypeToComfyUiDirectory(modelType, fileType) {
  * @param {string} id - Model ID.
  * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
  *
- * @returns {Object} Dictionary containing recieved model info. Returns an empty if fails.
+ * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
  */
 async function civitai_requestInfo(id, apiPath) {
     const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
-    return await request(url);
+    try {
+        return await request(url);
+    }
+    catch (error) {
+        console.error("Failed to get model info from Civitai!", error);
+        return {};
+    }
 }
 
 /**
@@ -186,7 +192,7 @@ function civitai_getModelFilesInfo(modelVersionInfo, type = null, fp = null, siz
  *
  * @param {string} stringUrl - Model url.
  *
- * @returns {Object} - Download information for the given url.
+ * @returns {Promise<Object>} - Download information for the given url.
  */
 async function civitai_getFilteredInfo(stringUrl) {
     const url = new URL(stringUrl);
@@ -264,7 +270,13 @@ async function civitai_getFilteredInfo(stringUrl) {
  */
 async function huggingFace_requestInfo(id, apiPath = "models") {
     const url = "https://huggingface.co/api/" + apiPath + "/" + id;
-    return await request(url);
+    try {
+        return await request(url);
+    }
+    catch (error) {
+        console.error("Failed to get model info from HuggingFace!", error);
+        return {};
+    }
 }
 
 /**
@@ -1606,15 +1618,14 @@ class ModelManager extends ComfyDialog {
         /** @type {HTMLDivElement} */ modelInfoUrl: null,
         /** @type {HTMLDivElement} */ modelInfoOverwrite: null,
         /** @type {HTMLDivElement} */ modelInfos: null,
-        modelInfoRadioGroup: null,
-        modelInfoPreview: null,
-        modelInfoDefaultUri: null,
-        setAsPreviewButton: null,
+        /** @type {HTMLDivElement} */ modelInfoRadioGroup: null,
+        /** @type {HTMLDivElement} */ modelInfoPreview: null,
+        /** @type {HTMLDivElement} */ modelInfoDefaultUri: null,
+        /** @type {HTMLDivElement} */ setAsPreviewButton: null,
 
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
         /** @type {HTMLSelectElement} */ modelSortSelect: null,
-        /** @type {HTMLDivElement} */ //searchDirectoryDropdown: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
 
         /** @type {HTMLDivElement} */ sidebarButtons: null,
@@ -1649,7 +1660,10 @@ class ModelManager extends ComfyDialog {
     /** @type {string} */
     #systemSeparator = null;
 
+    /** @type {Function} */
     #resetModelInfoPreview = () => {};
+    
+    /** @type {Function} */
     #modelInfoDefaultIsChecked = () => { return false; };
 
     constructor() {
@@ -2161,7 +2175,7 @@ class ModelManager extends ComfyDialog {
     }
 
     /**
-     * @param {boolean} reloadData 
+     * @param {Promise<boolean>} reloadData 
      */
     async #settingsTab_reload(reloadData) {
         const data = await request("/model-manager/settings/load");

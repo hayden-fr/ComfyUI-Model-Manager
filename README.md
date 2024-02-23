@@ -15,9 +15,9 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Download Tab
 
-- View multiple models associated to a url.
-- Select download directory.
-- Optionally download default or custom preview image.
+- View multiple models associated with a url.
+- Select a download directory.
+- Optionally also download a model preview image (a default image along side the model, from another url or locally uploaded).
 - Civitai and HuggingFace API token configurable in `server_settings.yaml`.
 
 ### Models Tab
@@ -29,12 +29,12 @@ I made this fork because the original repo was inactive and missing many things 
 - Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
 - Sort for models (Date Created, Date Modified, Name).
 
-### Model Info
+### Model Info View
 
 - View model metadata, including training tags and bucket resolutions.
-- Delete or move a model.
 - Read, edit and save notes in a `.txt` file beside the model.
-- Change or remove preview image with a file upload or a url.
+- Change or remove a model's preview image (add a different one using a url or local upload).
+- Move or **permanently** remove models.
 
 ### ComfyUI Node Graph
 
@@ -47,62 +47,56 @@ I made this fork because the original repo was inactive and missing many things 
 
 ### Settings Tab
 
-- Change colors using ComfyUI's theme colors.
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
   - Text to always search.
   - Show/Hide add embedding extension.
+- Colors follow ComfyUI's current theme.
 
 ## TODO
-
-### Code
-
-- Javascript cleanup.
-  - Seperate into classes per tab?
-  - HTML generation all inside main class?
-  - More server driven, HTMX-like HTML generation? (Avoid x2 states)
-
-### Model Copying
-
-- Copy model path?
 
 ### Download Model Info
 
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
 
+### Sidebar
+
+- Drag sidebar width/height dynamically.
+
+### Accessibility
+
+- Proper naming, labeling, alt text, etc. for html elements.
+- Tool tips.
+- Better error messages.
+
+### Image preview
+
+- Better placeholder preview. (with proper spelling!)
+- Show preview images for videos.
+  - If ffmpeg or cv2 available, extract the first frame of the video and use as image preview.
+
 ### Settings
 
-- Exclude hidden folders with a `.` prefix.
-- Enable optional checksum to detect if a model is already downloaded.
-- Sidebar width/height.
+- Toggle exclusion of "hidden folders" with a `.` prefix.
+- Sidebar default width/height.
+- Toggle non-uniform preview sizes. (How to handle extreme aspect ratios?)
 
 ### Search filtering and sort
 
 - Real-time search
   - Check search code is optimized to avoid recalculation on every minor input change
-- Directory dropdown
-  - Use always filter to filter directory content auto-suggest dropdown
+- Filter directory dropdown
+  - Filter directory content in auto-suggest dropdown (not clear how this should be implemented)
 - Filters dropdown
-  - Stable Diffusion model version/Clip/Upscale/?
+  - Stable Diffusion model version, if applicable
   - Favorites
-- Sort-by dropdown
-  - Recently used (ascending/decending)
-  - Frequently used (ascending/decending)
-- `or` vs `and` type of keyword search (currently `and`)
+- Swap between `and` and `or` keyword search? (currently `and`)
 
-### Image preview
+### Code
 
-- Support multiple preview images. (swipe?)
-- Show preview images for videos.
-  - If ffmpeg or cv2 available, extract the first frame of the video and use as image preview.
-  - Play preview video?
-
-### Accessibility
-
-- Proper naming and labeling.
-- Tool tips?
-
-### Sidebar
-
-- Drag sidebar width/height dynamically.
+- Javascript cleanup.
+  - Better abstraction and objectification. (After codebase settles down)
+  - Separate into classes per tab?
+  - HTML generation all inside main class?
+  - More server driven, HTMX-like HTML generation? (Avoid x2 states)

@@ -409,14 +409,18 @@ def download_file(url, filename, overwrite):
         api_key = server_settings["civitai_api_key"]
         if (api_key != ""):
             def_headers["Authorization"] = f"Bearer {api_key}"
-            url = url + f"?token={api_key}" # TODO: Authorization didn't work in the header
+            url += "&" if "?" in url else "?" # not the most robust solution
+            url += f"token={api_key}" # TODO: Authorization didn't work in the header
     elif url.startswith("https://huggingface.co/"):
         api_key = server_settings["huggingface_api_key"]
         if api_key != "":
             def_headers["Authorization"] = f"Bearer {api_key}"
     rh = requests.get(url=url, stream=True, verify=False, headers=def_headers, proxies=None, allow_redirects=False)
     if not rh.ok:
-        raise ValueError("Unable to download")
+        raise ValueError(
+            "Unable to download! Request header status code: " + 
+            str(rh.status_code)
+        )
 
     downloaded_size = 0
     if rh.status_code == 200 and os.path.exists(filename_temp):
@@ -432,7 +436,7 @@ def download_file(url, filename, overwrite):
         if not redirect_url.startswith("http"):
             # Civitai requires login (NSFW or user-required)
             # TODO: inform user WHY download failed
-            raise ValueError("Unable to download!")
+            raise ValueError("Unable to download from Civitai! Redirect url: " + str(redirect_url))
         download_file(redirect_url, filename, overwrite)
         return
     if rh.status_code == 302 and r.status_code == 302:
@@ -440,7 +444,7 @@ def download_file(url, filename, overwrite):
         redirect_url = r.content.decode("utf-8")
         redirect_url_index = redirect_url.find("http")
         if redirect_url_index == -1:
-            raise ValueError("Unable to download!")
+            raise ValueError("Unable to download from HuggingFace! Redirect url: " + str(redirect_url))
         download_file(redirect_url[redirect_url_index:], filename, overwrite)
         return
     elif rh.status_code == 200 and r.status_code == 206:
