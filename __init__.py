@@ -672,6 +672,7 @@ async def move_model(request):
     old_file_without_extension, _ = os.path.splitext(old_file)
     new_file_without_extension, _ = os.path.splitext(new_file)
 
+    # TODO: this could overwrite existing files...
     for extension in image_extensions + (".txt",):
         old_file = old_file_without_extension + extension
         if os.path.isfile(old_file):
@@ -704,7 +705,7 @@ async def delete_model(request):
     if file is None:
         return web.json_response(result)
 
-    _, extension = os.path.split(file)
+    _, extension = os.path.splitext(file)
     if not extension in folder_paths_get_supported_pt_extensions(model_type):
         # cannot delete arbitrary files
         return web.json_response(result)
