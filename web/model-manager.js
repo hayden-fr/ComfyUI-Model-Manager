@@ -1836,12 +1836,10 @@ class ModelManager extends ComfyDialog {
                                             const container = this.#el.modelInfoContainer;
                                             const oldFile = container.dataset.path;
                                             const [oldFilePath, oldFileName] = searchPath_split(oldFile);
-                                            const [_, extension] = searchPath_splitExtension(oldFile);
                                             const newFile = (
                                                 moveDestinationInput.value + 
                                                 this.#searchSeparator + 
-                                                oldFileName + 
-                                                extension
+                                                oldFileName
                                             );
                                             moved = await request(
                                                 `/model-manager/model/move`,

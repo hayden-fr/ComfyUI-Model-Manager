@@ -706,7 +706,7 @@ async def delete_model(request):
 
     _, extension = os.path.split(file)
     if not extension in folder_paths_get_supported_pt_extensions(model_type):
-        # cannot move arbitrary files
+        # cannot delete arbitrary files
         return web.json_response(result)
 
     if os.path.isfile(file):
