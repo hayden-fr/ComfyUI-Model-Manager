@@ -486,14 +486,9 @@ def download_file(url, filename, overwrite):
 
 
 def download_image(image_uri, model_path, overwrite):
-    extension = None # TODO: doesn't work for https://civitai.com/images/...
-    for image_extension in image_extensions:
-        if image_uri.endswith(image_extension):
-            extension = image_extension
-            break
-    if extension is None:
+    _, extension = os.path.splitext(image_uri) # TODO: doesn't work for https://civitai.com/images/...
+    if not extension in image_extensions:
         raise ValueError("Invalid image type!")
-
     path_without_extension, _ = os.path.splitext(model_path)
     file = path_without_extension + extension
     download_file(image_uri, file, overwrite)
@@ -607,12 +602,8 @@ async def download_model(request):
         return web.json_response(result)
 
     name = formdata.get("name")
-    model_extension = None
-    for ext in folder_paths_get_supported_pt_extensions(model_type):
-        if name.endswith(ext):
-            model_extension = ext
-            break
-    if model_extension is None:
+    _, model_extension = os.path.splitext(name)
+    if not model_extension in folder_paths_get_supported_pt_extensions(model_type):
         result["invalid"] = "name"
         return web.json_response(result)
     file_name = os.path.join(directory, name)
@@ -646,21 +637,30 @@ async def move_model(request):
     old_file = body.get("oldFile", None)
     if old_file is None:
         return web.json_response({ "success": False })
-    old_file, _ = search_path_to_system_path(old_file)
+    old_file, old_model_type = search_path_to_system_path(old_file)
     if not os.path.isfile(old_file):
         return web.json_response({ "success": False })
-    _, filename = os.path.split(old_file)
-
-    new_path = body.get("newDirectory", None)
-    if new_path is None:
-        return web.json_response({ "success": False })
-    new_path, _ = search_path_to_system_path(new_path)
-    if new_path is None:
-        return web.json_response({ "success": False })
-    if not os.path.isdir(new_path):
+    _, model_extension = os.path.splitext(old_file)
+    if not model_extension in folder_paths_get_supported_pt_extensions(old_model_type):
+        # cannot move arbitrary files
         return web.json_response({ "success": False })
 
-    new_file = os.path.join(new_path, filename)
+    new_file = body.get("newFile", None)
+    if new_file is None or new_file == "":
+        # cannot have empty name
+        return web.json_response({ "success": False })
+    new_file, new_model_type = search_path_to_system_path(new_file)
+    if not new_file.endswith(model_extension):
+        return web.json_response({ "success": False })
+    if os.path.isfile(new_file):
+        # cannot overwrite existing file
+        return web.json_response({ "success": False })
+    if not model_extension in folder_paths_get_supported_pt_extensions(new_model_type):
+        return web.json_response({ "success": False })
+    new_file_dir, _ = os.path.split(new_file)
+    if not os.path.isdir(new_file_dir):
+        return web.json_response({ "success": False })
+
     if old_file == new_file:
         return web.json_response({ "success": False })
     try:
@@ -704,12 +704,9 @@ async def delete_model(request):
     if file is None:
         return web.json_response(result)
 
-    is_model = None
-    for ext in folder_paths_get_supported_pt_extensions(model_type):
-        if file.endswith(ext):
-            is_model = True
-            break
-    if not is_model:
+    _, extension = os.path.split(file)
+    if not extension in folder_paths_get_supported_pt_extensions(model_type):
+        # cannot move arbitrary files
         return web.json_response(result)
 
     if os.path.isfile(file):

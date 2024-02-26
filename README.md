@@ -34,7 +34,7 @@ I made this fork because the original repo was inactive and missing many things 
 - View model metadata, including training tags and bucket resolutions.
 - Read, edit and save notes in a `.txt` file beside the model.
 - Change or remove a model's preview image (add a different one using a url or local upload).
-- Move or **permanently** remove models.
+- Rename, move or **permanently** remove models.
 
 ### ComfyUI Node Graph
 
@@ -55,8 +55,16 @@ I made this fork because the original repo was inactive and missing many things 
 
 ## TODO
 
+### Download Model
+
+- Checkbox to optionally save description in `.txt` file for Civitai. (what about "About Model"?)
+- Server setting to enable creating new folders (on download, on move).
+
 ### Download Model Info
 
+- Auto-save notes? (requires debounce and save confirmation)
+- Load workflow from preview (Should be easy to add with ComfyUI built-in clipboard.)
+- Default weights on add/drag? (optional override on drag?)
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
 
@@ -89,13 +97,14 @@ I made this fork because the original repo was inactive and missing many things 
 - Filter directory dropdown
   - Filter directory content in auto-suggest dropdown (not clear how this should be implemented)
 - Filters dropdown
-  - Stable Diffusion model version, if applicable
+  - Stable Diffusion model version, if applicable (Maybe dropdown list of "Base Models" is more pratical to impliment?)
   - Favorites
 - Swap between `and` and `or` keyword search? (currently `and`)
 
 ### Code
 
 - Javascript cleanup.
+  - Stop abusing popup/modal.
   - Better abstraction and objectification. (After codebase settles down)
   - Separate into classes per tab?
   - HTML generation all inside main class?

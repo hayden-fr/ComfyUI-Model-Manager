@@ -225,6 +225,10 @@
 }
 
 /* model manager common */
+.model-manager h1 {
+    min-width: 0;
+}
+
 .model-manager button,
 .model-manager select,
 .model-manager input {
@@ -504,7 +508,6 @@
     background-color: var(--bg-color);
     border-radius: 16px;
     color: var(--fg-color);
-    padding: 16px;
     width: auto;
 }
 

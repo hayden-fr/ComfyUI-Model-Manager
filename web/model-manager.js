@@ -750,11 +750,24 @@ function modelWidgetIndex(nodeType) {
 
 /**
  * @param {string} path
- * @returns {string}
+ * @returns {[string, string]}
  */
-function pathToFileString(path) {
+function searchPath_split(path) {
     const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
-    return path.slice(i);
+    return [path.slice(0, i), path.slice(i)];
+}
+
+/**
+ * @param {string} path
+ * @param {string[]} extensions
+ * @returns {[string, string]}
+ */
+function searchPath_splitExtension(path) {
+    const i = path.lastIndexOf(".");
+    if (i === -1) {
+        return [path, ""];
+    }
+    return [path.slice(0, i), path.slice(i)];
 }
 
 /**
@@ -1016,7 +1029,7 @@ class ModelGrid {
             event.stopPropagation();
         }
         else if (modelType === "embeddings") {
-            const embeddingFile = pathToFileString(path);
+            const [embeddingDirectory, embeddingFile] = searchPath_split(path);
             const selectedNodes = app.canvas.selected_nodes;
             for (var i in selectedNodes) {
                 const selectedNode = selectedNodes[i];
@@ -1079,7 +1092,7 @@ class ModelGrid {
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
             if (nodeAtPos) {
                 app.canvas.selectNode(nodeAtPos);
-                const embeddingFile = pathToFileString(path);
+                const [embeddingDirectory, embeddingFile] = searchPath_split(path);
                 target.value = insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                 event.stopPropagation();
             }
@@ -1097,7 +1110,7 @@ class ModelGrid {
         let success = false;
         if (nodeType === "Embedding") {
             if (navigator.clipboard){
-                const embeddingFile = pathToFileString(path);
+                const [embeddingDirectory, embeddingFile] = searchPath_split(path);
                 const embeddingText = insertEmbeddingIntoText("", embeddingFile, removeEmbeddingExtension);
                 navigator.clipboard.writeText(embeddingText);
                 success = true;
@@ -1669,12 +1682,12 @@ class ModelManager extends ComfyDialog {
     constructor() {
         super();
 
-        const moveDestination = $el("input.search-text-area", {
+        const moveDestinationInput = $el("input.search-text-area", {
             placeholder: "/",
         });
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
-            moveDestination,
+            moveDestinationInput,
             () => {
                 searchDropdown.update(
                     this.#data.modelDirectories,
@@ -1811,7 +1824,7 @@ class ModelManager extends ComfyDialog {
                                     },
                                 }),
                                 $el("div.search-models", [
-                                    moveDestination,
+                                    moveDestinationInput,
                                     searchDropdown.element,
                                 ]),
                                 $el("button", {
@@ -1821,21 +1834,30 @@ class ModelManager extends ComfyDialog {
                                         let moved = false;
                                         if (confirmation) {
                                             const container = this.#el.modelInfoContainer;
+                                            const oldFile = container.dataset.path;
+                                            const [oldFilePath, oldFileName] = searchPath_split(oldFile);
+                                            const [_, extension] = searchPath_splitExtension(oldFile);
+                                            const newFile = (
+                                                moveDestinationInput.value + 
+                                                this.#searchSeparator + 
+                                                oldFileName + 
+                                                extension
+                                            );
                                             moved = await request(
                                                 `/model-manager/model/move`,
                                                 {
                                                     method: "POST",
                                                     body: JSON.stringify({
-                                                        "oldFile": container.dataset.path,
-                                                        "newDirectory": moveDestination.value,
+                                                        "oldFile": oldFile,
+                                                        "newFile": newFile,
                                                     }),
                                                 }
                                             )
                                             .then((result) => {
                                                 const moved = result["success"];
-                                                if (moved) 
+                                                if (moved)
                                                 {
-                                                    moveDestination.value = "";
+                                                    moveDestinationInput.value = "";
                                                     container.innerHTML = "";
                                                     this.#el.modelInfoView.style.display = "none";
                                                     this.#modelTab_updateModels();
@@ -2043,7 +2065,63 @@ class ModelManager extends ComfyDialog {
         const innerHtml = [];
         const filename = info["File Name"];
         if (filename !== undefined && filename !== null && filename !== "") {
-            innerHtml.push($el("h1", [filename]));
+            innerHtml.push(
+                $el("div.row", {
+                    style: { margin: "8px 0 16px 0" },
+                }, [
+                    $el("h1", {
+                        style: { margin: "0" },
+                    }, [
+                        filename,
+                    ]),
+                    $el("div", [
+                        $el("button.icon-button", {
+                            textContent: "✎",
+                            onclick: async(e) => {
+                                const name = window.prompt("New model name:");
+                                let renamed = false;
+                                if (name !== null && name !== "") {
+                                    const container = this.#el.modelInfoContainer;
+                                    const oldFile = container.dataset.path;
+                                    const [oldFilePath, oldFileName] = searchPath_split(oldFile);
+                                    const [_, extension] = searchPath_splitExtension(oldFile);
+                                    const newFile = (
+                                        oldFilePath + 
+                                        this.#searchSeparator + 
+                                        name + 
+                                        extension
+                                    );
+                                    renamed = await request(
+                                        `/model-manager/model/move`,
+                                        {
+                                            method: "POST",
+                                            body: JSON.stringify({
+                                                "oldFile": oldFile,
+                                                "newFile": newFile,
+                                            }),
+                                        }
+                                    )
+                                    .then((result) => {
+                                        const renamed = result["success"];
+                                        if (renamed)
+                                        {
+                                            container.innerHTML = "";
+                                            this.#el.modelInfoView.style.display = "none";
+                                            this.#modelTab_updateModels();
+                                        }
+                                        return renamed;
+                                    })
+                                    .catch(err => {
+                                        console.log(err);
+                                        return false;
+                                    });
+                                }
+                                buttonAlert(e.target, renamed);
+                            },
+                        }),
+                    ]),
+                ]),
+            );
         }
         
         if (info["Preview"]) {
@@ -2102,7 +2180,7 @@ class ModelManager extends ComfyDialog {
                                 elements.push($el("h2", [key + ":"]));
                                 const noteArea = $el("textarea.comfy-multiline-input", {
                                     value: value, 
-                                    rows: 5,
+                                    rows: 10,
                                 });
                                 elements.push(noteArea);
                                 elements.push($el("button", {
