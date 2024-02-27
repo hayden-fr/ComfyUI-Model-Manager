@@ -1617,18 +1617,18 @@ class ModelInfoView {
                         $el("button.icon-button", {
                             textContent: "✎",
                             onclick: async(e) => {
-                                const name = window.prompt("New model name:");
+                                const container = this.elements.info;
+                                const oldFile = container.dataset.path;
+                                const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
+                                const oldName = SearchPath.splitExtension(oldFileName)[0];
+                                const newName = window.prompt("New model name:", oldName);
                                 let renamed = false;
-                                if (name !== null && name !== "") {
-                                    const container = this.elements.info;
-                                    const oldFile = container.dataset.path;
-                                    const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
-                                    const [_, extension] = SearchPath.splitExtension(oldFile);
+                                if (newName !== null && newName !== "" && newName != oldName) {
                                     const newFile = (
                                         oldFilePath + 
                                         searchSeparator + 
-                                        name + 
-                                        extension
+                                        newName + 
+                                        SearchPath.splitExtension(oldFile)[1]
                                     );
                                     renamed = await request(
                                         `/model-manager/model/move`,
