@@ -3,21 +3,6 @@ import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 
 /**
- * @param {Function} callback
- * @param {number | undefined} delay
- * @returns {Function}
- */
-function debounce(callback, delay) {
-    let timeoutId = null;
-    return (...args) => {
-        window.clearTimeout(timeoutId);
-        timeoutId = window.setTimeout(() => {
-            callback(...args);
-        }, delay);
-    };
-}
-
-/**
  * @param {string} url
  * @param {any} [options=undefined]
  * @returns {Promise}
@@ -49,14 +34,42 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
-const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
-
-const MODEL_SORT_DATE_CREATED = "dateCreated";
-const MODEL_SORT_DATE_MODIFIED = "dateModified";
-const MODEL_SORT_DATE_NAME = "name";
-
 const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
+
+class SearchPath {
+    /**
+     * @param {string} path
+     * @returns {[string, string]}
+     */
+    static split(path) {
+        const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
+        return [path.slice(0, i), path.slice(i)];
+    }
+
+    /**
+     * @param {string} path
+     * @param {string[]} extensions
+     * @returns {[string, string]}
+     */
+    static splitExtension(path) {
+        const i = path.lastIndexOf(".");
+        if (i === -1) {
+            return [path, ""];
+        }
+        return [path.slice(0, i), path.slice(i)];
+    }
+
+    /**
+     * @param {string} path
+     * @returns {string}
+     */
+    static systemPath(path, searchSeparator, systemSeparator) {
+        const i1 = path.indexOf(searchSeparator, 1);
+        const i2 = path.indexOf(searchSeparator, i1 + 1);
+        return path.slice(i2 + 1).replaceAll(searchSeparator, systemSeparator);
+    }
+}
 
 /**
  * @param {string | undefined} [searchPath=undefined]
@@ -75,301 +88,515 @@ function imageUri(imageSearchPath = undefined, dateImageModified = undefined) {
 }
 
 /**
- * Tries to return the related ComfyUI model directory if unambigious.
- *
- * @param {string | undefined} modelType - Model type.
- * @param {string | undefined} [fileType] - File type. Relevant for "Diffusers".
- *
- * @returns {(string | null)} Logical base directory name for model type. May be null if the directory is ambiguous or not a model type.
+ * @param {(...args) => void} callback
+ * @param {number | undefined} delay
+ * @returns {(...args) => void}
  */
-function modelTypeToComfyUiDirectory(modelType, fileType) {
-    if (fileType !== undefined && fileType !== null) {
-        const f = fileType.toLowerCase();
-        if (f == "diffusers") { return "diffusers"; } // TODO: is this correct?
-    }
-
-    if (modelType !== undefined && modelType !== null) {
-        const m = modelType.toLowerCase();
-        // TODO: somehow allow for SERVER to set dir?
-        // TODO: allow user to choose EXISTING folder override/null? (style_models, HuggingFace) (use an object/map instead so settings can be dynamically set)
-        if (m == "aestheticGradient") { return null; }
-        else if (m == "checkpoint" || m == "checkpoints") { return "checkpoints"; }
-        //else if (m == "") { return "clip"; }
-        //else if (m == "") { return "clip_vision"; }
-        else if (m == "controlnet") { return "controlnet"; }
-        //else if (m == "Controlnet") { return "style_models"; } // are these controlnets? (TI-Adapter)
-        //else if (m == "") { return "gligen"; }
-        else if (m == "hypernetwork" || m == "hypernetworks") { return "hypernetworks"; }
-        else if (m == "lora" || m == "loras") { return "loras"; }
-        else if (m == "locon") { return "loras"; }
-        else if (m == "motionmodule") { return null; }
-        else if (m == "other") { return null; }
-        else if (m == "pose") { return null; }
-        else if (m == "textualinversion" || m == "embedding" || m == "embeddings") { return "embeddings"; }
-        //else if (m == "") { return "unet"; }
-        else if (m == "upscaler" || m == "upscale_model" || m == "upscale_models") { return "upscale_models"; }
-        else if (m == "vae") { return "vae"; }
-        else if (m == "wildcard" || m == "wildcards") { return null; }
-        else if (m == "workflow" || m == "workflows") { return null; }
-    }
-    return null;
+function debounce(callback, delay) {
+    let timeoutId = null;
+    return (...args) => {
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+            callback(...args);
+        }, delay);
+    };
 }
 
 /**
- * Get model info from Civitai.
- *
- * @param {string} id - Model ID.
- * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
- *
- * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+ * @param {HTMLButtonElement} element
+ * @param {boolean} success
+ * @param {string} [successText=""]
+ * @param {string} [failureText=""]
+ * @param {string} [resetText=""]
  */
-async function civitai_requestInfo(id, apiPath) {
-    const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
-    try {
-        return await request(url);
+function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
+    if (element === undefined || element === null) {
+        return;
     }
-    catch (error) {
-        console.error("Failed to get model info from Civitai!", error);
-        return {};
+    const name = success ? "button-success" : "button-failure";
+    element.classList.add(name);
+    if (successText != "" && failureText != "") {
+        element.innerHTML = success ? successText : failureText;
     }
+    // TODO: debounce would be nice to get working...
+    window.setTimeout((element, name, innerHTML) => {
+        element.classList.remove(name);
+        if (innerHTML != "") {
+            element.innerHTML = innerHTML;
+        }
+    }, 1000, element, name, resetText);
 }
 
-/**
- * Extract file information from the given model version infomation.
- *
- * @param {Object} modelVersionInfo - Model version infomation.
- * @param {(string|null)} [type=null] - Optional select by model type.
- * @param {(string|null)} [fp=null] - Optional select by floating point quantization.
- * @param {(string|null)} [size=null] - Optional select by sizing.
- * @param {(string|null)} [format=null] - Optional select by file format.
- *
- * @returns {Object} - Extracted list of infomation on each file of the given model version.
- */
-function civitai_getModelFilesInfo(modelVersionInfo, type = null, fp = null, size = null, format = null) {
-    const files = [];
-    const modelVersionFiles = modelVersionInfo["files"];
-    for (let i = 0; i < modelVersionFiles.length; i++) {
-        const modelVersionFile = modelVersionFiles[i];
+class Tabs {
+    /** @type {Record<string, HTMLDivElement>} */
+    #head = {};
+    /** @type {Record<string, HTMLDivElement>} */
+    #body = {};
+    
+    /**
+     * @param {HTMLDivElement[]} tabs
+     */
+    constructor(tabs) {
+        const head = [];
+        const body = [];
         
-        const fileType = modelVersionFile["type"];
-        if (type instanceof String && type != fileType) { continue; }
+        tabs.forEach((el, index) => {
+            const name = el.getAttribute("data-name");
+            
+            /** @type {HTMLDivElement} */
+            const tag = $el(
+                "div.head-item",
+                { onclick: () => this.active(name) },
+                [name]
+            );
+                
+            if (index === 0) {
+                this.#active = name;
+            }
+            
+            this.#head[name] = tag;
+            head.push(tag);
+            this.#body[name] = el;
+            body.push(el);
+        });
         
-        const fileMeta = modelVersionFile["metadata"];
+        this.element = $el("div.comfy-tabs", [
+            $el("div.comfy-tabs-head", head),
+            $el("div.comfy-tabs-body", body),
+        ]);
         
-        const fileFp = fileMeta["fp"];
-        if (fp instanceof String && fp != fileFp) { continue; }
-        
-        const fileSize = fileMeta["size"];
-        if (size instanceof String && size != fileSize) { continue; }
-        
-        const fileFormat = fileMeta["format"];
-        if (format instanceof String && format != fileFormat) { continue; }
-        
-        files.push({
-            "downloadUrl": modelVersionFile["downloadUrl"],
-            "format": fileFormat,
-            "fp": fileFp,
-            "hashes": modelVersionFile["hashes"],
-            "name": modelVersionFile["name"],
-            "size": fileSize,
-            "sizeKB": modelVersionFile["sizeKB"],
-            "type": fileType,
+        this.active(this.#active);
+    }
+    
+    #active = undefined;
+    
+    /**
+     * @param {string} name
+     */
+    active(name) {
+        this.#active = name;
+        Object.keys(this.#head).forEach((key) => {
+            if (name === key) {
+                this.#head[key].classList.add("active");
+                this.#body[key].style.display = "";
+            } else {
+                this.#head[key].classList.remove("active");
+                this.#body[key].style.display = "none";
+            }
         });
     }
-    return {
-        "files": files,
-        "id": modelVersionInfo["id"],
-        "images": modelVersionInfo["images"].map((image) => {
-            // TODO: do I need to double-check image matches resource?
-            return image["url"];
-        }),
-        "name": modelVersionInfo["name"],
-    };
 }
 
 /**
- * 
- *
- * @param {string} stringUrl - Model url.
- *
- * @returns {Promise<Object>} - Download information for the given url.
+ * @param {Record<HTMLDivElement, Any>} tabs
+ * @returns {HTMLDivElement[]}
  */
-async function civitai_getFilteredInfo(stringUrl) {
-    const url = new URL(stringUrl);
-    if (url.hostname != "civitai.com") { return {}; }
-    if (url.pathname == "/") { return {} }
-    const urlPath = url.pathname;
-    if (urlPath.startsWith("/api")) {
-        const idEnd = urlPath.length - (urlPath.at(-1) == "/" ? 1 : 0);
-        const idStart = urlPath.lastIndexOf("/", idEnd - 1) + 1;
-        const modelVersionId = urlPath.substring(idStart, idEnd);
-        if (parseInt(modelVersionId, 10) == NaN) {
-            return {};
-        }
-        const modelVersionInfo = await civitai_requestInfo(modelVersionId, "model-versions");
-        if (Object.keys(modelVersionInfo).length == 0) {
-            return {};
-        }
-        const searchParams = url.searchParams;
-        const filesInfo = civitai_getModelFilesInfo(
-            modelVersionInfo,
-            searchParams.get("type"),
-            searchParams.get("fp"),
-            searchParams.get("size"),
-            searchParams.get("format"),
+function $tabs(tabs) {
+    const instance = new Tabs(tabs);
+    return instance.element;
+}
+
+/**
+ * @param {string} name
+ * @param {HTMLDivElement[]} el
+ * @returns {HTMLDivElement}
+ */
+function $tab(name, el) {
+    return $el("div", { dataset: { name } }, el);
+}
+
+/**
+ * @returns {HTMLLabelElement}
+ */
+function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
+    const text = x.textContent;
+    const input = $el("input", {
+        type: "checkbox", 
+        checked: x.checked ?? false, 
+    });
+    const label = $el("label", [
+        input, 
+        text === "" || text === undefined || text === null ? "" : " " + text,
+    ]);
+    if (x.$ !== undefined){
+        x.$(input);
+    }
+    return label;
+}
+
+/**
+ * @param {Any} attr
+ * @returns {HTMLDivElement}
+ */
+function $radioGroup(attr) {
+    const { name = Date.now(), onchange, options = [], $ } = attr;
+    
+    /** @type {HTMLDivElement[]} */
+    const radioGroup = options.map((item, index) => {
+        const inputRef = { value: null };
+
+        return $el(
+            "div.comfy-radio",
+            { onclick: () => inputRef.value.click() },
+            [
+                $el("input.radio-input", {
+                    type: "radio",
+                    name: name,
+                    value: item.value,
+                    checked: index === 0,
+                    $: (el) => (inputRef.value = el),
+                }),
+                $el("label", [item.label ?? item.value]),
+            ]
         );
-        return {
-            "name": modelVersionInfo["model"]["name"],
-            "type": modelVersionInfo["model"]["type"],
-            "versions": [filesInfo]
-        }
-    }
-    else if (urlPath.startsWith('/models')) {
-        const idStart = urlPath.indexOf("models/") + "models/".length;
-        const idEnd = (() => {
-            const idEnd = urlPath.indexOf("/", idStart);
-            return idEnd === -1 ? urlPath.length : idEnd;
-        })();
-        const modelId = urlPath.substring(idStart, idEnd);
-        if (parseInt(modelId, 10) == NaN) {
-            return {};
-        }
-        const modelInfo = await civitai_requestInfo(modelId, "models");
-        if (Object.keys(modelInfo).length == 0) {
-            return {};
-        }
-        const modelVersionId = parseInt(url.searchParams.get("modelVersionId"));
-        const modelVersions = [];
-        const modelVersionInfos = modelInfo["modelVersions"];
-        for (let i = 0; i < modelVersionInfos.length; i++) {
-            const versionInfo = modelVersionInfos[i];
-            if (!Number.isNaN(modelVersionId)) {
-                if (modelVersionId != versionInfo["id"]) {continue; }
-            }
-            const filesInfo = civitai_getModelFilesInfo(versionInfo);
-            modelVersions.push(filesInfo);
-        }
-        return {
-            "name": modelInfo["name"],
-            "type": modelInfo["type"],
-            "versions": modelVersions
-        }
-    }
-    else {
-        return {};
-    }
-}
-
-/**
- * Get model info from Huggingface.
- *
- * @param {string} id - Model ID.
- * @param {string} apiPath - API path.
- *
- * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
- */
-async function huggingFace_requestInfo(id, apiPath = "models") {
-    const url = "https://huggingface.co/api/" + apiPath + "/" + id;
-    try {
-        return await request(url);
-    }
-    catch (error) {
-        console.error("Failed to get model info from HuggingFace!", error);
-        return {};
-    }
-}
-
-/**
- * 
- *
- * @param {string} stringUrl - Model url.
- *
- * @returns {Promise<Object>}
- */
-async function huggingFace_getFilteredInfo(stringUrl) {
-    const url = new URL(stringUrl);
-    if (url.hostname != "huggingface.co") { return {}; }
-    if (url.pathname == "/") { return {} }
-    const urlPath = url.pathname;
-    const i0 = 1;
-    const i1 = urlPath.indexOf("/", i0);
-    if (i1 == -1 || urlPath.length - 1 == i1) {
-        // user-name only
-        return {};
-    }
-    let i2 = urlPath.indexOf("/", i1 + 1);
-    if (i2 == -1) {
-        // model id only
-        i2 = urlPath.length;
-    }
-    const modelId = urlPath.substring(i0, i2);
-    const urlPathEnd = urlPath.substring(i2);
-    
-    const isValidBranch = (
-        urlPathEnd.startsWith("/resolve") ||
-        urlPathEnd.startsWith("/blob") ||
-        urlPathEnd.startsWith("/tree")
-    );
-    
-    let branch = "/main";
-    let filePath = "";
-    if (isValidBranch) {
-        const i0 = branch.length;
-        const i1 = urlPathEnd.indexOf("/", i0 + 1);
-        if (i1 == -1) {
-            if (i0 != urlPathEnd.length) {
-                // ends with branch
-                branch = urlPathEnd.substring(i0);
-            }
-        }
-        else {
-            branch = urlPathEnd.substring(i0, i1);
-            if (urlPathEnd.length - 1 > i1) {
-                filePath = urlPathEnd.substring(i1);
-            }
-        }
-    }
-    
-    const modelInfo = await huggingFace_requestInfo(modelId);
-    //const modelInfo = await requestInfo(modelId + "/tree" + branch); // this only gives you the files at the given branch path...
-    // oid: SHA-1?, lfs.oid: SHA-256
-
-    const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
-    const modelFiles = modelInfo["siblings"].filter((sib) => {
-        const filename = sib["rfilename"];
-        for (let i = 0; i < MODEL_EXTENSIONS.length; i++) {
-            if (filename.endsWith(MODEL_EXTENSIONS[i])) {
-                return filename.startsWith(clippedFilePath);
-            }
-        }
-        return false;
-    }).map((sib) => {
-        const filename = sib["rfilename"];
-        return filename;
-    });
-    if (modelFiles.length === 0) {
-        return {};
-    }
-    
-    const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
-    
-    const images = modelInfo["siblings"].filter((sib) => {
-        const filename = sib["rfilename"];
-        for (let i = 0; i < IMAGE_EXTENSIONS.length; i++) {
-            if (filename.endsWith(IMAGE_EXTENSIONS[i])) {
-                return filename.startsWith(clippedFilePath);
-            }
-        }
-        return false;
-    }).map((sib) => {
-        return baseDownloadUrl + "/" + sib["rfilename"];
     });
     
-    return {
-        "baseDownloadUrl": baseDownloadUrl,
-        "modelFiles": modelFiles,
-        "images": images,
+    const element = $el("input", { value: options[0]?.value });
+    $?.(element);
+
+    radioGroup.forEach((radio) => {
+        radio.addEventListener("change", (event) => {
+            const selectedValue = event.target.value;
+            element.value = selectedValue;
+            onchange?.(selectedValue);
+        });
+    });
+    
+    return $el("div.comfy-radio-group", radioGroup);
+}
+
+class ImageSelect {
+    /** @constant {string} */ #PREVIEW_DEFAULT = "Default";
+    /** @constant {string} */ #PREVIEW_UPLOAD = "Upload";
+    /** @constant {string} */ #PREVIEW_URL = "URL";
+    /** @constant {string} */ #PREVIEW_NONE = "No Preview";
+    
+    elements = {
+        /** @type {HTMLDivElement} */ radioGroup: null,
+        /** @type {HTMLDivElement} */ radioButtons: null,
+        /** @type {HTMLDivElement} */ previews: null,
+        
+        /** @type {HTMLImageElement} */ defaultPreviewNoImage: null,
+        /** @type {HTMLDivElement} */ defaultPreviews: null,
+        /** @type {HTMLDivElement} */ defaultUrl: null,
+        
+        /** @type {HTMLImageElement} */ customUrlPreview: null,
+        /** @type {HTMLInputElement} */ customUrl: null,
+        /** @type {HTMLDivElement} */ custom: null,
+        
+        /** @type {HTMLImageElement} */ uploadPreview: null,
+        /** @type {HTMLInputElement} */ uploadFile: null,
+        /** @type {HTMLDivElement} */ upload: null,
     };
+    
+    /** @type {string} */
+    #name = null;
+    
+    /** @returns {string|File} */
+    getImage() {
+        const name = this.#name;
+        const value = document.querySelector(`input[name="${name}"]:checked`).value;
+        const elements = this.elements;
+        switch (value) {
+            case this.#PREVIEW_DEFAULT:
+                const children = elements.defaultPreviews.children;
+                const noImage = imageUri();
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (child.style.display !== "none" && 
+                        child.nodeName === "IMG" && 
+                        !child.src.endsWith(noImage)
+                    ) {
+                        return child.src;
+                    }
+                }
+                return "";
+            case this.#PREVIEW_URL:
+                return elements.customUrl.value;
+            case this.#PREVIEW_UPLOAD:
+                return elements.uploadFile.files[0] ?? "";
+            case this.#PREVIEW_NONE:
+                return imageUri();
+        }
+        return "";
+    }
+    
+    /** @returns {void} */
+    resetModelInfoPreview() {
+        let noimage = this.elements.defaultUrl.dataset.noimage;
+        [
+            this.elements.defaultPreviewNoImage,
+            this.elements.defaultPreviews,
+            this.elements.customUrlPreview,
+            this.elements.uploadPreview,
+        ].forEach((el) => {
+            el.style.display = "none";
+            if (this.elements.defaultPreviewNoImage !== el) {
+                if (el.nodeName === "IMG") {
+                    el.src = noimage;
+                }
+                else {
+                    el.children[0].src = noimage;
+                }
+            }
+            else {
+                el.src = imageUri();
+            }
+        });
+        this.checkDefault();
+        this.elements.uploadFile.value = "";
+        this.elements.customUrl.value = "";
+        this.elements.upload.style.display = "none";
+        this.elements.custom.style.display = "none";
+    }
+    
+    /** @returns {boolean} */
+    defaultIsChecked() {
+        const children = this.elements.radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === this.#PREVIEW_DEFAULT) {
+                return radioButton.checked;
+            }
+        };
+        return false;
+    }
+    
+    /** @returns {void} */
+    checkDefault() {
+        const children = this.elements.radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === this.#PREVIEW_DEFAULT) {
+                this.elements.defaultPreviews.style.display = "block";
+                radioButton.checked = true;
+                break;
+            }
+        };
+    }
+    
+    /**
+     * @param {1 | -1} step 
+     */
+    stepDefaultPreviews(step) {
+        const children = this.elements.defaultPreviews.children;
+        if (children.length === 0) {
+            return;
+        }
+        let currentIndex = -step;
+        for (let i = 0; i < children.length; i++) {
+            const previewImage = children[i];
+            const display = previewImage.style.display;
+            if (display !== "none") {
+                currentIndex = i;
+            }
+            previewImage.style.display = "none";
+        }
+        currentIndex = currentIndex + step;
+        if (currentIndex >= children.length) { currentIndex = 0; }
+        else if (currentIndex < 0) { currentIndex = children.length - 1; }
+        children[currentIndex].style.display = "block";
+    }
+    
+    /**
+     * @param {string} radioGroupName - Should be unique for every radio group.
+     * @param {string[]|undefined} defaultPreviews
+     */
+    constructor(radioGroupName, defaultPreviews = []) {
+        if (defaultPreviews === undefined | defaultPreviews === null | defaultPreviews.length === 0) {
+            defaultPreviews = [imageUri()];
+        }
+        this.#name = radioGroupName;
+        
+        const el_defaultUri = $el("div", {
+            $: (el) => (this.elements.defaultUrl = el),
+            style: { display: "none" },
+            "data-noimage": imageUri(),
+        });
+        
+        const el_defaultPreviewNoImage = $el("img", {
+            $: (el) => (this.elements.defaultPreviewNoImage = el),
+            src: imageUri(),
+            style: { display: "none" },
+            loading: "lazy",
+        });
+        
+        const el_defaultPreviews = $el("div", {
+            $: (el) => (this.elements.defaultPreviews = el),
+            style: {
+                width: "100%",
+                height: "100%",
+            },
+        }, (() => {
+            const imgs = defaultPreviews.map((url) => {
+                return $el("img", {
+                    src: url,
+                    style: { display: "none" },
+                    loading: "lazy",
+                    onerror: (e) => {
+                        e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                    },
+                });
+            });
+            if (imgs.length > 0) {
+                imgs[0].style.display = "block";
+            }
+            return imgs;
+        })());
+        
+        const el_uploadPreview = $el("img", {
+            $: (el) => (this.elements.uploadPreview = el),
+            src: imageUri(),
+            style: { display : "none" },
+            onerror: (e) => {
+                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+            },
+        });
+        const el_uploadFile = $el("input", {
+            $: (el) => (this.elements.uploadFile = el),
+            type: "file",
+            accept: IMAGE_EXTENSIONS.join(", "),
+            onchange: (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    el_uploadPreview.src = URL.createObjectURL(file);
+                }
+                else {
+                    el_uploadPreview.src = el_defaultUri.dataset.noimage;
+                }
+            },
+        });
+        const el_upload = $el("div", {
+            $: (el) => (this.elements.upload = el),
+            style: { display: "none" },
+        }, [
+            el_uploadFile,
+        ]);
+        
+        const el_customUrlPreview = $el("img", {
+            $: (el) => (this.elements.customUrlPreview = el),
+            src: imageUri(),
+            style: { display: "none" },
+            onerror: (e) => {
+                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+            },
+        });
+        const el_customUrl = $el("input.search-text-area", {
+            $: (el) => (this.elements.customUrl = el),
+            type: "text",
+            placeholder: "https://custom-image-preview.png",
+        });
+        const el_custom = $el("div.row.tab-header-flex-block", {
+            $: (el) => (this.elements.custom = el),
+            style: { display: "none" },
+        }, [
+            el_customUrl,
+            $el("button.icon-button", {
+                textContent: "🔍︎",
+                onclick: (e) => {
+                    el_customUrlPreview.src = el_customUrl.value;
+                },
+            }),
+        ]);
+        
+        const el_previewButtons = $el("div.model-preview-overlay", {
+            style: {
+                display: el_defaultPreviews.children.length > 1 ? "block" : "none",
+            },
+        }, [
+            $el("button.icon-button.model-preview-button-left", {
+                textContent: "←",
+                onclick: () => this.stepDefaultPreviews(-1),
+            }),
+            $el("button.icon-button.model-preview-button-right", {
+                textContent: "→",
+                onclick: () => this.stepDefaultPreviews(1),
+            }),
+        ]);
+        const el_previews = $el("div.item", {
+            $: (el) => (this.elements.previews = el),
+        }, [
+            $el("div", {
+                    style: {
+                        "width": "100%",
+                        "height": "100%",
+                    },
+                }, 
+                [
+                    el_defaultPreviewNoImage,
+                    el_defaultPreviews,
+                    el_customUrlPreview,
+                    el_uploadPreview,
+                ],
+            ),
+            el_previewButtons,
+        ]);
+        
+        const el_radioButtons = $radioGroup({
+            name: radioGroupName,
+            onchange: (value) => {
+                el_custom.style.display = "none";
+                el_upload.style.display = "none";
+                
+                el_defaultPreviews.style.display = "none";
+                el_previewButtons.style.display = "none";
+                
+                el_defaultPreviewNoImage.style.display = "none";
+                el_uploadPreview.style.display = "none";
+                el_customUrlPreview.style.display = "none";
+                
+                switch (value) {
+                    case this.#PREVIEW_DEFAULT:
+                        el_defaultPreviews.style.display = "block";
+                        el_previewButtons.style.display = el_defaultPreviews.children.length > 1 ? "block" : "none";
+                        break;
+                    case this.#PREVIEW_UPLOAD:
+                        el_upload.style.display = "flex";
+                        el_uploadPreview.style.display = "block";
+                        break;
+                    case this.#PREVIEW_URL:
+                        el_custom.style.display = "flex";
+                        el_customUrlPreview.style.display = "block";
+                        break;
+                    case this.#PREVIEW_NONE:
+                    default:
+                        el_defaultPreviewNoImage.style.display = "block";
+                        break;
+                }
+            },
+            options: (() => {
+                const radios = [];
+                radios.push({ value: this.#PREVIEW_DEFAULT });
+                radios.push({ value: this.#PREVIEW_UPLOAD })
+                radios.push({ value: this.#PREVIEW_URL });
+                radios.push({ value: this.#PREVIEW_NONE });
+                return radios;
+            })(),
+        });
+        this.elements.radioButtons = el_radioButtons;
+        
+        const children = el_radioButtons.children;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            const radioButton = child.children[0];
+            if (radioButton.value === this.#PREVIEW_DEFAULT) {
+                radioButton.checked = true;
+                break;
+            }
+        };
+        
+        const el_radioGroup = $el("div.model-preview-select-radio-container", {
+            $: (el) => (this.elements.radioGroup = el),
+        }, [
+            $el("div.row.tab-header-flex-block", [el_radioButtons]),
+            $el("div", [
+                el_custom,
+                el_upload,
+            ]),
+        ]);
+    }
 }
 
 /**
@@ -379,31 +606,33 @@ async function huggingFace_getFilteredInfo(stringUrl) {
  * @param {number | undefined} childIndex
  */
 
+const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
+
 class DirectoryDropdown {
     /** @type {HTMLDivElement} */
-    element = undefined;
+    element = null;
     
     /** @type {Boolean} */
     showDirectoriesOnly = false;
-
+    
     /** @type {HTMLInputElement} */
-    #input = undefined;
+    #input = null;
     
     // TODO: remove this
-    /** @type {Function} */
+    /** @type {() => void} */
     #updateDropdown = null;
     
-    /** @type {Function} */
+    /** @type {() => void} */
     #updateCallback = null;
     
-    /** @type {Function} */
+    /** @type {() => Promise<void>} */
     #submitCallback = null;
     
     /**
      * @param {HTMLInputElement} input
-     * @param {Function} updateDropdown
-     * @param {Function} [updateCallback= () => {}]
-     * @param {Function} [submitCallback= () => {}]
+     * @param {() => void} updateDropdown
+     * @param {() => void} [updateCallback= () => {}]
+     * @param {() => Promise<void>} [submitCallback= () => {}]
      * @param {String} [searchSeparator="/"]
      * @param {Boolean} [showDirectoriesOnly=false]
      */
@@ -566,7 +795,7 @@ class DirectoryDropdown {
             },
         );
     }
-    
+
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
@@ -580,7 +809,7 @@ class DirectoryDropdown {
         const previousPath = oldFilterText.substring(0, iSep + 1);
         input.value = previousPath + selectedText;
     }
-    
+
     /**
      * @param {DirectoryItem[]} directories
      * @param {string} searchSeparator
@@ -740,196 +969,34 @@ class DirectoryDropdown {
     }
 }
 
-/**
- * @param {string} nodeType
- * @returns {int}
- */
-function modelWidgetIndex(nodeType) {
-    return 0;
-}
-
-/**
- * @param {string} path
- * @returns {[string, string]}
- */
-function searchPath_split(path) {
-    const i = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\")) + 1;
-    return [path.slice(0, i), path.slice(i)];
-}
-
-/**
- * @param {string} path
- * @param {string[]} extensions
- * @returns {[string, string]}
- */
-function searchPath_splitExtension(path) {
-    const i = path.lastIndexOf(".");
-    if (i === -1) {
-        return [path, ""];
-    }
-    return [path.slice(0, i), path.slice(i)];
-}
-
-/**
- * @param {string} path
- * @returns {string}
- */
-function searchPathToSystemPath(path, searchSeparator, systemSeparator) {
-    const i1 = path.indexOf(searchSeparator, 1);
-    const i2 = path.indexOf(searchSeparator, i1 + 1);
-    return path.slice(i2 + 1).replaceAll(searchSeparator, systemSeparator);
-}
-
-/**
- * @param {string} file
- * @returns {string | undefined}
- */
-function removeModelExtension(file) {
-    // This is a bit sloppy (can assume server sends without)
-    const i = file.lastIndexOf(".");
-    if (i != -1) {
-        return file.substring(0, i);
-    }
-}
-
-/**
- * @param {string} text
- * @param {string} file
- * @param {boolean} removeExtension
- * @returns {string}
- */
-function insertEmbeddingIntoText(text, file, removeExtension) {
-    let name = file;
-    if (removeExtension) {
-        name = removeModelExtension(name)
-    }
-    const sep = text.length === 0 || text.slice(-1).match(/\s/) ? "" : " ";
-    return text + sep + "(embedding:" +  name  + ":1.0)";
-}
-
-/**
- * @param {HTMLButtonElement} element
- * @param {boolean} success
- * @param {string} [successText=""]
- * @param {string} [failureText=""]
- * @param {string} [resetText=""]
- */
-function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
-    if (element === undefined || element === null) {
-        return;
-    }
-    const name = success ? "button-success" : "button-failure";
-    element.classList.add(name);
-    if (successText != "" && failureText != "") {
-        element.innerHTML = success ? successText : failureText;
-    }
-    // TODO: debounce would be nice to get working...
-    window.setTimeout((element, name, innerHTML) => {
-        element.classList.remove(name);
-        if (innerHTML != "") {
-            element.innerHTML = innerHTML;
-        }
-    }, 1000, element, name, resetText);
-}
-
-class Tabs {
-    /** @type {Record<string, HTMLDivElement>} */
-    #head = {};
-    /** @type {Record<string, HTMLDivElement>} */
-    #body = {};
-
-    /**
-     * @param {HTMLDivElement[]} tabs
-     */
-    constructor(tabs) {
-        const head = [];
-        const body = [];
-
-        tabs.forEach((el, index) => {
-            const name = el.getAttribute("data-name");
-
-            /** @type {HTMLDivElement} */
-            const tag = $el(
-                "div.head-item",
-                { onclick: () => this.active(name) },
-                [name]
-            );
-
-            if (index === 0) {
-                this.#active = name;
-            }
-
-            this.#head[name] = tag;
-            head.push(tag);
-            this.#body[name] = el;
-            body.push(el);
-        });
-
-        this.element = $el("div.comfy-tabs", [
-            $el("div.comfy-tabs-head", head),
-            $el("div.comfy-tabs-body", body),
-        ]);
-
-        this.active(this.#active);
-    }
-
-    #active = undefined;
-
-    /**
-     * @param {string} name
-     */
-    active(name) {
-        this.#active = name;
-        Object.keys(this.#head).forEach((key) => {
-            if (name === key) {
-                this.#head[key].classList.add("active");
-                this.#body[key].style.display = "";
-            } else {
-                this.#head[key].classList.remove("active");
-                this.#body[key].style.display = "none";
-            }
-        });
-    }
-}
-
-/**
- * @param {Record<HTMLDivElement, Any>} tabs
- * @returns {HTMLDivElement[]}
- */
-function $tabs(tabs) {
-    const instance = new Tabs(tabs);
-    return instance.element;
-}
-
-/**
- * @param {string} name
- * @param {HTMLDivElement[]} el
- * @returns {HTMLDivElement}
- */
-function $tab(name, el) {
-    return $el("div", { dataset: { name } }, el);
-}
-
-/**
- * @returns {HTMLLabelElement}
- */
-function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
-    const text = x.textContent;
-    const input = $el("input", {
-        type: "checkbox", 
-        checked: x.checked ?? false, 
-    });
-    const label = $el("label", [
-        input, 
-        text === "" || text === undefined || text === null ? "" : " " + text,
-    ]);
-    if (x.$ !== undefined){
-        x.$(input);
-    }
-    return label;
-}
+const MODEL_SORT_DATE_CREATED = "dateCreated";
+const MODEL_SORT_DATE_MODIFIED = "dateModified";
+const MODEL_SORT_DATE_NAME = "name";
 
 class ModelGrid {
+    /**
+     * @param {string} nodeType
+     * @returns {int}
+     */
+    static modelWidgetIndex(nodeType) {
+        return 0;
+    }
+    
+    /**
+     * @param {string} text
+     * @param {string} file
+     * @param {boolean} removeExtension
+     * @returns {string}
+     */
+    static insertEmbeddingIntoText(text, file, removeExtension) {
+        let name = file;
+        if (removeExtension) {
+            name = SearchPath.splitExtension(name)[0];
+        }
+        const sep = text.length === 0 || text.slice(-1).match(/\s/) ? "" : " ";
+        return text + sep + "(embedding:" +  name  + ":1.0)";
+    }
+    
     /**
      * @param {Array} list
      * @param {string} searchString
@@ -974,7 +1041,7 @@ class ModelGrid {
      * @returns {Array}
      */
     static #sort(list, sortBy, reverse = false) {
-        let compareFn = undefined;
+        let compareFn = null;
         switch (sortBy) {
             case MODEL_SORT_DATE_NAME:
                 compareFn = (a, b) => { return a[MODEL_SORT_DATE_NAME].localeCompare(b[MODEL_SORT_DATE_NAME]); };
@@ -992,7 +1059,7 @@ class ModelGrid {
         const sorted = list.sort(compareFn);
         return reverse ? sorted.reverse() : sorted;
     }
-
+    
     /**
      * @param {Event} event
      * @param {string} modelType
@@ -1004,7 +1071,7 @@ class ModelGrid {
         let success = false;
         if (modelType !== "embeddings") {
             const nodeType = modelNodeType[modelType];
-            const widgetIndex = modelWidgetIndex(nodeType);
+            const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             let node = LiteGraph.createNode(nodeType, null, []);
             if (node) {
                 node.widgets[widgetIndex].value = path;
@@ -1029,15 +1096,15 @@ class ModelGrid {
             event.stopPropagation();
         }
         else if (modelType === "embeddings") {
-            const [embeddingDirectory, embeddingFile] = searchPath_split(path);
+            const [embeddingDirectory, embeddingFile] = SearchPath.split(path);
             const selectedNodes = app.canvas.selected_nodes;
             for (var i in selectedNodes) {
                 const selectedNode = selectedNodes[i];
                 const nodeType = modelNodeType[modelType];
-                const widgetIndex = modelWidgetIndex(nodeType);
+                const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
                 const target = selectedNode.widgets[widgetIndex].element;
                 if (target && target.type === "textarea") {
-                    target.value = insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
+                    target.value = ModelGrid.insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                     success = true;
                 }
             }
@@ -1048,7 +1115,7 @@ class ModelGrid {
         }
         buttonAlert(event.target, success, "✔", "✖", "✚");
     }
-
+    
     /**
      * @param {Event} event
      * @param {string} modelType
@@ -1060,7 +1127,7 @@ class ModelGrid {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
             const nodeType = modelNodeType[modelType];
-            const widgetIndex = modelWidgetIndex(nodeType);
+            const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
@@ -1092,13 +1159,13 @@ class ModelGrid {
             const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
             if (nodeAtPos) {
                 app.canvas.selectNode(nodeAtPos);
-                const [embeddingDirectory, embeddingFile] = searchPath_split(path);
-                target.value = insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
+                const [embeddingDirectory, embeddingFile] = SearchPath.split(path);
+                target.value = ModelGrid.insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                 event.stopPropagation();
             }
         }
     }
-
+    
     /**
      * @param {Event} event
      * @param {string} modelType
@@ -1110,8 +1177,8 @@ class ModelGrid {
         let success = false;
         if (nodeType === "Embedding") {
             if (navigator.clipboard){
-                const [embeddingDirectory, embeddingFile] = searchPath_split(path);
-                const embeddingText = insertEmbeddingIntoText("", embeddingFile, removeEmbeddingExtension);
+                const [embeddingDirectory, embeddingFile] = SearchPath.split(path);
+                const embeddingText = ModelGrid.insertEmbeddingIntoText("", embeddingFile, removeEmbeddingExtension);
                 navigator.clipboard.writeText(embeddingText);
                 success = true;
             }
@@ -1121,7 +1188,7 @@ class ModelGrid {
         }
         else if (nodeType) {
             const node = LiteGraph.createNode(nodeType, null, []);
-            const widgetIndex = modelWidgetIndex(nodeType);
+            const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             node.widgets[widgetIndex].value = path;
             app.canvas.copyToClipboard([node]);
             success = true;
@@ -1131,14 +1198,14 @@ class ModelGrid {
         }
         buttonAlert(event.target, success, "✔", "✖", "⧉︎");
     }
-
+    
     /**
      * @param {Array} models
      * @param {string} modelType
      * @param {Object.<HTMLInputElement>} settingsElements
      * @param {String} searchSeparator
      * @param {String} systemSeparator
-     * @param {Function} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
      * @returns {HTMLElement[]}
      */
     static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, modelInfoCallback) {
@@ -1155,7 +1222,7 @@ class ModelGrid {
             return models.map((item) => {
                 const previewInfo = item.preview;
                 const searchPath = item.path;
-                const path = searchPathToSystemPath(searchPath, searchSeparator, systemSeparator);
+                const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
                 if (showAddButton) {
                     buttons.push(
@@ -1223,7 +1290,7 @@ class ModelGrid {
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
                     }, [
-                        $el("p", [showModelExtension ? item.name : removeModelExtension(item.name)])
+                        $el("p", [showModelExtension ? item.name : SearchPath.splitExtension(item.name)[0]])
                     ]),
                 ]);
             });
@@ -1231,7 +1298,7 @@ class ModelGrid {
             return [$el("h2", ["No Models"])];
         }
     }
-
+    
     /**
      * @param {HTMLDivElement} modelGrid
      * @param {Object} models
@@ -1244,7 +1311,7 @@ class ModelGrid {
      * @param {HTMLInputElement} modelFilter
      * @param {String} searchSeparator
      * @param {String} systemSeparator
-     * @param {Function} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
      */
     static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, searchSeparator, systemSeparator, modelInfoCallback) {
         let modelType = modelSelect.value;
@@ -1292,436 +1359,58 @@ class ModelGrid {
     }
 }
 
-/**
- * @param {Any} attr
- * @returns {HTMLDivElement}
- */
-function $radioGroup(attr) {
-    const { name = Date.now(), onchange, options = [], $ } = attr;
-
-    /** @type {HTMLDivElement[]} */
-    const radioGroup = options.map((item, index) => {
-        const inputRef = { value: null };
-
-        return $el(
-            "div.comfy-radio",
-            { onclick: () => inputRef.value.click() },
-            [
-                $el("input.radio-input", {
-                    type: "radio",
-                    name: name,
-                    value: item.value,
-                    checked: index === 0,
-                    $: (el) => (inputRef.value = el),
-                }),
-                $el("label", [item.label ?? item.value]),
-            ]
-        );
-    });
-
-    const element = $el("input", { value: options[0]?.value });
-    $?.(element);
-
-    radioGroup.forEach((radio) => {
-        radio.addEventListener("change", (event) => {
-            const selectedValue = event.target.value;
-            element.value = selectedValue;
-            onchange?.(selectedValue);
-        });
-    });
-
-    return $el("div.comfy-radio-group", radioGroup);
-}
-
-/**
- * @param {HTMLDivElement} previewImageContainer
- * @param {Event} e 
- * @param {1 | -1} step 
- */
-function updateRadioPreview(previewImageContainer, step) {
-    const children = previewImageContainer.children;
-    if (children.length === 0) {
-        return;
-    }
-    let currentIndex = -step;
-    for (let i = 0; i < children.length; i++) {
-        const previewImage = children[i];
-        const display = previewImage.style.display;
-        if (display !== "none") {
-            currentIndex = i;
-        }
-        previewImage.style.display = "none";
-    }
-    currentIndex = currentIndex + step;
-    if (currentIndex >= children.length) { currentIndex = 0; }
-    else if (currentIndex < 0) { currentIndex = children.length - 1; }
-    children[currentIndex].style.display = "block";
-}
-
-/**
- * @param {String} uniqueName
- * @param {String[]} defaultPreviews
- * @returns {[]}
- */
-function radioGroupImageSelect(uniqueName, defaultPreviews) {
-    const defaultImageCount = defaultPreviews.length;
+class ModelInfoView {
+    /** @type {HTMLDivElement} */
+    element = null;
     
-    const el_defaultUri = $el("div", {
-        style: { display: "none" },
-        "data-noimage": imageUri(),
-    });
-    
-    const el_noImage = $el("img", {
-        src: imageUri(),
-        style: {
-            display: defaultImageCount === 0 ? "block" : "none",
-        },
-        loading: "lazy",
-    });
-    
-    const el_defaultImages = $el("div", {
-        style: {
-            width: "100%",
-            height: "100%",
-        },
-    }, (() => {
-        const imgs = defaultPreviews.map((url) => {
-            return $el("img", {
-                src: url,
-                style: { display: "none" },
-                loading: "lazy",
-                onerror: (e) => {
-                    e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
-                },
-            });
-        });
-        if (imgs.length > 0) {
-            imgs[0].style.display = "block";
-        }
-        return imgs;
-    })());
-    
-    const el_uploadImage = $el("img", {
-        src: imageUri(),
-        style: { display : "none" },
-        onerror: (e) => {
-            e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
-        },
-    });
-    const el_uploadFile = $el("input", {
-        type: "file",
-        accept: IMAGE_EXTENSIONS.join(", "),
-        onchange: (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                el_uploadImage.src = URL.createObjectURL(file);
-            }
-            else {
-                el_uploadImage.src = el_defaultUri.dataset.noimage;
-            }
-        },
-    });
-    const el_upload = $el("div", {
-        style: { display: "none" },
-    }, [
-        el_uploadFile,
-    ]);
-    
-    const el_urlImage = $el("img", {
-        src: imageUri(),
-        style: { display: "none" },
-        onerror: (e) => {
-            e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
-        },
-    });
-    const el_customUrl = $el("input.search-text-area", {
-        type: "text",
-        placeholder: "https://custom-image-preview.png",
-    });
-    const el_custom = $el("div.row.tab-header-flex-block", {
-        style: { display: "none" },
-    }, [
-        el_customUrl,
-        $el("button.icon-button", {
-            textContent: "🔍︎",
-            onclick: (e) => {
-                el_urlImage.src = el_customUrl.value;
-            },
-        }),
-    ]);
-    
-    const el_previewButtons = $el("div.model-preview-overlay", {
-        style: {
-            display: el_defaultImages.children.length > 1 ? "block" : "none",
-        },
-    }, [
-        $el("button.icon-button.model-preview-button-left", {
-            textContent: "←",
-            onclick: () => updateRadioPreview(el_defaultImages, -1),
-        }),
-        $el("button.icon-button.model-preview-button-right", {
-            textContent: "→",
-            onclick: () => updateRadioPreview(el_defaultImages, 1),
-        }),
-    ]);
-    const previews = [
-        el_noImage,
-        el_defaultImages,
-        el_urlImage,
-        el_uploadImage,
-    ];
-    const el_preview = $el("div.item", [
-        $el("div", {
-                style: {
-                    "width": "100%",
-                    "height": "100%",
-                },
-            }, 
-            previews,
-        ),
-        el_previewButtons,
-    ]);
-    
-    const PREVIEW_DEFAULT = "Default";
-    const PREVIEW_UPLOAD = "Upload";
-    const PREVIEW_URL = "URL";
-    const PREVIEW_NONE = "No Preview";
-    
-    const el_radioButtons = $radioGroup({
-        name: uniqueName,
-        onchange: (value) => {
-            el_custom.style.display = "none";
-            el_upload.style.display = "none";
-            
-            el_defaultImages.style.display = "none";
-            el_previewButtons.style.display = "none";
-            
-            el_noImage.style.display = "none";
-            el_uploadImage.style.display = "none";
-            el_urlImage.style.display = "none";
-            
-            switch (value) {
-                case PREVIEW_DEFAULT:
-                    el_defaultImages.style.display = "block";
-                    el_previewButtons.style.display = el_defaultImages.children.length > 1 ? "block" : "none";
-                    break;
-                case PREVIEW_UPLOAD:
-                    el_upload.style.display = "flex";
-                    el_uploadImage.style.display = "block";
-                    break;
-                case PREVIEW_URL:
-                    el_custom.style.display = "flex";
-                    el_urlImage.style.display = "block";
-                    break;
-                case PREVIEW_NONE:
-                default:
-                    el_noImage.style.display = "block";
-                    break;
-            }
-        },
-        options: (() => {
-            const radios = [];
-            if (defaultImageCount > 0) {
-                radios.push({ value: PREVIEW_DEFAULT });
-            }
-            radios.push({ value: PREVIEW_UPLOAD })
-            radios.push({ value: PREVIEW_URL });
-            radios.push({ value: PREVIEW_NONE });
-            return radios;
-        })(),
-    });
-    
-    const defaultIsChecked = () => {
-        const children = el_radioButtons.children;
-        for (let i = 0; i < children.length; i++) {
-            const child = children[i];
-            const radioButton = child.children[0];
-            if (radioButton.value === PREVIEW_DEFAULT) {
-                return radioButton.checked;
-            }
-        };
-        return false;
-    }
-    
-    if (defaultImageCount > 0) {
-        const children = el_radioButtons.children;
-        for (let i = 0; i < children.length; i++) {
-            const child = children[i];
-            const radioButton = child.children[0];
-            if (radioButton.value === PREVIEW_DEFAULT) {
-                radioButton.checked = true;
-                break;
-            }
-        };
-    }
-    
-    const resetModelInfoPreview = () => {
-        let noimage = el_defaultUri.dataset.noimage;
-        previews.forEach((el) => {
-            el.style.display = "none";
-            if (el_noImage !== el) {
-                if (el.nodeName === "IMG") {
-                    el.src = noimage;
-                }
-                else {
-                    el.children[0].src = noimage;
-                }
-            }
-            else {
-                el.src = imageUri();
-            }
-        });
-        const children = el_radioButtons.children;
-        for (let i = 0; i < children.length; i++) {
-            const child = children[i];
-            const radioButton = child.children[0];
-            if (radioButton.value === PREVIEW_DEFAULT) {
-                el_defaultImages.style.display = "block";
-                radioButton.checked = true;
-                break;
-            }
-        };
-        el_uploadFile.value = "";
-        el_customUrl.value = "";
-        el_upload.style.display = "none";
-        el_custom.style.display = "none";
+    elements = {
+        /** @type {HTMLDivElement} */ info: null,
+        /** @type {HTMLButtonElement} */ setPreviewButton: null,
     };
     
-    const getImage = () => {
-        const value = document.querySelector(`input[name="${uniqueName}"]:checked`).value;
-        switch (value) {
-            case PREVIEW_DEFAULT:
-                if (defaultImageCount === 0) {
-                    return "";
-                }
-                const children = el_defaultImages.children;
-                for (let i = 0; i < children.length; i++) {
-                    const child = children[i];
-                    if (child.style.display !== "none") {
-                        return child.src;
-                    }
-                }
-                return "";
-            case PREVIEW_URL:
-                return el_customUrl.value;
-            case PREVIEW_UPLOAD:
-                return el_uploadFile.files[0] ?? "";
-            case PREVIEW_NONE:
-                return imageUri();
-        }
-        return "";
-    };
+    /** @type {ImageSelect} */
+    previewSelect = null;
     
-    const el_radioGroup = $el("div.model-preview-select-radio-container", [
-        $el("div.row.tab-header-flex-block", [el_radioButtons]),
-        $el("div", [
-            el_custom,
-            el_upload,
-        ]),
-    ]);
-    
-    // TODO: make this an object?
-    return [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked];
-}
-
-class ModelManager extends ComfyDialog {
-    #el = {
-        /** @type {HTMLDivElement} */ modelInfoView: null,
-        /** @type {HTMLDivElement} */ modelInfoContainer: null,
-        /** @type {HTMLDivElement} */ modelInfoUrl: null,
-        /** @type {HTMLDivElement} */ modelInfoOverwrite: null,
-        /** @type {HTMLDivElement} */ modelInfos: null,
-        /** @type {HTMLDivElement} */ modelInfoRadioGroup: null,
-        /** @type {HTMLDivElement} */ modelInfoPreview: null,
-        /** @type {HTMLDivElement} */ modelInfoDefaultUri: null,
-        /** @type {HTMLDivElement} */ setAsPreviewButton: null,
-
-        /** @type {HTMLDivElement} */ modelGrid: null,
-        /** @type {HTMLSelectElement} */ modelTypeSelect: null,
-        /** @type {HTMLSelectElement} */ modelSortSelect: null,
-        /** @type {HTMLInputElement} */ modelContentFilter: null,
-
-        /** @type {HTMLDivElement} */ sidebarButtons: null,
-
-        /** @type {HTMLDivElement} */ settingsTab: null,
-        /** @type {HTMLButtonElement} */ settings_reloadBtn: null,
-        /** @type {HTMLButtonElement} */ settings_saveBtn: null,
-        settings: {
-            //"sidebar-default-height": null,
-            //"sidebar-default-width": null,
-            /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
-            /** @type {HTMLInputElement} */ "model-persistent-search": null,
-            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
-            /** @type {HTMLInputElement} */ "model-show-add-button": null,
-            /** @type {HTMLInputElement} */ "model-show-copy-button": null,
-            /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
-            /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
-            /** @type {HTMLInputElement} */ "model-add-offset": null,
-        }
-    };
-
-    #data = {
-        /** @type {Object} */ models: {},
-        /** @type {DirectoryItem[]} */ modelDirectories: [],
-        /** @type {Array} */ previousModelFilters: [],
-        /** @type {Object.<{value: string}>} */ previousModelType: { value: undefined },
-    };
-
-    /** @type {string} */
-    #searchSeparator = "/";
-
-    /** @type {string} */
-    #systemSeparator = null;
-
-    /** @type {Function} */
-    #resetModelInfoPreview = () => {};
-    
-    /** @type {Function} */
-    #modelInfoDefaultIsChecked = () => { return false; };
-
-    constructor() {
-        super();
-
+    /**
+     * @param {DirectoryItem[]} modelDirectories - Should be unique for every radio group.
+     * @param {() => Promise<void>} updateModels
+     * @param {string} searchSeparator
+     */
+    constructor(modelDirectories, updateModels, searchSeparator) {
         const moveDestinationInput = $el("input.search-text-area", {
-            placeholder: "/",
+            placeholder: searchSeparator,
         });
+        
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
             moveDestinationInput,
             () => {
                 searchDropdown.update(
-                    this.#data.modelDirectories,
-                    this.#searchSeparator,
+                    modelDirectories,
+                    searchSeparator,
                 );
             },
             () => {},
             () => {},
-            this.#searchSeparator,
+            searchSeparator,
             true,
         );
         
-        const [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked] = radioGroupImageSelect(
-            "model-info-preview-model-FYUIKMNVB", 
-            [imageUri()],
-        );
-        el_preview.style.display = "flex";
-        this.#el.modelInfoRadioGroup = el_radioGroup;
-        this.#el.modelInfoPreview = el_preview;
-        this.#el.modelInfoDefaultUri = el_defaultUri;
-        this.#resetModelInfoPreview = resetModelInfoPreview;
-        this.#modelInfoDefaultIsChecked = defaultIsChecked;
+        const previewSelect = new ImageSelect("model-info-preview-model-FYUIKMNVB");
+        this.previewSelect = previewSelect;
+        previewSelect.elements.previews.style.display = "flex";
         
-        const setAsPreviewButton = $el("button", {
-            $: (el) => (this.#el.setAsPreviewButton = el),
+        const setPreviewButton = $el("button", {
+            $: (el) => (this.elements.setPreviewButton = el),
             textContent: "Set as Preview",
             onclick: async(e) => {
                 const confirmation = window.confirm("Change preview image PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
                     e.target.disabled = true;
-                    const container = this.#el.modelInfoContainer;
+                    const container = this.elements.info;
                     const path = container.dataset.path;
-                    const imageUrl = getImage();
+                    const imageUrl = previewSelect.getImage();
                     if (imageUrl === imageUri()) {
                         const encodedPath = encodeURIComponent(path);
                         updatedPreview = await request(
@@ -1758,10 +1447,11 @@ class ModelManager extends ComfyDialog {
                         });
                     }
                     if (updatedPreview) {
-                        this.#modelTab_updateModels();
-                        this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
-                        this.#resetModelInfoPreview();
-                        this.#el.modelInfoView.style.display = "none";
+                        updateModels();
+                        const previewSelect = this.previewSelect;
+                        previewSelect.elements.defaultUrl.dataset.noimage = imageUri();
+                        previewSelect.resetModelInfoPreview();
+                        this.element.style.display = "none";
                     }
                     
                     e.target.disabled = false;
@@ -1769,285 +1459,127 @@ class ModelManager extends ComfyDialog {
                 buttonAlert(e.target, updatedPreview);
             },
         });
-        
-        el_radioButtons.addEventListener("change", (e) => {
-            setAsPreviewButton.style.display = defaultIsChecked() ? "none" : "block";
+        previewSelect.elements.radioButtons.addEventListener("change", (e) => {
+            setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         });
         
-        this.element = $el(
-            "div.comfy-modal.model-manager",
-            {
-                parent: document.body,
-            },
-            [
-                $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
-                    $el("div.model-info-view", {
-                        $: (el) => (this.#el.modelInfoView = el),
-                        style: { display: "none" },
-                    }, [
-                        $el("div.row.tab-header", {
-                            display: "block",
-                        }, [
-                            $el("div.row.tab-header-flex-block", [
-                                $el("button.icon-button", {
-                                    textContent: "🗑︎",
-                                    onclick: async(e) => {
-                                        const affirmation = "delete";
-                                        const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
-                                        let deleted = false;
-                                        if (confirmation === affirmation) {
-                                            const container = this.#el.modelInfoContainer;
-                                            const path = encodeURIComponent(container.dataset.path);
-                                            deleted = await request(
-                                                `/model-manager/model/delete?path=${path}`,
-                                                {
-                                                    method: "POST",
-                                                }
-                                            )
-                                            .then((result) => {
-                                                const deleted = result["success"];
-                                                if (deleted) 
-                                                {
-                                                    container.innerHTML = "";
-                                                    this.#el.modelInfoView.style.display = "none";
-                                                    this.#modelTab_updateModels();
-                                                }
-                                                return deleted;
-                                            })
-                                            .catch((err) => {
-                                                return false;
-                                            });
-                                        }
-                                        if (!deleted) {
-                                            buttonAlert(e.target, false);
-                                        }
-                                    },
-                                }),
-                                $el("div.search-models", [
-                                    moveDestinationInput,
-                                    searchDropdown.element,
-                                ]),
-                                $el("button", {
-                                    textContent: "Move",
-                                    onclick: async(e) => {
-                                        const confirmation = window.confirm("Move this file?");
-                                        let moved = false;
-                                        if (confirmation) {
-                                            const container = this.#el.modelInfoContainer;
-                                            const oldFile = container.dataset.path;
-                                            const [oldFilePath, oldFileName] = searchPath_split(oldFile);
-                                            const newFile = (
-                                                moveDestinationInput.value + 
-                                                this.#searchSeparator + 
-                                                oldFileName
-                                            );
-                                            moved = await request(
-                                                `/model-manager/model/move`,
-                                                {
-                                                    method: "POST",
-                                                    body: JSON.stringify({
-                                                        "oldFile": oldFile,
-                                                        "newFile": newFile,
-                                                    }),
-                                                }
-                                            )
-                                            .then((result) => {
-                                                const moved = result["success"];
-                                                if (moved)
-                                                {
-                                                    moveDestinationInput.value = "";
-                                                    container.innerHTML = "";
-                                                    this.#el.modelInfoView.style.display = "none";
-                                                    this.#modelTab_updateModels();
-                                                }
-                                                return moved;
-                                            })
-                                            .catch(err => {
-                                                return false;
-                                            });
-                                        }
-                                        buttonAlert(e.target, moved);
-                                    },
-                                }),
-                            ]),
-                        ]),
-                        $el("div.model-info-container", {
-                            $: (el) => (this.#el.modelInfoContainer = el),
-                            "data-path": "",
-                        }),
-                    ]),
-                    $el("div.topbar-buttons",
-                        [
-                            $el("div.sidebar-buttons",
-                            {
-                                $: (el) => (this.#el.sidebarButtons = el),
-                            },
-                            [
-                                $el("button.icon-button", {
-                                    textContent: "◧",
-                                    onclick: (event) => this.#setSidebar(event),
-                                }),
-                                $el("button.icon-button", {
-                                    textContent: "⬒",
-                                    onclick: (event) => this.#setSidebar(event),
-                                }),
-                                $el("button.icon-button", {
-                                    textContent: "⬓",
-                                    onclick: (event) => this.#setSidebar(event),
-                                }),
-                                $el("button.icon-button", {
-                                    textContent: "◨",
-                                    onclick: (event) => this.#setSidebar(event),
-                                }),
-                            ]),
-                            $el("button.icon-button", {
-                                textContent: "✖",
-                                onclick: () => {
-                                    const infoView = this.#el.modelInfoView;
-                                    if (infoView.style.display === "none") {
-                                        this.close();
-                                    }
-                                    else {
-                                        infoView.style.display = "none";
-                                    }
-                                },
-                            }),
-                        ]
-                    ),
-                    $tabs([
-                        $tab("Download", [this.#downloadTab_new()]),
-                        $tab("Models", this.#modelTab_new()),
-                        $tab("Settings", [this.#settingsTab_new()]),
-                    ]),
-                ]),
-            ]
-        );
-
-        this.#init();
-    }
-
-    #init() {
-        this.#settingsTab_reload(false);
-        this.#modelTab_updateModels();
-    }
-
-    /** @type {DirectoryDropdown} */
-    #modelContentFilterDirectoryDropdown = null;
-
-    /**
-     * @returns {HTMLElement[]}
-     */
-    #modelTab_new() {
-        /** @type {HTMLDivElement} */
-        const modelGrid = $el("div.comfy-grid");
-        this.#el.modelGrid = modelGrid;
-
-        const searchInput = $el("input.search-text-area", {
-            $: (el) => (this.#el.modelContentFilter = el),
-            placeholder: "example: /0/1.5/styles/clothing -.pt",
-        });
-
-        const searchDropdown = new DirectoryDropdown(
-            searchInput,
-            this.#modelTab_updateDirectoryDropdown,
-            this.#modelTab_updatePreviousModelFilter,
-            this.#modelTab_updateModelGrid,
-            this.#searchSeparator,
-            false,
-        );
-        this.#modelContentFilterDirectoryDropdown = searchDropdown;
-
-        return [
-            $el("div.row.tab-header", [
+        this.element = $el("div.model-info-view", {
+            style: { display: "none" },
+        }, [
+            $el("div.row.tab-header", {
+                display: "block",
+            }, [
                 $el("div.row.tab-header-flex-block", [
                     $el("button.icon-button", {
-                        type: "button",
-                        textContent: "⟳",
-                        onclick: () => this.#modelTab_updateModels(),
-                    }),
-                    $el("select.model-select-dropdown", {
-                        $: (el) => (this.#el.modelTypeSelect = el),
-                        name: "model-type",
-                        onchange: () => this.#modelTab_updateModelGrid(),
-                    }),
-                    $el("select.model-select-dropdown",
-                        {
-                            $: (el) => (this.#el.modelSortSelect = el),
-                            onchange: () => this.#modelTab_updateModelGrid(),
+                        textContent: "🗑︎",
+                        onclick: async(e) => {
+                            const affirmation = "delete";
+                            const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
+                            let deleted = false;
+                            if (confirmation === affirmation) {
+                                const container = this.elements.info;
+                                const path = encodeURIComponent(container.dataset.path);
+                                deleted = await request(
+                                    `/model-manager/model/delete?path=${path}`,
+                                    {
+                                        method: "POST",
+                                    }
+                                )
+                                .then((result) => {
+                                    const deleted = result["success"];
+                                    if (deleted) 
+                                    {
+                                        container.innerHTML = "";
+                                        this.element.style.display = "none";
+                                        updateModels();
+                                    }
+                                    return deleted;
+                                })
+                                .catch((err) => {
+                                    return false;
+                                });
+                            }
+                            if (!deleted) {
+                                buttonAlert(e.target, false);
+                            }
                         },
-                        [
-                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest to newest)"]),
-                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest to newest)"]),
-                            $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
-                        ],
-                    ),
-                ]),
-                $el("div.row.tab-header-flex-block", [
+                    }),
                     $el("div.search-models", [
-                        searchInput,
+                        moveDestinationInput,
                         searchDropdown.element,
                     ]),
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "🔍︎",
-                        onclick: () => this.#modelTab_updateModelGrid(),
+                    $el("button", {
+                        textContent: "Move",
+                        onclick: async(e) => {
+                            const confirmation = window.confirm("Move this file?");
+                            let moved = false;
+                            if (confirmation) {
+                                const container = this.elements.info;
+                                const oldFile = container.dataset.path;
+                                const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
+                                const newFile = (
+                                    moveDestinationInput.value + 
+                                    searchSeparator + 
+                                    oldFileName
+                                );
+                                moved = await request(
+                                    `/model-manager/model/move`,
+                                    {
+                                        method: "POST",
+                                        body: JSON.stringify({
+                                            "oldFile": oldFile,
+                                            "newFile": newFile,
+                                        }),
+                                    }
+                                )
+                                .then((result) => {
+                                    const moved = result["success"];
+                                    if (moved)
+                                    {
+                                        moveDestinationInput.value = "";
+                                        container.innerHTML = "";
+                                        this.element.style.display = "none";
+                                        updateModels();
+                                    }
+                                    return moved;
+                                })
+                                .catch(err => {
+                                    return false;
+                                });
+                            }
+                            buttonAlert(e.target, moved);
+                        },
                     }),
                 ]),
             ]),
-            modelGrid,
-        ];
+            $el("div.model-info-container", {
+                $: (el) => (this.elements.info = el),
+                "data-path": "",
+            }),
+        ]);
     }
-
-    #modelTab_updateModelGrid = () => {
-        const sortValue = this.#el.modelSortSelect.value;
-        const reverseSort = sortValue[0] === "-";
-        const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
-        ModelGrid.update(
-            this.#el.modelGrid,
-            this.#data.models,
-            this.#el.modelTypeSelect,
-            this.#data.previousModelType,
-            this.#el.settings,
-            sortBy,
-            reverseSort,
-            this.#data.previousModelFilters,
-            this.#el.modelContentFilter,
-            this.#searchSeparator,
-            this.#systemSeparator,
-            this.#modelTab_showModelInfo,
-        );
+    
+    /** @returns {boolean} */
+    isVisible() {
+        return this.element.style.display === "none";
     }
-
-    async #modelTab_updateModels() {
-        this.#systemSeparator = await request("/model-manager/system-separator");
-        this.#data.models = await request("/model-manager/models/list");
-        const newModelDirectories = await request("/model-manager/models/directory-list");
-        this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // note: do NOT create a new array
-        this.#modelTab_updateModelGrid();
+    
+    /** @returns {void} */
+    show() {
+        this.element.removeAttribute("style");
     }
-
-    #modelTab_updatePreviousModelFilter = () => {
-        const modelType = this.#el.modelTypeSelect.value;
-        const value = this.#el.modelContentFilter.value;
-        this.#data.previousModelFilters[modelType] = value;
-    };
-
-    #modelTab_updateDirectoryDropdown = () => {
-        this.#modelContentFilterDirectoryDropdown.update(
-            this.#data.modelDirectories,
-            this.#searchSeparator,
-            this.#el.modelTypeSelect.value,
-        );
-        this.#modelTab_updatePreviousModelFilter();
+    
+    /** @returns {void} */
+    hide() {
+        this.element.style.display = "none";
     }
-
+    
     /**
      * @param {string} searchPath
+     * @param {() => Promise<void>} updateModels
+     * @param {string} searchSeparator
      */
-    #modelTab_showModelInfo = async(searchPath) => {
+    async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
         const info = await request(`/model-manager/model/info?path=${path}`)
         .catch((err) => {
@@ -2057,7 +1589,7 @@ class ModelManager extends ComfyDialog {
         if (info === null) {
             return;
         }
-        const infoHtml = this.#el.modelInfoContainer;
+        const infoHtml = this.elements.info;
         infoHtml.innerHTML = "";
         infoHtml.dataset.path = searchPath;
         const innerHtml = [];
@@ -2079,13 +1611,13 @@ class ModelManager extends ComfyDialog {
                                 const name = window.prompt("New model name:");
                                 let renamed = false;
                                 if (name !== null && name !== "") {
-                                    const container = this.#el.modelInfoContainer;
+                                    const container = this.elements.info;
                                     const oldFile = container.dataset.path;
-                                    const [oldFilePath, oldFileName] = searchPath_split(oldFile);
-                                    const [_, extension] = searchPath_splitExtension(oldFile);
+                                    const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
+                                    const [_, extension] = SearchPath.splitExtension(oldFile);
                                     const newFile = (
                                         oldFilePath + 
-                                        this.#searchSeparator + 
+                                        searchSeparator + 
                                         name + 
                                         extension
                                     );
@@ -2104,8 +1636,8 @@ class ModelManager extends ComfyDialog {
                                         if (renamed)
                                         {
                                             container.innerHTML = "";
-                                            this.#el.modelInfoView.style.display = "none";
-                                            this.#modelTab_updateModels();
+                                            this.element.style.display = "none";
+                                            updateModels();
                                         }
                                         return renamed;
                                     })
@@ -2122,27 +1654,28 @@ class ModelManager extends ComfyDialog {
             );
         }
         
+        const previewSelect = this.previewSelect;
+        const defaultUrl = previewSelect.elements.defaultUrl;
         if (info["Preview"]) {
             const imagePath = info["Preview"]["path"];
             const imageDateModified = info["Preview"]["dateModified"];
-            this.#el.modelInfoDefaultUri.dataset.noimage = imageUri(imagePath, imageDateModified);
+            defaultUrl.dataset.noimage = imageUri(imagePath, imageDateModified);
         }
         else {
-            this.#el.modelInfoDefaultUri.dataset.noimage = imageUri();
+            defaultUrl.dataset.noimage = imageUri();
         }
-        this.#resetModelInfoPreview();
-        
-        const setAsPreviewButton = this.#el.setAsPreviewButton;
-        setAsPreviewButton.style.display = this.#modelInfoDefaultIsChecked() ? "none" : "block";
+        previewSelect.resetModelInfoPreview();
+        const setPreviewButton = this.elements.setPreviewButton;
+        setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         
         innerHtml.push($el("div", [
-            this.#el.modelInfoPreview,
+            previewSelect.elements.previews,
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
-                    this.#el.modelInfoRadioGroup,
+                    previewSelect.elements.radioGroup,
                 ]),
                 $el("div.row.tab-header-flex-block", [
-                    setAsPreviewButton,
+                    setPreviewButton,
                 ]),
             ]),
             $el("div", 
@@ -2189,7 +1722,7 @@ class ModelManager extends ComfyDialog {
                                             {
                                                 method: "POST",
                                                 body: JSON.stringify({
-                                                    "path": this.#el.modelInfoContainer.dataset.path,
+                                                    "path": this.elements.info.dataset.path,
                                                     "notes": noteArea.value,
                                                 }),
                                             }
@@ -2218,209 +1751,325 @@ class ModelManager extends ComfyDialog {
             ),
         ]));
         infoHtml.append.apply(infoHtml, innerHtml);
-        
-        this.#el.modelInfoView.removeAttribute("style"); // remove "display: none"
         // TODO: set default value of dropdown and value to model type?
     }
+}
 
+class Civitai {
     /**
-     * @param {HTMLInputElement[]} settings 
-     * @param {boolean} reloadData 
+     * Get model info from Civitai.
+     *
+     * @param {string} id - Model ID.
+     * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
+     *
+     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
      */
-    #setSettings(settings, reloadData) {
-        const el = this.#el.settings;
-        for (const [key, value] of Object.entries(settings)) {
-            const setting = el[key];
-            if (setting === undefined || setting === null) {
-                continue;
-            }
-            const type = setting.type;
-            switch (type) {
-                case "checkbox": setting.checked = Boolean(value); break;
-                case "range": setting.value = parseFloat(value); break;
-                case "textarea": setting.value = value; break;
-                case "number": setting.value = parseInt(value); break;
-                default: console.warn("Unknown settings input type!");
-            }
+    static async requestInfo(id, apiPath) {
+        const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
+        try {
+            return await request(url);
         }
-
-        if (reloadData) {
-            // Is this slow?
-            this.#modelTab_updateModels();
+        catch (error) {
+            console.error("Failed to get model info from Civitai!", error);
+            return {};
         }
     }
-
+    
     /**
-     * @param {Promise<boolean>} reloadData 
+     * Extract file information from the given model version infomation.
+     *
+     * @param {Object} modelVersionInfo - Model version infomation.
+     * @param {(string|null)} [type=null] - Optional select by model type.
+     * @param {(string|null)} [fp=null] - Optional select by floating point quantization.
+     * @param {(string|null)} [size=null] - Optional select by sizing.
+     * @param {(string|null)} [format=null] - Optional select by file format.
+     *
+     * @returns {Object} - Extracted list of infomation on each file of the given model version.
      */
-    async #settingsTab_reload(reloadData) {
-        const data = await request("/model-manager/settings/load");
-        const settings = data["settings"];
-        this.#setSettings(settings, reloadData);
-        buttonAlert(this.#el.settings_reloadBtn, true);
-    }
-
-    async #settingsTab_save() {
-        let settings = {};
-        for (const [setting, el] of Object.entries(this.#el.settings)) {
-            if (!el) { continue; } // hack
-            const type = el.type;
-            let value = null;
-            switch (type) {
-                case "checkbox": value = el.checked; break;
-                case "range": value = el.value; break;
-                case "textarea": value = el.value; break;
-                case "number": value = el.value; break;
-                default: console.warn("Unknown settings input type!");
-            }
-            settings[setting] = value;
+    static getModelFilesInfo(modelVersionInfo, type = null, fp = null, size = null, format = null) {
+        const files = [];
+        const modelVersionFiles = modelVersionInfo["files"];
+        for (let i = 0; i < modelVersionFiles.length; i++) {
+            const modelVersionFile = modelVersionFiles[i];
+            
+            const fileType = modelVersionFile["type"];
+            if (type instanceof String && type != fileType) { continue; }
+            
+            const fileMeta = modelVersionFile["metadata"];
+            
+            const fileFp = fileMeta["fp"];
+            if (fp instanceof String && fp != fileFp) { continue; }
+            
+            const fileSize = fileMeta["size"];
+            if (size instanceof String && size != fileSize) { continue; }
+            
+            const fileFormat = fileMeta["format"];
+            if (format instanceof String && format != fileFormat) { continue; }
+            
+            files.push({
+                "downloadUrl": modelVersionFile["downloadUrl"],
+                "format": fileFormat,
+                "fp": fileFp,
+                "hashes": modelVersionFile["hashes"],
+                "name": modelVersionFile["name"],
+                "size": fileSize,
+                "sizeKB": modelVersionFile["sizeKB"],
+                "type": fileType,
+            });
         }
-
-        const data = await request(
-            "/model-manager/settings/save",
-            {
-                method: "POST",
-                body: JSON.stringify({ "settings": settings }),
+        return {
+            "files": files,
+            "id": modelVersionInfo["id"],
+            "images": modelVersionInfo["images"].map((image) => {
+                // TODO: do I need to double-check image matches resource?
+                return image["url"];
+            }),
+            "name": modelVersionInfo["name"],
+        };
+    }
+    
+    /**
+     * 
+     *
+     * @param {string} stringUrl - Model url.
+     *
+     * @returns {Promise<Object>} - Download information for the given url.
+     */
+    static async getFilteredInfo(stringUrl) {
+        const url = new URL(stringUrl);
+        if (url.hostname != "civitai.com") { return {}; }
+        if (url.pathname == "/") { return {} }
+        const urlPath = url.pathname;
+        if (urlPath.startsWith("/api")) {
+            const idEnd = urlPath.length - (urlPath.at(-1) == "/" ? 1 : 0);
+            const idStart = urlPath.lastIndexOf("/", idEnd - 1) + 1;
+            const modelVersionId = urlPath.substring(idStart, idEnd);
+            if (parseInt(modelVersionId, 10) == NaN) {
+                return {};
             }
-        ).catch((err) => {
-            return { "success": false };
+            const modelVersionInfo = await Civitai.requestInfo(modelVersionId, "model-versions");
+            if (Object.keys(modelVersionInfo).length == 0) {
+                return {};
+            }
+            const searchParams = url.searchParams;
+            const filesInfo = Civitai.getModelFilesInfo(
+                modelVersionInfo,
+                searchParams.get("type"),
+                searchParams.get("fp"),
+                searchParams.get("size"),
+                searchParams.get("format"),
+            );
+            return {
+                "name": modelVersionInfo["model"]["name"],
+                "type": modelVersionInfo["model"]["type"],
+                "versions": [filesInfo]
+            }
+        }
+        else if (urlPath.startsWith('/models')) {
+            const idStart = urlPath.indexOf("models/") + "models/".length;
+            const idEnd = (() => {
+                const idEnd = urlPath.indexOf("/", idStart);
+                return idEnd === -1 ? urlPath.length : idEnd;
+            })();
+            const modelId = urlPath.substring(idStart, idEnd);
+            if (parseInt(modelId, 10) == NaN) {
+                return {};
+            }
+            const modelInfo = await Civitai.requestInfo(modelId, "models");
+            if (Object.keys(modelInfo).length == 0) {
+                return {};
+            }
+            const modelVersionId = parseInt(url.searchParams.get("modelVersionId"));
+            const modelVersions = [];
+            const modelVersionInfos = modelInfo["modelVersions"];
+            for (let i = 0; i < modelVersionInfos.length; i++) {
+                const versionInfo = modelVersionInfos[i];
+                if (!Number.isNaN(modelVersionId)) {
+                    if (modelVersionId != versionInfo["id"]) {continue; }
+                }
+                const filesInfo = Civitai.getModelFilesInfo(versionInfo);
+                modelVersions.push(filesInfo);
+            }
+            return {
+                "name": modelInfo["name"],
+                "type": modelInfo["type"],
+                "versions": modelVersions
+            }
+        }
+        else {
+            return {};
+        }
+    }
+}
+
+class HuggingFace {
+    /**
+     * Get model info from Huggingface.
+     *
+     * @param {string} id - Model ID.
+     * @param {string} apiPath - API path.
+     *
+     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+     */
+    static async requestInfo(id, apiPath = "models") {
+        const url = "https://huggingface.co/api/" + apiPath + "/" + id;
+        try {
+            return await request(url);
+        }
+        catch (error) {
+            console.error("Failed to get model info from HuggingFace!", error);
+            return {};
+        }
+    }
+    
+    /**
+     * 
+     *
+     * @param {string} stringUrl - Model url.
+     *
+     * @returns {Promise<Object>}
+     */
+    static async getFilteredInfo(stringUrl) {
+        const url = new URL(stringUrl);
+        if (url.hostname != "huggingface.co") { return {}; }
+        if (url.pathname == "/") { return {} }
+        const urlPath = url.pathname;
+        const i0 = 1;
+        const i1 = urlPath.indexOf("/", i0);
+        if (i1 == -1 || urlPath.length - 1 == i1) {
+            // user-name only
+            return {};
+        }
+        let i2 = urlPath.indexOf("/", i1 + 1);
+        if (i2 == -1) {
+            // model id only
+            i2 = urlPath.length;
+        }
+        const modelId = urlPath.substring(i0, i2);
+        const urlPathEnd = urlPath.substring(i2);
+        
+        const isValidBranch = (
+            urlPathEnd.startsWith("/resolve") ||
+            urlPathEnd.startsWith("/blob") ||
+            urlPathEnd.startsWith("/tree")
+        );
+        
+        let branch = "/main";
+        let filePath = "";
+        if (isValidBranch) {
+            const i0 = branch.length;
+            const i1 = urlPathEnd.indexOf("/", i0 + 1);
+            if (i1 == -1) {
+                if (i0 != urlPathEnd.length) {
+                    // ends with branch
+                    branch = urlPathEnd.substring(i0);
+                }
+            }
+            else {
+                branch = urlPathEnd.substring(i0, i1);
+                if (urlPathEnd.length - 1 > i1) {
+                    filePath = urlPathEnd.substring(i1);
+                }
+            }
+        }
+        
+        const modelInfo = await HuggingFace.requestInfo(modelId);
+        //const modelInfo = await requestInfo(modelId + "/tree" + branch); // this only gives you the files at the given branch path...
+        // oid: SHA-1?, lfs.oid: SHA-256
+        
+        const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
+        const modelFiles = modelInfo["siblings"].filter((sib) => {
+            const filename = sib["rfilename"];
+            for (let i = 0; i < MODEL_EXTENSIONS.length; i++) {
+                if (filename.endsWith(MODEL_EXTENSIONS[i])) {
+                    return filename.startsWith(clippedFilePath);
+                }
+            }
+            return false;
+        }).map((sib) => {
+            const filename = sib["rfilename"];
+            return filename;
         });
-        const success = data["success"];
-        if (success) {
-            const settings = data["settings"];
-            this.#setSettings(settings, true);
+        if (modelFiles.length === 0) {
+            return {};
         }
-        buttonAlert(this.#el.settings_saveBtn, success);
-    }
-
-    /**
-     * @returns {HTMLElement}
-     */
-    #settingsTab_new() {
-        const settingsTab = $el("div.model-manager-settings", [
-            $el("h1", ["Settings"]),
-            $el("div", [
-                $el("button", {
-                    $: (el) => (this.#el.settings_reloadBtn = el),
-                    type: "button",
-                    textContent: "Reload", // ⟳
-                    onclick: () => this.#settingsTab_reload(true),
-                }),
-                $el("button", {
-                    $: (el) => (this.#el.settings_saveBtn = el),
-                    type: "button",
-                    textContent: "Save", // 💾︎
-                    onclick: () => this.#settingsTab_save(),
-                }),
-            ]),
-            /*
-            $el("h2", ["Window"]),
-            $el("div", [
-                $el("p", ["Default sidebar width"]),
-                $el("input", {
-                    $: (el) => (this.#el.settings["sidebar-default-width"] = el),
-                    type: "number",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            $el("div", [
-                $el("p", ["Default sidebar height"]),
-                $el("input", {
-                    $: (el) => (this.#el.settings["sidebar-default-height"] = el),
-                    type: "number",
-                    textContent: "Default sidebar height",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            */
-            $el("h2", ["Model Search"]),
-            $el("div", [
-                $el("div.search-settings-text", [
-                    $el("p", ["Always include in model search:"]),
-                    $el("textarea.comfy-multiline-input", {
-                        $: (el) => (this.#el.settings["model-search-always-append"] = el),
-                        placeholder: "example: -nsfw",
-                    }),
-                ]),
-            ]),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-persistent-search"] = el),
-                textContent: "Persistent search text across model types",
-            }),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-show-label-extensions"] = el),
-                textContent: "Show model file extension in labels",
-            }),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-show-add-button"] = el),
-                textContent: "Show add button",
-            }),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-show-copy-button"] = el),
-                textContent: "Show copy button",
-            }),
-            $el("h2", ["Model Add"]),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-add-embedding-extension"] = el),
-                textContent: "Add extension to embedding",
-            }),
-            $checkbox({
-                $: (el) => (this.#el.settings["model-add-drag-strict-on-field"] = el),
-                textContent: "Strict dragging model onto a node's model field to add",
-            }),
-            $el("div", [
-                $el("input", {
-                    $: (el) => (this.#el.settings["model-add-offset"] = el),
-                    type: "number",
-                    step: 5,
-                }),
-                $el("p", ["Add model offset"]),
-            ]),
-        ]);
-        this.#el.settingsTab = settingsTab;
-        return settingsTab;
-    }
-
-    /**
-     * @param {Event} e
-     */
-    #setSidebar(e) {
-        // TODO: settings["sidebar-default-width"]
-        // TODO: settings["sidebar-default-height"]
-        // TODO: draggable resize?
-        const button = e.target;
-        const modelManager = this.element;
-        const sidebarButtons = this.#el.sidebarButtons.children;
-
-        let buttonIndex;
-        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            if (sidebarButtons[buttonIndex] === button) {
-                break;
+        
+        const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
+        
+        const images = modelInfo["siblings"].filter((sib) => {
+            const filename = sib["rfilename"];
+            for (let i = 0; i < IMAGE_EXTENSIONS.length; i++) {
+                if (filename.endsWith(IMAGE_EXTENSIONS[i])) {
+                    return filename.startsWith(clippedFilePath);
+                }
             }
-        }
-
-        const sidebarStates = ["sidebar-left", "sidebar-top", "sidebar-bottom", "sidebar-right"];
-        let stateIndex;
-        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
-            const state = sidebarStates[stateIndex];
-            if (modelManager.classList.contains(state)) {
-                modelManager.classList.remove(state);
-                break;
-            }
-        }
-
-        if (stateIndex != buttonIndex) {
-            const newSidebarState = sidebarStates[buttonIndex];
-            modelManager.classList.add(newSidebarState);
-        }
+            return false;
+        }).map((sib) => {
+            return baseDownloadUrl + "/" + sib["rfilename"];
+        });
+        
+        return {
+            "baseDownloadUrl": baseDownloadUrl,
+            "modelFiles": modelFiles,
+            "images": images,
+        };
     }
+}
 
+class DownloadTab {
+    /** @type {HTMLDivElement} */
+    element = null;
+    
+    elements = {
+        /** @type {HTMLInputElement} */ url: null,
+        /** @type {HTMLDivElement} */ infos: null,
+        /** @type {HTMLInputElement} */ overwrite: null,
+    };
+    
+    /** @type {() => Promise<void>} */
+    #updateModels = () => {};
+    
+    /**
+     * Tries to return the related ComfyUI model directory if unambigious.
+     *
+     * @param {string | undefined} modelType - Model type.
+     * @param {string | undefined} [fileType] - File type. Relevant for "Diffusers".
+     *
+     * @returns {(string | null)} Logical base directory name for model type. May be null if the directory is ambiguous or not a model type.
+     */
+    static modelTypeToComfyUiDirectory(modelType, fileType) {
+        if (fileType !== undefined && fileType !== null) {
+            const f = fileType.toLowerCase();
+            if (f == "diffusers") { return "diffusers"; } // TODO: is this correct?
+        }
+        
+        if (modelType !== undefined && modelType !== null) {
+            const m = modelType.toLowerCase();
+            // TODO: somehow allow for SERVER to set dir?
+            // TODO: allow user to choose EXISTING folder override/null? (style_models, HuggingFace) (use an object/map instead so settings can be dynamically set)
+            if (m == "aestheticGradient") { return null; }
+            else if (m == "checkpoint" || m == "checkpoints") { return "checkpoints"; }
+            //else if (m == "") { return "clip"; }
+            //else if (m == "") { return "clip_vision"; }
+            else if (m == "controlnet") { return "controlnet"; }
+            //else if (m == "Controlnet") { return "style_models"; } // are these controlnets? (TI-Adapter)
+            //else if (m == "") { return "gligen"; }
+            else if (m == "hypernetwork" || m == "hypernetworks") { return "hypernetworks"; }
+            else if (m == "lora" || m == "loras") { return "loras"; }
+            else if (m == "locon") { return "loras"; }
+            else if (m == "motionmodule") { return null; }
+            else if (m == "other") { return null; }
+            else if (m == "pose") { return null; }
+            else if (m == "textualinversion" || m == "embedding" || m == "embeddings") { return "embeddings"; }
+            //else if (m == "") { return "unet"; }
+            else if (m == "upscaler" || m == "upscale_model" || m == "upscale_models") { return "upscale_models"; }
+            else if (m == "vae") { return "vae"; }
+            else if (m == "wildcard" || m == "wildcards") { return null; }
+            else if (m == "workflow" || m == "workflows") { return null; }
+        }
+        return null;
+    }
+    
     /**
      * @param {Object} info
      * @param {String[]} modelTypes
@@ -2429,8 +2078,8 @@ class ModelManager extends ComfyDialog {
      * @param {int} id
      * @returns {HTMLDivElement}
      */
-    #downloadTab_modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
-        const [el_radioGroup, el_radioButtons, el_preview, getImage, el_defaultUri, resetModelInfoPreview, defaultIsChecked] = radioGroupImageSelect(
+    #modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
+        const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
         );
@@ -2445,8 +2094,8 @@ class ModelManager extends ComfyDialog {
         
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
-            placeholder: this.#searchSeparator + "0",
-            value: this.#searchSeparator + "0",
+            placeholder: searchSeparator + "0",
+            value: searchSeparator + "0",
         });
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
@@ -2482,7 +2131,7 @@ class ModelManager extends ComfyDialog {
             $el("div", {
                 style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
             }, [
-                el_preview,
+                downloadPreviewSelect.elements.previews,
                 $el("div.download-settings", [
                     $el("div", {
                         style: { "margin-top": "8px" }
@@ -2502,7 +2151,7 @@ class ModelManager extends ComfyDialog {
                                     formData.append("download", info["downloadUrl"]);
                                     formData.append("path",
                                         el_modelTypeSelect.value + 
-                                        this.#searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
+                                        searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
                                         el_saveDirectoryPath.value
                                     );
                                     formData.append("name", (() => {
@@ -2516,8 +2165,9 @@ class ModelManager extends ComfyDialog {
                                         }) ?? "";
                                         return name + ext;
                                     })());
-                                    formData.append("image", getImage());
-                                    formData.append("overwrite", this.#el.modelInfoOverwrite.checked);
+                                    const image = downloadPreviewSelect.getImage();
+                                    formData.append("image", image === imageUri() ? "" : image);
+                                    formData.append("overwrite", this.elements.overwrite.checked);
                                     e.target.disabled = true;
                                     const [success, resultText] = await request(
                                         "/model-manager/model/download",
@@ -2535,7 +2185,7 @@ class ModelManager extends ComfyDialog {
                                         return [false, "📥︎"];
                                     });
                                     if (success) {
-                                        this.#modelTab_updateModels();
+                                        this.#updateModels();
                                     }
                                     buttonAlert(e.target, success, "✔", "✖", resultText);
                                     e.target.disabled = success;
@@ -2543,7 +2193,7 @@ class ModelManager extends ComfyDialog {
                             }),
                             el_filename,
                         ]),
-                        el_radioGroup,
+                        downloadPreviewSelect.elements.radioGroup,
                     ]),
                 ]),
             ]),
@@ -2551,8 +2201,8 @@ class ModelManager extends ComfyDialog {
         
         el_modelTypeSelect.selectedIndex = 0; // reset
         const comfyUIModelType = (
-            modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
-            modelTypeToComfyUiDirectory(info["modelType"]) ??
+            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
             null
         );
         if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
@@ -2568,15 +2218,20 @@ class ModelManager extends ComfyDialog {
         
         return modelInfo;
     }
-
-    async #downloadTab_search() {
-        const infosHtml = this.#el.modelInfos;
+    
+    /**
+     * @param {Object} models
+     * @param {DirectoryItem[]} modelDirectories
+     * @param {string} searchSeparator
+     */
+    async search(models, modelDirectories, searchSeparator) {
+        const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
 
-        const urlText = this.#el.modelInfoUrl.value;
+        const urlText = this.elements.url.value;
         const modelInfos = await (async () => {
             if (urlText.startsWith("https://civitai.com")) {
-                const civitaiInfo = await civitai_getFilteredInfo(urlText);
+                const civitaiInfo = await Civitai.getFilteredInfo(urlText);
                 if (Object.keys(civitaiInfo).length === 0) {
                     return [];
                 }
@@ -2604,7 +2259,7 @@ class ModelManager extends ComfyDialog {
                 return infos;
             }
             if (urlText.startsWith("https://huggingface.co")) {
-                const hfInfo = await huggingFace_getFilteredInfo(urlText);
+                const hfInfo = await HuggingFace.getFilteredInfo(urlText);
                 if (Object.keys(hfInfo).length === 0) {
                     return [];
                 }
@@ -2635,7 +2290,7 @@ class ModelManager extends ComfyDialog {
                     return {
                         "images": [],
                         "fileName": file["name"],
-                        "modelType": modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                        "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
                         "downloadUrl": file["download"],
                         "downloadFilePath": "",
                         "details": {},
@@ -2645,18 +2300,18 @@ class ModelManager extends ComfyDialog {
             return [];
         })();
         
-        const modelTypes = Object.keys(this.#data.models);
+        const modelTypes = Object.keys(models);
         const modelInfosHtml = modelInfos.filter((modelInfo) => {
             const filename = modelInfo["fileName"];
             return MODEL_EXTENSIONS.find((ext) => {
                 return filename.endsWith(ext);
             }) ?? false;
         }).map((modelInfo, id) => {
-            return this.#downloadTab_modelInfo(
+            return this.#modelInfo(
                 modelInfo,
                 modelTypes,
-                this.#data.modelDirectories,
-                this.#searchSeparator,
+                modelDirectories,
+                searchSeparator,
                 id,
             );
         });
@@ -2668,7 +2323,7 @@ class ModelManager extends ComfyDialog {
                 modelInfosHtml[0].open = true;
             }
             const label = $checkbox({
-                $: (el) => { this.#el.modelInfoOverwrite = el; },
+                $: (el) => { this.elements.overwrite = el; },
                 textContent: "Overwrite Existing Files",
             });
             modelInfosHtml.unshift(label);
@@ -2677,33 +2332,554 @@ class ModelManager extends ComfyDialog {
     }
     
     /**
-     * @returns {HTMLElement}
+     * @param {Object} models
+     * @param {DirectoryItem[]} modelDirectories
+     * @param {() => Promise<void>} updateModels
+     * @param {string} searchSeparator
      */
-    #downloadTab_new() {
-        return $el("div.tab-header", [
+    constructor(models, modelDirectories, updateModels, searchSeparator) {
+        this.#updateModels = updateModels;
+        const search = async() => this.search(models, modelDirectories, searchSeparator);
+        $el("div.tab-header", {
+            $: (el) => (this.element = el),
+        }, [
             $el("div.row.tab-header-flex-block", [
                 $el("input.search-text-area", {
-                    $: (el) => (this.#el.modelInfoUrl = el),
+                    $: (el) => (this.elements.url = el),
                     type: "text",
                     placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
                     onkeydown: (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
-                            this.#downloadTab_search();
+                            search();
                         }
                     },
                 }),
                 $el("button.icon-button", {
-                    onclick: () => this.#downloadTab_search(),
+                    onclick: () => search(),
                     textContent: "🔍︎",
                 }),
             ]),
             $el("div.download-model-infos", {
-                $: (el) => (this.#el.modelInfos = el),
+                $: (el) => (this.elements.infos = el),
             }, [
                 $el("div", ["Input a URL to select a model to download."]),
             ]),
         ]);
+    }
+}
+
+class ModelTab {
+    /** @type {HTMLDivElement} */
+    element = null;
+    
+    elements = {
+        /** @type {HTMLDivElement} */ modelGrid: null,
+        /** @type {HTMLSelectElement} */ modelTypeSelect: null,
+        /** @type {HTMLSelectElement} */ modelSortSelect: null,
+        /** @type {HTMLInputElement} */ modelContentFilter: null,
+    };
+    
+    /** @type {DirectoryDropdown} */
+    directoryDropdown = null;
+    
+    /**
+     * @param {() => void} updateDirectoryDropdown
+     * @param {() => void} updatePreviousModelFilter
+     * @param {() => Promise<void>} updateModelGrid
+     * @param {() => Promise<void>} updateModels
+     * @param {string} searchSeparator
+     */
+    constructor(updateDirectoryDropdown, updatePreviousModelFilter, updateModelGrid, updateModels, searchSeparator) {
+        /** @type {HTMLDivElement} */
+        const modelGrid = $el("div.comfy-grid");
+        this.elements.modelGrid = modelGrid;
+        
+        const searchInput = $el("input.search-text-area", {
+            $: (el) => (this.elements.modelContentFilter = el),
+            placeholder: "example: /0/1.5/styles/clothing -.pt",
+        });
+        
+        const searchDropdown = new DirectoryDropdown(
+            searchInput,
+            updateDirectoryDropdown,
+            updatePreviousModelFilter,
+            updateModelGrid,
+            searchSeparator,
+            false,
+        );
+        this.directoryDropdown = searchDropdown;
+        
+        this.element = $el("div", [
+            $el("div.row.tab-header", [
+                $el("div.row.tab-header-flex-block", [
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "⟳",
+                        onclick: () => updateModels(),
+                    }),
+                    $el("select.model-select-dropdown", {
+                        $: (el) => (this.elements.modelTypeSelect = el),
+                        name: "model-type",
+                        onchange: () => updateModelGrid(),
+                    }),
+                    $el("select.model-select-dropdown",
+                        {
+                            $: (el) => (this.elements.modelSortSelect = el),
+                            onchange: () => updateModelGrid(),
+                        },
+                        [
+                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest to oldest)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
+                        ],
+                    ),
+                ]),
+                $el("div.row.tab-header-flex-block", [
+                    $el("div.search-models", [
+                        searchInput,
+                        searchDropdown.element,
+                    ]),
+                    $el("button.icon-button", {
+                        type: "button",
+                        textContent: "🔍︎",
+                        onclick: () => updateModelGrid(),
+                    }),
+                ]),
+            ]),
+            modelGrid,
+        ]);
+    }
+}
+
+class SettingsTab {
+    /** @type {HTMLDivElement} */
+    element = null;
+    
+    elements = {
+        /** @type {HTMLButtonElement} */ reloadButton: null,
+        /** @type {HTMLButtonElement} */ saveButton: null,
+        /** @type {HTMLDivElement} */ setPreviewButton: null,
+        settings: {
+            //"sidebar-default-height": null,
+            //"sidebar-default-width": null,
+            /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
+            /** @type {HTMLInputElement} */ "model-persistent-search": null,
+            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
+            /** @type {HTMLInputElement} */ "model-show-add-button": null,
+            /** @type {HTMLInputElement} */ "model-show-copy-button": null,
+            /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
+            /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
+            /** @type {HTMLInputElement} */ "model-add-offset": null,
+        },
+    };
+    
+    /** @return {() => Promise<void>} */
+    #updateModels = () => {};
+    
+    /**
+     * @param {Object} settingsData 
+     * @param {boolean} updateModels 
+     */
+    #setSettings(settingsData, updateModels) {
+        const settings = this.elements.settings;
+        for (const [key, value] of Object.entries(settingsData)) {
+            const setting = settings[key];
+            if (setting === undefined || setting === null) {
+                continue;
+            }
+            const type = setting.type;
+            switch (type) {
+                case "checkbox": setting.checked = Boolean(value); break;
+                case "range": setting.value = parseFloat(value); break;
+                case "textarea": setting.value = value; break;
+                case "number": setting.value = parseInt(value); break;
+                default: console.warn("Unknown settings input type!");
+            }
+        }
+
+        if (updateModels) {
+            this.#updateModels(); // Is this slow?
+        }
+    }
+    
+    /**
+     * @param {boolean} updateModels
+     * @returns {Promise<void>}
+     */
+    async reload(updateModels) {
+        const data = await request("/model-manager/settings/load");
+        this.#setSettings(data["settings"], updateModels);
+        buttonAlert(this.elements.reloadButton, true);
+    }
+    
+    /** @returns {Promise<void>} */
+    async save() {
+        let settingsData = {};
+        for (const [setting, el] of Object.entries(this.elements.settings)) {
+            if (!el) { continue; } // hack
+            const type = el.type;
+            let value = null;
+            switch (type) {
+                case "checkbox": value = el.checked; break;
+                case "range": value = el.value; break;
+                case "textarea": value = el.value; break;
+                case "number": value = el.value; break;
+                default: console.warn("Unknown settings input type!");
+            }
+            settingsData[setting] = value;
+        }
+
+        const data = await request(
+            "/model-manager/settings/save",
+            {
+                method: "POST",
+                body: JSON.stringify({ "settings": settingsData }),
+            }
+        ).catch((err) => {
+            return { "success": false };
+        });
+        const success = data["success"];
+        if (success) {
+            this.#setSettings(data["settings"], true);
+        }
+        buttonAlert(this.elements.saveButton, success);
+    }
+    
+    /**
+     * @param {() => Promise<void>} updateModels
+     */
+    constructor(updateModels) {
+        this.#updateModels = updateModels;
+        const settings = this.elements.settings;
+        $el("div.model-manager-settings", {
+            $: (el) => (this.element = el),
+        }, [
+            $el("h1", ["Settings"]),
+            $el("div", [
+                $el("button", {
+                    $: (el) => (this.elements.reloadButton = el),
+                    type: "button",
+                    textContent: "Reload", // ⟳
+                    onclick: () => this.reload(true),
+                }),
+                $el("button", {
+                    $: (el) => (this.elements.saveButton = el),
+                    type: "button",
+                    textContent: "Save", // 💾︎
+                    onclick: () => this.save(),
+                }),
+            ]),
+            /*
+            $el("h2", ["Window"]),
+            $el("div", [
+                $el("p", ["Default sidebar width"]),
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-width"] = el),
+                    type: "number",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            $el("div", [
+                $el("p", ["Default sidebar height"]),
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-height"] = el),
+                    type: "number",
+                    textContent: "Default sidebar height",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            */
+            $el("h2", ["Model Search"]),
+            $el("div", [
+                $el("div.search-settings-text", [
+                    $el("p", ["Always include in model search:"]),
+                    $el("textarea.comfy-multiline-input", {
+                        $: (el) => (settings["model-search-always-append"] = el),
+                        placeholder: "example: -nsfw",
+                    }),
+                ]),
+            ]),
+            $checkbox({
+                $: (el) => (settings["model-persistent-search"] = el),
+                textContent: "Persistent search text across model types",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-label-extensions"] = el),
+                textContent: "Show model file extension in labels",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-add-button"] = el),
+                textContent: "Show add button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-copy-button"] = el),
+                textContent: "Show copy button",
+            }),
+            $el("h2", ["Model Add"]),
+            $checkbox({
+                $: (el) => (settings["model-add-embedding-extension"] = el),
+                textContent: "Add extension to embedding",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-add-drag-strict-on-field"] = el),
+                textContent: "Strict dragging model onto a node's model field to add",
+            }),
+            $el("div", [
+                $el("input", {
+                    $: (el) => (settings["model-add-offset"] = el),
+                    type: "number",
+                    step: 5,
+                }),
+                $el("p", ["Add model offset"]),
+            ]),
+        ]);
+    }
+}
+
+class SidebarButtons {
+    /** @type {HTMLDivElement} */
+    element = null;
+    
+    /** @type {ModelManager} */
+    #modelManager = null;
+    
+    /**
+     * @param {Event} e
+     */
+    #setSidebar(e) {
+        // TODO: settings["sidebar-default-width"]
+        // TODO: settings["sidebar-default-height"]
+        // TODO: draggable resize?
+        const button = e.target;
+        const modelManager = this.#modelManager.element;
+        const sidebarButtons = this.element.children;
+
+        let buttonIndex;
+        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
+            if (sidebarButtons[buttonIndex] === button) {
+                break;
+            }
+        }
+
+        const sidebarStates = ["sidebar-left", "sidebar-bottom", "sidebar-top", "sidebar-right"];
+        let stateIndex;
+        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
+            const state = sidebarStates[stateIndex];
+            if (modelManager.classList.contains(state)) {
+                modelManager.classList.remove(state);
+                break;
+            }
+        }
+
+        if (stateIndex != buttonIndex) {
+            const newSidebarState = sidebarStates[buttonIndex];
+            modelManager.classList.add(newSidebarState);
+        }
+    }
+    
+    /**
+     * @param {ModelManager} modelManager
+     */
+    constructor(modelManager) {
+        this.#modelManager = modelManager;
+        $el("div.sidebar-buttons",
+        {
+            $: (el) => (this.element = el),
+        },
+        [
+            $el("button.icon-button", {
+                textContent: "◧",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+            $el("button.icon-button", {
+                textContent: "⬓",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+            $el("button.icon-button", {
+                textContent: "⬒",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+            $el("button.icon-button", {
+                textContent: "◨",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+        ]);
+    }
+}
+
+class ModelManager extends ComfyDialog {
+    #data = {
+        /** @type {Object} */ models: {},
+        /** @type {DirectoryItem[]} */ modelDirectories: [],
+        /** @type {Array} */ previousModelFilters: [],
+        /** @type {Object.<{value: string}>} */ previousModelType: { value: null },
+    };
+    
+    /** @type {string} */
+    #searchSeparator = "/";
+    
+    /** @type {string} */
+    #systemSeparator = null;
+    
+    /** @type {ModelInfoView} */
+    #modelInfoView = null;
+    
+    /** @type {DownloadTab} */
+    #downloadTab = null;
+    
+    /** @type {ModelTab} */
+    #modelTab = null;
+    
+    /** @type {SettingsTab} */
+    #settingsTab = null;
+    
+    /** @type {SidebarButtons} */
+    #sidebarButtons = null;
+    
+    constructor() {
+        super();
+        const modelInfoView = new ModelInfoView(
+            this.#data.modelDirectories, 
+            this.#modelTab_updateModels, 
+            this.#searchSeparator, 
+        );
+        this.#modelInfoView = modelInfoView;
+        
+        const downloadTab = new DownloadTab(
+            this.#data.models,
+            this.#data.modelDirectories,
+            this.#modelTab_updateModels,
+            this.#searchSeparator,
+        );
+        this.#downloadTab = DownloadTab;
+        
+        const modelTab = new ModelTab(
+            this.#modelTab_updateDirectoryDropdown,
+            this.#modelTab_updatePreviousModelFilter,
+            this.#modelTab_updateModelGrid,
+            this.#modelTab_updateModels,
+            this.#searchSeparator,
+        );
+        this.#modelTab = modelTab;
+        
+        const settingsTab = new SettingsTab(
+            this.#modelTab_updateModels, 
+        );
+        this.#settingsTab = settingsTab;
+        
+        const sidebarButtons = new SidebarButtons(this);
+        this.#sidebarButtons = sidebarButtons;
+        
+        this.element = $el(
+            "div.comfy-modal.model-manager",
+            {
+                parent: document.body,
+            },
+            [
+                $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
+                    modelInfoView.element,
+                    $el("div.topbar-buttons",
+                        [
+                            sidebarButtons.element,
+                            $el("button.icon-button", {
+                                textContent: "✖",
+                                onclick: () => {
+                                    if (modelInfoView.isVisible()) { // TODO: decouple
+                                        this.close();
+                                    }
+                                    else {
+                                        modelInfoView.hide();
+                                    }
+                                },
+                            }),
+                        ]
+                    ),
+                    $tabs([
+                        $tab("Download", [downloadTab.element]),
+                        $tab("Models", [modelTab.element]),
+                        $tab("Settings", [settingsTab.element]),
+                    ]),
+                ]),
+            ]
+        );
+        
+        this.#init();
+    }
+    
+    #init() {
+        this.#settingsTab.reload(false);
+        this.#modelTab_updateModels();
+    }
+    
+    #modelTab_updateModelGrid = () => {
+        const modelTab = this.#modelTab;
+        const sortValue = modelTab.elements.modelSortSelect.value;
+        const reverseSort = sortValue[0] === "-";
+        const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
+        ModelGrid.update(
+            modelTab.elements.modelGrid,
+            this.#data.models,
+            modelTab.elements.modelTypeSelect,
+            this.#data.previousModelType,
+            this.#settingsTab.elements.settings,
+            sortBy,
+            reverseSort,
+            this.#data.previousModelFilters,
+            modelTab.elements.modelContentFilter,
+            this.#searchSeparator,
+            this.#systemSeparator,
+            this.#modelTab_showModelInfo,
+        );
+    }
+    
+    #modelTab_updateModels = async() => {
+        this.#systemSeparator = await request("/model-manager/system-separator");
+        
+        const newModels = await request("/model-manager/models/list");
+        Object.assign(this.#data.models, newModels); // NOTE: do NOT create a new object
+        
+        const newModelDirectories = await request("/model-manager/models/directory-list");
+        this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
+        
+        this.#modelTab_updateModelGrid();
+    }
+    
+    #modelTab_updatePreviousModelFilter = () => {
+        const modelType = this.#modelTab.elements.modelTypeSelect.value;
+        const value = this.#modelTab.elements.modelContentFilter.value;
+        this.#data.previousModelFilters[modelType] = value;
+    };
+    
+    #modelTab_updateDirectoryDropdown = () => {
+        this.#modelTab.directoryDropdown.update(
+            this.#data.modelDirectories,
+            this.#searchSeparator,
+            this.#modelTab.elements.modelTypeSelect.value,
+        );
+        this.#modelTab_updatePreviousModelFilter();
+    }
+    
+    /**
+     * @param {string} searchPath
+     */
+    #modelTab_showModelInfo = async(searchPath) => {
+        this.#modelInfoView.update(
+            searchPath, 
+            this.#modelTab_updateModels, 
+            this.#searchSeparator
+        ).then(() => {
+            this.#modelInfoView.show();
+        });
     }
 }
 
