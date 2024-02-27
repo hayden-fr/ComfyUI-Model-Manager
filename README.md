@@ -49,9 +49,11 @@ Download, browse and delete models in ComfyUI.
   - Show/Hide add embedding extension.
 - Colors follow ComfyUI's current theme.
 
+## TODO
+
 <details>
 
-<summary><h2>TODO</h2></summary>
+<summary></summary>
 
 ### Download Model
 
