@@ -492,6 +492,7 @@ class ImageSelect {
             $: (el) => (this.elements.customUrl = el),
             type: "text",
             name: "custom preview image url",
+            autocomplete: "off",
             placeholder: "https://custom-image-preview.png",
         });
         const el_custom = $el("div.row.tab-header-flex-block", {
@@ -1385,6 +1386,7 @@ class ModelInfoView {
     constructor(modelDirectories, updateModels, searchSeparator) {
         const moveDestinationInput = $el("input.search-text-area", {
             name: "move directory",
+            autocomplete: "off",
             placeholder: searchSeparator,
         });
         
@@ -2105,6 +2107,7 @@ class DownloadTab {
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
             name: "save directory",
+            autocomplete: "off",
             placeholder: searchSeparator + "0",
             value: searchSeparator + "0",
         });
@@ -2129,6 +2132,7 @@ class DownloadTab {
         const el_filename = $el("input.plain-text-area", {
             type: "text",
             name: "model save file name",
+            autocomplete: "off",
             placeholder: (() => {
                 const filename = info["fileName"];
                 // TODO: only remove valid model file extensions
@@ -2360,6 +2364,7 @@ class DownloadTab {
                     $: (el) => (this.elements.url = el),
                     type: "text",
                     name: "model download url",
+                    autocomplete: "off",
                     placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
                     onkeydown: (e) => {
                         if (e.key === "Enter") {
@@ -2412,6 +2417,7 @@ class ModelTab {
             $: (el) => (this.elements.modelContentFilter = el),
             type: "text",
             name: "model search",
+            autocomplete: "off",
             placeholder: "example: /0/1.5/styles/clothing -.pt",
         });
         
