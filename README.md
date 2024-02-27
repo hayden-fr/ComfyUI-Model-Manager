@@ -51,11 +51,7 @@ Download, browse and delete models in ComfyUI.
 
 <details>
 
-<summary>
-
-## TODO
-
-</summary>
+<summary><h2>TODO</h2></summary>
 
 ### Download Model
 
