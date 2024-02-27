@@ -105,8 +105,6 @@ def search_path_to_system_path(model_path):
     )
 
     return (system_path, model_path_type)
-    
-print()
 
 
 def get_safetensor_header(path):

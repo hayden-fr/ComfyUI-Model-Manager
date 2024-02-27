@@ -7,11 +7,7 @@ Download, browse and delete models in ComfyUI.
   <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="45%"/>
 </div>
 
-## About this fork
-
-I made this fork because the original repo was inactive and missing many things I needed to make ComfyUI more usable. Also, many other custom nodes bundle unrelated features together or search the internet in the background.
-
-## Fork Improvements
+## Features
 
 ### Download Tab
 
@@ -53,7 +49,13 @@ I made this fork because the original repo was inactive and missing many things 
   - Show/Hide add embedding extension.
 - Colors follow ComfyUI's current theme.
 
+<details>
+
+<summary>
+
 ## TODO
+
+</summary>
 
 ### Download Model
 
@@ -101,11 +103,4 @@ I made this fork because the original repo was inactive and missing many things 
   - Favorites
 - Swap between `and` and `or` keyword search? (currently `and`)
 
-### Code
-
-- Javascript cleanup.
-  - Stop abusing popup/modal.
-  - Better abstraction and objectification. (After codebase settles down)
-  - Separate into classes per tab?
-  - HTML generation all inside main class?
-  - More server driven, HTMX-like HTML generation? (Avoid x2 states)
+</details>

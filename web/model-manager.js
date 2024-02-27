@@ -212,6 +212,7 @@ function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
     const text = x.textContent;
     const input = $el("input", {
         type: "checkbox", 
+        name: text ?? "checkbox",
         checked: x.checked ?? false, 
     });
     const label = $el("label", [
@@ -234,7 +235,7 @@ function $radioGroup(attr) {
     /** @type {HTMLDivElement[]} */
     const radioGroup = options.map((item, index) => {
         const inputRef = { value: null };
-
+        
         return $el(
             "div.comfy-radio",
             { onclick: () => inputRef.value.click() },
@@ -251,7 +252,10 @@ function $radioGroup(attr) {
         );
     });
     
-    const element = $el("input", { value: options[0]?.value });
+    const element = $el("input", {
+        name: name + "-group",
+        value: options[0]?.value,
+    });
     $?.(element);
 
     radioGroup.forEach((radio) => {
@@ -457,6 +461,7 @@ class ImageSelect {
         const el_uploadFile = $el("input", {
             $: (el) => (this.elements.uploadFile = el),
             type: "file",
+            name: "upload preview image",
             accept: IMAGE_EXTENSIONS.join(", "),
             onchange: (e) => {
                 const file = e.target.files[0];
@@ -486,6 +491,7 @@ class ImageSelect {
         const el_customUrl = $el("input.search-text-area", {
             $: (el) => (this.elements.customUrl = el),
             type: "text",
+            name: "custom preview image url",
             placeholder: "https://custom-image-preview.png",
         });
         const el_custom = $el("div.row.tab-header-flex-block", {
@@ -566,14 +572,14 @@ class ImageSelect {
                         break;
                 }
             },
-            options: (() => {
-                const radios = [];
-                radios.push({ value: this.#PREVIEW_DEFAULT });
-                radios.push({ value: this.#PREVIEW_UPLOAD })
-                radios.push({ value: this.#PREVIEW_URL });
-                radios.push({ value: this.#PREVIEW_NONE });
-                return radios;
-            })(),
+            options: [
+                this.#PREVIEW_DEFAULT,
+                this.#PREVIEW_URL,
+                this.#PREVIEW_UPLOAD,
+                this.#PREVIEW_NONE,
+            ].map((value) => {
+                return { value: value, };
+            }),
         });
         this.elements.radioButtons = el_radioButtons;
         
@@ -1378,6 +1384,7 @@ class ModelInfoView {
      */
     constructor(modelDirectories, updateModels, searchSeparator) {
         const moveDestinationInput = $el("input.search-text-area", {
+            name: "move directory",
             placeholder: searchSeparator,
         });
         
@@ -1710,6 +1717,7 @@ class ModelInfoView {
                             if (key === "Notes") {
                                 elements.push($el("h2", [key + ":"]));
                                 const noteArea = $el("textarea.comfy-multiline-input", {
+                                    name: "model notes",
                                     value: value, 
                                     rows: 10,
                                 });
@@ -2084,7 +2092,9 @@ class DownloadTab {
             info["images"],
         );
         
-        const el_modelTypeSelect = $el("select.model-select-dropdown", (() => {
+        const el_modelTypeSelect = $el("select.model-select-dropdown", {
+            name: "model select dropdown",
+        }, (() => {
             const options = [$el("option", { value: "" }, ["-- Model Type --"])];
             modelTypes.forEach((modelType) => {
                 options.push($el("option", { value: modelType }, [modelType]));
@@ -2094,6 +2104,7 @@ class DownloadTab {
         
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
+            name: "save directory",
             placeholder: searchSeparator + "0",
             value: searchSeparator + "0",
         });
@@ -2117,6 +2128,7 @@ class DownloadTab {
         
         const el_filename = $el("input.plain-text-area", {
             type: "text",
+            name: "model save file name",
             placeholder: (() => {
                 const filename = info["fileName"];
                 // TODO: only remove valid model file extensions
@@ -2347,6 +2359,7 @@ class DownloadTab {
                 $el("input.search-text-area", {
                     $: (el) => (this.elements.url = el),
                     type: "text",
+                    name: "model download url",
                     placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
                     onkeydown: (e) => {
                         if (e.key === "Enter") {
@@ -2397,6 +2410,8 @@ class ModelTab {
         
         const searchInput = $el("input.search-text-area", {
             $: (el) => (this.elements.modelContentFilter = el),
+            type: "text",
+            name: "model search",
             placeholder: "example: /0/1.5/styles/clothing -.pt",
         });
         
@@ -2426,6 +2441,7 @@ class ModelTab {
                     $el("select.model-select-dropdown",
                         {
                             $: (el) => (this.elements.modelSortSelect = el),
+                            name: "model select dropdown",
                             onchange: () => updateModelGrid(),
                         },
                         [
@@ -2580,6 +2596,7 @@ class SettingsTab {
                 $el("input", {
                     $: (el) => (settings["sidebar-default-width"] = el),
                     type: "number",
+                    name: "default sidebar width",
                     value: 0.5,
                     min: 0.0,
                     max: 1.0,
@@ -2591,6 +2608,7 @@ class SettingsTab {
                 $el("input", {
                     $: (el) => (settings["sidebar-default-height"] = el),
                     type: "number",
+                    name: "default sidebar height",
                     textContent: "Default sidebar height",
                     value: 0.5,
                     min: 0.0,
@@ -2605,6 +2623,7 @@ class SettingsTab {
                     $el("p", ["Always include in model search:"]),
                     $el("textarea.comfy-multiline-input", {
                         $: (el) => (settings["model-search-always-append"] = el),
+                        name: "always include in model search",
                         placeholder: "example: -nsfw",
                     }),
                 ]),
@@ -2638,6 +2657,7 @@ class SettingsTab {
                 $el("input", {
                     $: (el) => (settings["model-add-offset"] = el),
                     type: "number",
+                    name: "model add offset",
                     step: 5,
                 }),
                 $el("p", ["Add model offset"]),
