@@ -1,192 +1,3 @@
-/* comfy table */
-.comfy-table {
-    width: 100%;
-    table-layout: auto;
-    border-collapse: separate;
-	border-spacing: 0;
-}
-
-.comfy-table .table-head tr {
-    background-color: var(--tr-even-bg-color);
-}
-
-/* comfy tabs */
-.comfy-tabs {
-    color: var(--fg-color);
-}
-
-.comfy-tabs-head {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    border-bottom: 2px solid var(--border-color);
-}
-
-.comfy-tabs-head .head-item {
-    padding: 8px 12px;
-    border: 2px solid var(--border-color);
-    border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    background-color: var(--comfy-menu-bg);
-    cursor: pointer;
-    margin-bottom: 0px;
-    z-index: 1;
-}
-
-.comfy-tabs-head .head-item.active {
-    background-color: var(--comfy-input-bg);
-    cursor: default;
-    position: relative;
-    z-index: 1;
-}
-
-.comfy-tabs-body {
-    background-color: var(--bg-color);
-    border: 2px solid var(--border-color);
-    border-top: none;
-    padding: 16px 0px;
-}
-
-/* comfy grid */
-.comfy-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.model-manager .item {
-    position: relative;
-    width: 230px;
-    height: 345px;
-    text-align: center;
-    overflow: hidden;
-	border-radius: 8px;
-}
-
-.model-manager .item img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.model-manager .model-preview-button-left,
-.model-manager .model-preview-button-right {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    margin: auto;
-    border-radius: 20px;
-}
-
-.model-manager .model-preview-button-right {
-    right: 4px;
-}
-
-.model-manager .model-preview-button-left {
-    left: 4px;
-}
-
-.comfy-grid .model-label {
-	background-color: #000a;
-	width: 100%;
-	height: 2.2rem;
-	position: absolute;
-	bottom: 0;
-	text-align: center;
-	line-height: 2.2rem;
-}
-
-.comfy-grid .model-label > p {
-	width: calc(100% - 2rem);
-	overflow-x: scroll;
-	white-space: nowrap;
-	display: inline-block;
-	vertical-align: middle;
-	margin: 0;
-}
-
-.comfy-grid .model-label {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-}
-
-.comfy-grid .model-label ::-webkit-scrollbar { 
-    width: 0;
-    height: 0;
-}
-
-.model-manager .item .model-preview-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100%;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0);
-}
-
-.comfy-grid .model-preview-top-right,
-.comfy-grid .model-preview-top-left {
-    position: absolute;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    top: 8px;
-}
-
-.comfy-grid .model-preview-top-right {
-    right: 8px;
-}
-
-.comfy-grid .model-preview-top-left {
-    left: 8px;
-}
-
-.comfy-grid .model-button {
-    opacity: 0.65;
-}
-
-.comfy-grid .model-button:hover {
-    opacity: 1;
-}
-
-.comfy-grid .model-label {
-    user-select: text;
-}
-
-/* comfy radio group */
-.comfy-radio-group {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    min-width: 0;
-}
-
-.comfy-radio {
-    display: flex;
-    gap: 4px;
-    padding: 4px 16px;
-    color: var(--input-text);
-	border: 2px solid var(--border-color);
-    border-radius: 16px;
-    background-color: var(--comfy-input-bg);
-    font-size: 18px;
-}
-
-.comfy-radio:has(> input[type="radio"]:checked) {
-	border-color: var(--border-color);
-	background-color: var(--comfy-menu-bg);
-}
-
-.comfy-radio input[type="radio"]:checked + label {
-	color: var(--fg-color);
-}
-
-.radio-input {
-	opacity: 0;
-	position: absolute;
-}
-
 /* model manager */
 .model-manager {
     box-sizing: border-box;
@@ -197,6 +8,11 @@
     padding: 10px;
     color: var(--bg-color);
     z-index: 2000;
+}
+
+.model-manager .comfy-modal-content {
+    width: 100%;
+    gap: 16px;
 }
 
 .model-manager.sidebar-left {
@@ -219,14 +35,21 @@
     left: 75%;
 }
 
-.model-manager .comfy-modal-content {
-    width: 100%;
-    gap: 16px;
-}
-
-/* model manager common */
+/* common */
 .model-manager h1 {
     min-width: 0;
+}
+
+.model-manager textarea {
+    width: 100%;
+    font-size: 1.2em;
+    border: solid 2px var(--border-color);
+    border-radius: 8px;
+    resize: vertical;
+}
+
+.model-manager input[type="file"] {
+	flex: 1;
 }
 
 .model-manager button,
@@ -288,14 +111,85 @@
     line-height: 1.15;
 }
 
-/* model manager row */
 .model-manager .row {
     display: flex;
     min-width: 0;
     gap: 8px;
 }
 
-/* comfy tabs */
+.model-manager .tab-header {
+    display: flex;
+    padding: 8px 0;
+    flex-direction: column;
+    background-color: var(--bg-color);
+}
+
+.model-manager .tab-header-flex-block {
+	width: 100%;
+    min-width: 0;
+}
+
+.model-manager .button-success {
+    color: green;
+    border-color: green;
+}
+
+.model-manager .button-failure {
+    color: darkred;
+    border-color: darkred;
+}
+
+.model-manager .no-select {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* sidebar buttons */
+.model-manager .sidebar-buttons {
+    overflow: hidden;
+    padding-right: 10px;
+    color: var(--input-text);
+}
+
+/* tabs */
+.model-manager .comfy-tabs {
+    color: var(--fg-color);
+}
+
+.model-manager .comfy-tabs-head {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.model-manager .comfy-tabs-head .head-item {
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background-color: var(--comfy-menu-bg);
+    cursor: pointer;
+    margin-bottom: 0px;
+    z-index: 1;
+}
+
+.model-manager .comfy-tabs-head .head-item.active {
+    background-color: var(--comfy-input-bg);
+    cursor: default;
+    position: relative;
+    z-index: 1;
+}
+
+.model-manager .comfy-tabs-body {
+    background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-top: none;
+    padding: 16px 0px;
+}
+
 .model-manager .comfy-tabs {
     flex: 1;
     display: flex;
@@ -316,7 +210,205 @@
     overflow-x: auto;
 }
 
-/* model manager special */
+/* model info view */
+.model-manager .model-info-view {
+    background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 40px;
+    overflow-wrap: break-word;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.model-manager .model-info-container {
+    background-color: var(--bg-color);
+    border-radius: 16px;
+    color: var(--fg-color);
+    width: auto;
+}
+
+/* download tab */
+
+.model-manager [data-name="Download"] summary {
+    padding: 16px;
+}
+
+.model-manager [data-name="Download"] .download-settings {
+    flex: 1;
+}
+
+.model-manager .download-model-infos {
+    padding: 16px 0;
+}
+
+/* models tab */
+.model-manager [data-name="Models"] .row {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+}
+
+/* preview image */
+.model-manager .item {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+	border-radius: 8px;
+}
+
+.model-manager .item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.model-manager .model-preview-button-left,
+.model-manager .model-preview-button-right {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    border-radius: 20px;
+}
+
+.model-manager .model-preview-button-right {
+    right: 4px;
+}
+
+.model-manager .model-preview-button-left {
+    left: 4px;
+}
+
+.model-manager .item .model-preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* grid */
+.model-manager .comfy-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.model-manager .comfy-grid .model-label {
+	background-color: #000a;
+	width: 100%;
+	height: 2.2rem;
+	position: absolute;
+	bottom: 0;
+	text-align: center;
+	line-height: 2.2rem;
+}
+
+.model-manager .comfy-grid .model-label > p {
+	width: calc(100% - 2rem);
+	overflow-x: scroll;
+	white-space: nowrap;
+	display: inline-block;
+	vertical-align: middle;
+	margin: 0;
+}
+
+.model-manager .comfy-grid .model-label {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.model-manager .comfy-grid .model-label ::-webkit-scrollbar { 
+    width: 0;
+    height: 0;
+}
+
+.model-manager .comfy-grid .model-preview-top-right,
+.model-manager .comfy-grid .model-preview-top-left {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    top: 8px;
+}
+
+.model-manager .comfy-grid .model-preview-top-right {
+    right: 8px;
+}
+
+.model-manager .comfy-grid .model-preview-top-left {
+    left: 8px;
+}
+
+.model-manager .comfy-grid .model-button {
+    opacity: 0.65;
+}
+
+.model-manager .comfy-grid .model-button:hover {
+    opacity: 1;
+}
+
+.model-manager .comfy-grid .model-label {
+    user-select: text;
+}
+
+/* radio */
+.model-manager .comfy-radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.model-manager .comfy-radio {
+    display: flex;
+    gap: 4px;
+    padding: 4px 16px;
+    color: var(--input-text);
+	border: 2px solid var(--border-color);
+    border-radius: 16px;
+    background-color: var(--comfy-input-bg);
+    font-size: 18px;
+}
+
+.model-manager .comfy-radio:has(> input[type="radio"]:checked) {
+	border-color: var(--border-color);
+	background-color: var(--comfy-menu-bg);
+}
+
+.model-manager .comfy-radio input[type="radio"]:checked + label {
+	color: var(--fg-color);
+}
+
+.model-manager .radio-input {
+	opacity: 0;
+	position: absolute;
+}
+
+/* model preview select */
+.model-preview-select-radio-container {
+    min-width: 0;
+    flex: 1;
+}
+
+.model-manager .model-preview-select-radio-container img {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+	border-radius: 8px;
+    object-fit: cover;
+}
+
+/* topbar */
 .model-manager .topbar-buttons {
     position: absolute;
     display: flex;
@@ -330,42 +422,7 @@
     padding: 1px 6px;
 }
 
-.model-manager .sidebar-buttons {
-    overflow: hidden;
-    padding-right: 10px;
-    color: var(--input-text);
-}
-
-.model-manager [data-name="Install"] .row,
-.model-manager [data-name="Models"] .row {
-    position: sticky;
-    z-index: 1;
-    top: 0;
-}
-
-.model-manager [data-name="Install"] input {
-	flex-grow: 1;
-	overflow-x: clip;
-}
-
-.model-manager .table-head {
-	position: sticky;
-	top: 116px;
-    z-index: 1;
-}
-
-.model-manager .tab-header {
-    display: flex;
-    padding: 8px 0;
-    flex-direction: column;
-    background-color: var(--bg-color);
-}
-
-.model-manager .tab-header-flex-block {
-	width: 100%;
-    min-width: 0;
-}
-
+/* search dropdown */
 .model-manager .search-models {
     display: flex;
     flex-direction: row;
@@ -402,7 +459,7 @@
     z-index: 1;
 }
 
-.search-dropdown:empty {
+.model-manager .search-dropdown:empty {
     display: none;
 }
 
@@ -421,16 +478,6 @@
 
 .model-manager .search-dropdown > p.search-dropdown-selected {
     background-color: var(--border-color);
-}
-
-.model-manager .button-success {
-    color: green;
-    border-color: green;
-}
-
-.model-manager .button-failure {
-    color: darkred;
-    border-color: darkred;
 }
 
 /* model manager settings */
@@ -454,69 +501,4 @@
 
 .search-settings-text {
     width: 100%;
-}
-
-.model-manager textarea {
-    width: 100%;
-    font-size: 1.2em;
-    border: solid 2px var(--border-color);
-    border-radius: 8px;
-    resize: vertical;
-}
-
-.model-preview-select-radio-container {
-    min-width: 0;
-    flex: 1;
-}
-
-.model-manager input[type="file"] {
-	flex: 1;
-}
-
-.model-preview-select-radio-container img {
-    position: relative;
-    width: 230px;
-    height: 345px;
-    text-align: center;
-    overflow: hidden;
-	border-radius: 8px;
-    object-fit: cover;
-}
-
-.model-manager [data-name="Download"] summary {
-    padding: 16px;
-}
-
-.model-manager [data-name="Download"] .download-settings {
-    flex: 1;
-}
-
-.model-manager .model-info-view {
-    background-color: var(--bg-color);
-    border: 2px solid var(--border-color);
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    margin-top: 40px;
-    overflow-wrap: break-word;
-    overflow-y: auto;
-    padding: 20px;
-}
-
-.model-manager .model-info-container {
-    background-color: var(--bg-color);
-    border-radius: 16px;
-    color: var(--fg-color);
-    width: auto;
-}
-
-.model-manager .no-select {
-    -webkit-user-select: none;
-    -ms-user-select: none;
-    user-select: none;
-}
-
-.model-manager .download-model-infos {
-    padding: 16px 0;
 }
