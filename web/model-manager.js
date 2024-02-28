@@ -473,7 +473,7 @@ class ImageSelect {
                 }
             },
         });
-        const el_upload = $el("div", {
+        const el_upload = $el("div.row.tab-header-flex-block", {
             $: (el) => (this.elements.upload = el),
             style: { display: "none" },
         }, [
