@@ -1687,6 +1687,7 @@ class ModelInfoView {
                     setPreviewButton,
                 ]),
             ]),
+            $el("h2", ["Details:"]),
             $el("div", 
                 (() => {
                     const elements = [];
@@ -1745,6 +1746,12 @@ class ModelInfoView {
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
+                            }
+                            else if (key === "Description") {
+                                if (value !== "") {
+                                    elements.push($el("h2", [key + ":"]));
+                                    elements.push($el("p", [value]));
+                                }
                             }
                             else if (key === "Preview") {
                                 //
@@ -2491,6 +2498,8 @@ class SettingsTab {
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
+            /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
+            
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
@@ -2641,6 +2650,10 @@ class SettingsTab {
             $checkbox({
                 $: (el) => (settings["model-show-label-extensions"] = el),
                 textContent: "Show model file extension in labels",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-preview-fallback-search-safetensors-thumbnail"] = el),
+                textContent: "Fallback on embedded thumbnail in safetensors (refresh slow)",
             }),
             $checkbox({
                 $: (el) => (settings["model-show-add-button"] = el),
@@ -2931,7 +2944,7 @@ app.registerExtension({
             rel: "stylesheet",
             href: "./extensions/ComfyUI-Model-Manager/model-manager.css",
         });
-
+        
         app.ui.menuContainer.appendChild(
             $el("button", {
                 id: "comfyui-model-manager-button",

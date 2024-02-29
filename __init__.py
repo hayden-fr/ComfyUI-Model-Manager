@@ -7,6 +7,7 @@ import sys
 import copy
 import importlib
 import re
+import base64
 
 from aiohttp import web
 import server
@@ -149,6 +150,7 @@ def ui_rules():
         Rule("model-search-always-append", "", str),
         Rule("model-persistent-search", True, bool),
         Rule("model-show-label-extensions", False, bool),
+        Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
         Rule("model-add-embedding-extension", False, bool),
@@ -193,17 +195,28 @@ async def get_model_preview(request):
 
     image_path = no_preview_image
     image_extension = "png"
-
+    image_data = None
     if uri != "no-preview":
         sep = os.path.sep
-        uri = uri.replace("/" if sep == "\\" else "/", os.path.sep)
-        image_path, _ = search_path_to_system_path(uri)
-        if os.path.exists(image_path):
-            _, image_extension = os.path.splitext(uri)
-            image_extension = image_extension[1:]
+        uri = uri.replace("/" if sep == "\\" else "/", sep)
+        path, _ = search_path_to_system_path(uri)
+        head, extension = os.path.splitext(path)
+        if os.path.exists(path):
+            image_extension = extension[1:]
+            image_path = path
+        elif os.path.exists(head) and os.path.splitext(head)[1] == ".safetensors":
+            image_extension = extension[1:]
+            header = get_safetensor_header(head)
+            metadata = header.get("__metadata__", None)
+            if metadata is not None:
+                thumbnail = metadata.get("modelspec.thumbnail", None)
+                if thumbnail is not None:
+                    image_data = thumbnail.split(',')[1]
+                    image_data = base64.b64decode(image_data)
 
-    with open(image_path, "rb") as img_file:
-        image_data = img_file.read()
+    if image_data == None:
+        with open(image_path, "rb") as file:
+            image_data = file.read()
 
     return web.Response(body=image_data, content_type="image/" + image_extension)
 
@@ -267,7 +280,12 @@ async def delete_model_preview(request):
 
 
 @server.PromptServer.instance.routes.get("/model-manager/models/list")
-async def load_download_models(request):
+async def get_model_list(request):
+    use_safetensor_thumbnail = (
+        config_loader.yaml_load(ui_settings_uri, ui_rules())
+        .get("model-preview-fallback-search-safetensors-thumbnail", False)
+    )
+
     model_types = os.listdir(comfyui_model_uri)
     model_types.remove("configs")
     model_types.sort()
@@ -277,7 +295,7 @@ async def load_download_models(request):
         model_extensions = tuple(folder_paths_get_supported_pt_extensions(model_type))
         file_infos = []
         for base_path_index, model_base_path in enumerate(folder_paths_get_folder_paths(model_type)):
-            if not os.path.exists(model_base_path): # Bug in main code?
+            if not os.path.exists(model_base_path): # TODO: Bug in main code? ("ComfyUI\output\checkpoints", "ComfyUI\output\clip", "ComfyUI\models\t2i_adapter", "ComfyUI\output\vae")
                 continue
             for cwd, _subdirs, files in os.walk(model_base_path):
                 dir_models = []
@@ -290,7 +308,7 @@ async def load_download_models(request):
                         dir_images.append(file)
 
                 for model in dir_models:
-                    model_name, _ = os.path.splitext(model)
+                    model_name, model_ext = os.path.splitext(model)
                     image = None
                     image_modified = None
                     for iImage in range(len(dir_images)-1, -1, -1):
@@ -304,6 +322,19 @@ async def load_download_models(request):
                     stats = pathlib.Path(abs_path).stat()
                     model_modified = stats.st_mtime_ns
                     model_created = stats.st_ctime_ns
+                    if use_safetensor_thumbnail and image is None and model_ext == ".safetensors":
+                        # try to fallback on safetensor embedded thumbnail
+                        header = get_safetensor_header(abs_path)
+                        metadata = header.get("__metadata__", None)
+                        if metadata is not None:
+                            thumbnail = metadata.get("modelspec.thumbnail", None)
+                            if thumbnail is not None:
+                                i0 = thumbnail.find("/") + 1
+                                i1 = thumbnail.find(";")
+                                image_ext = "." + thumbnail[i0:i1]
+                                if image_ext in image_extensions:
+                                    image = model + image_ext
+                                    image_modified = model_modified
                     rel_path = "" if cwd == model_base_path else os.path.relpath(cwd, model_base_path)
                     info = (model, image, base_path_index, rel_path, model_modified, model_created, image_modified)
                     file_infos.append(info)
@@ -386,7 +417,7 @@ def linear_directory_hierarchy(refresh = False):
 
 
 @server.PromptServer.instance.routes.get("/model-manager/models/directory-list")
-async def directory_list(request):
+async def get_directory_list(request):
     #body = await request.json()
     dir_list = linear_directory_hierarchy(True)
     #json.dump(dir_list, sys.stdout, indent=4)
@@ -510,9 +541,10 @@ async def get_model_info(request):
     info["File Directory"] = path
     info["File Size"] = str(os.path.getsize(file)) + " bytes"
     stats = pathlib.Path(file).stat()
-    date_format = "%Y/%m/%d %H:%M:%S"
+    date_format = "%Y-%m-%d %H:%M:%S"
+    date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
+    info["Date Modified"] = date_modified
     info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
-    info["Date Modified"] = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
 
     file_name, _ = os.path.splitext(file)
 
@@ -529,11 +561,66 @@ async def get_model_info(request):
 
     header = get_safetensor_header(file)
     metadata = header.get("__metadata__", None)
+    #json.dump(metadata, sys.stdout, indent=4)
+    #print()
+
+    if metadata is not None and info.get("Preview", None) is None:
+        thumbnail = metadata.get("modelspec.thumbnail")
+        if thumbnail is not None:
+            i0 = thumbnail.find("/") + 1
+            i1 = thumbnail.find(";", i0)
+            thumbnail_extension = "." + thumbnail[i0:i1]
+            if thumbnail_extension in image_extensions:
+                info["Preview"] = {
+                    "path": request.query["path"] + thumbnail_extension,
+                    "dateModified": date_modified,
+                }
+
     if metadata is not None:
-        info["Base Model"] = metadata.get("ss_sd_model_name", "")
-        info["Clip Skip"] = metadata.get("ss_clip_skip", "")
-        info["Hash"] = metadata.get("sshs_model_hash", "")
-        info["Output Name"] = metadata.get("ss_output_name", "")
+        train_end = metadata.get("modelspec.date", "").replace("T", " ")
+        train_start = metadata.get("ss_training_started_at", "")
+        if train_start != "":
+            try:
+                train_start = float(train_start)
+                train_start = datetime.fromtimestamp(train_start).strftime(date_format)
+            except:
+                train_start = ""
+        info["Date Trained"] = (
+            train_start + 
+            (" ... " if train_start != "" and train_end != "" else "") + 
+            train_end
+        )
+
+        info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
+        info["Base Model"] = metadata.get("ss_base_model_version", "")
+        info["Architecture"] = metadata.get("modelspec.architecture", "") # "stable-diffusion-xl-v1-base"
+
+        clip_skip = metadata.get("ss_clip_skip", "")
+        if clip_skip == "None":
+            clip_skip = ""
+        info["Clip Skip"] = clip_skip # default 1 (disable clip skip)
+        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "") # "epsilon"
+
+        # it is unclear what these are
+        #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
+        #info["SSHS Model Hash"] = metadata.get("sshs_model_hash", "")
+        #info["SSHS Legacy Hash"] = metadata.get("sshs_legacy_hash", "")
+        #info["New SD Model Hash"] = metadata.get("ss_new_sd_model_hash", "")
+
+        #info["Output Name"] = metadata.get("ss_output_name", "")
+        #info["Title"] = metadata.get("modelspec.title", "")
+        info["Author"] = metadata.get("modelspec.author", "")
+        info["License"] = metadata.get("modelspec.license", "")
+
+    if metadata is not None:
+        training_comment = metadata.get("ss_training_comment", "")
+        info["Description"] = (
+            metadata.get("modelspec.description", "") + 
+            "\n\n" + 
+            metadata.get("modelspec.usage_hint", "") + 
+            "\n\n" + 
+            training_comment if training_comment != "None" else ""
+        ).strip()
 
     txt_file = file_name + ".txt"
     notes = ""
