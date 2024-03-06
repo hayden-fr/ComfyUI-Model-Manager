@@ -1,98 +1,3 @@
-/* comfy table */
-.comfy-table {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
-}
-
-.comfy-table .table-head tr {
-    background-color: var(--tr-even-bg-color);
-}
-
-/* comfy tabs */
-.comfy-tabs {
-    color: #fff;
-}
-
-.comfy-tabs-head {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    border-bottom: 1px solid #6a6a6a;
-}
-
-.comfy-tabs-head .head-item {
-    padding: 8px 12px;
-    border: 1px solid #6a6a6a;
-    border-bottom: none;
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-    cursor: pointer;
-    margin-bottom: -1px;
-}
-
-.comfy-tabs-head .head-item.active {
-    background-color: #2e2e2e;
-    cursor: default;
-    position: relative;
-    z-index: 1;
-}
-
-.comfy-tabs-body {
-    background-color: #2e2e2e;
-    border: 1px solid #6a6a6a;
-    border-top: none;
-    padding: 16px 0px;
-}
-
-/* comfy grid */
-.comfy-grid {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 16px;
-}
-
-.comfy-grid .item {
-    position: relative;
-    width: 230px;
-    height: 345px;
-    text-align: center;
-    overflow: hidden;
-}
-
-.comfy-grid .item img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-}
-
-.comfy-grid .item p {
-    position: absolute;
-    bottom: 0px;
-    background-color: #000a;
-    width: 100%;
-    margin: 0;
-    padding: 9px 0px;
-}
-
-/* comfy radio group */
-.comfy-radio-group {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.comfy-radio {
-    display: flex;
-    gap: 4px;
-    padding: 4px 8px;
-    color: var(--input-text);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background-color: var(--comfy-input-bg);
-    font-size: 18px;
-}
-
 /* model manager */
 .model-manager {
     box-sizing: border-box;
@@ -101,7 +6,7 @@
     max-width: unset;
     max-height: unset;
     padding: 10px;
-    color: #fff;
+    color: var(--bg-color);
     z-index: 2000;
 }
 
@@ -110,18 +15,55 @@
     gap: 16px;
 }
 
-/* model manager common */
+.model-manager.sidebar-left {
+    width: 50%;
+    left: 25%;
+}
+
+.model-manager.sidebar-top {
+    height: 50%;
+    top: 25%;
+}
+
+.model-manager.sidebar-bottom {
+    height: 50%;
+    top: 75%;
+}
+
+.model-manager.sidebar-right {
+    width: 50%;
+    left: 75%;
+}
+
+/* common */
+.model-manager h1 {
+    min-width: 0;
+}
+
+.model-manager textarea {
+    width: 100%;
+    font-size: 1.2em;
+    border: solid 2px var(--border-color);
+    border-radius: 8px;
+    resize: vertical;
+}
+
+.model-manager input[type="file"] {
+    width: 100%;
+}
+
 .model-manager button,
 .model-manager select,
 .model-manager input {
     padding: 4px 8px;
     margin: 0;
+	border: 2px solid var(--border-color);
 }
 
 .model-manager button:disabled,
 .model-manager select:disabled,
 .model-manager input:disabled {
-    background-color: #6a6a6a;
+    background-color: var(--comfy-menu-bg);
     filter: brightness(1.2);
     cursor: not-allowed;
 }
@@ -136,27 +78,118 @@
 }
 
 .model-manager ::-webkit-scrollbar {
-    width: 6px;
+    width: 16px;
 }
 
 .model-manager ::-webkit-scrollbar-track {
-    background-color: #353535;
+    background-color: var(--comfy-input-bg);
     border-right: 1px solid var(--border-color);
     border-bottom: 1px solid var(--border-color);
 }
 
 .model-manager ::-webkit-scrollbar-thumb {
-    background-color: #a1a1a1;
+    background-color: var(--fg-color);
     border-radius: 3px;
 }
 
-/* model manager row */
+.model-manager .search-text-area::-webkit-input-placeholder {
+   font-style: italic;
+}
+.model-manager .search-text-area:-moz-placeholder {
+   font-style: italic;  
+}
+.model-manager .search-text-area::-moz-placeholder {
+   font-style: italic;  
+}
+.model-manager .search-text-area:-ms-input-placeholder {  
+   font-style: italic; 
+}
+
+.icon-button {
+    height: 40px;
+    width: 40px;
+    line-height: 1.15;
+}
+
 .model-manager .row {
     display: flex;
+    min-width: 0;
     gap: 8px;
 }
 
-/* comfy tabs */
+.model-manager .tab-header {
+    display: flex;
+    padding: 8px 0;
+    flex-direction: column;
+    background-color: var(--bg-color);
+}
+
+.model-manager .tab-header-flex-block {
+	width: 100%;
+    min-width: 0;
+}
+
+.model-manager .button-success {
+    color: green;
+    border-color: green;
+}
+
+.model-manager .button-failure {
+    color: darkred;
+    border-color: darkred;
+}
+
+.model-manager .no-select {
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* sidebar buttons */
+.model-manager .sidebar-buttons {
+    overflow: hidden;
+    padding-right: 10px;
+    color: var(--input-text);
+}
+
+/* tabs */
+.model-manager .comfy-tabs {
+    color: var(--fg-color);
+}
+
+.model-manager .comfy-tabs-head {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.model-manager .comfy-tabs-head .head-item {
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-bottom: none;
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+    background-color: var(--comfy-menu-bg);
+    cursor: pointer;
+    margin-bottom: 0px;
+    z-index: 1;
+}
+
+.model-manager .comfy-tabs-head .head-item.active {
+    background-color: var(--comfy-input-bg);
+    cursor: default;
+    position: relative;
+    z-index: 1;
+}
+
+.model-manager .comfy-tabs-body {
+    background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
+    border-top: none;
+    padding: 16px 0px;
+}
+
 .model-manager .comfy-tabs {
     flex: 1;
     display: flex;
@@ -171,36 +204,302 @@
 
 .model-manager .comfy-tabs-body > div {
     position: relative;
-    max-height: 100%;
+    height: 100%;
+    width: auto;
     padding: 0 16px;
-    overflow-x: hidden;
+    overflow-x: auto;
 }
 
-/* model manager special */
-.model-manager .close {
+/* model info view */
+.model-manager .model-info-view {
+    background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    margin-top: 40px;
+    overflow-wrap: break-word;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.model-manager .model-info-container {
+    background-color: var(--bg-color);
+    border-radius: 16px;
+    color: var(--fg-color);
+    width: auto;
+}
+
+/* download tab */
+
+.model-manager [data-name="Download"] summary {
+    padding: 16px;
+    word-wrap: break-word;
+}
+
+.model-manager [data-name="Download"] .download-settings {
+    flex: 1;
+}
+
+.model-manager .download-model-infos {
+    padding: 16px 0;
+}
+
+/* models tab */
+.model-manager [data-name="Models"] .row {
+    position: sticky;
+    z-index: 1;
+    top: 0;
+}
+
+/* preview image */
+.model-manager .item {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+	border-radius: 8px;
+}
+
+.model-manager .item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.model-manager .model-preview-button-left,
+.model-manager .model-preview-button-right {
     position: absolute;
-    padding: 1px 6px;
+    top: 0;
+    bottom: 0;
+    margin: auto;
+    border-radius: 20px;
+}
+
+.model-manager .model-preview-button-right {
+    right: 4px;
+}
+
+.model-manager .model-preview-button-left {
+    left: 4px;
+}
+
+.model-manager .item .model-preview-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background-color: rgba(0, 0, 0, 0);
+}
+
+/* grid */
+.model-manager .comfy-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.model-manager .comfy-grid .model-label {
+	background-color: #000a;
+	width: 100%;
+	height: 2.2rem;
+	position: absolute;
+	bottom: 0;
+	text-align: center;
+	line-height: 2.2rem;
+}
+
+.model-manager .comfy-grid .model-label > p {
+	width: calc(100% - 2rem);
+	overflow-x: scroll;
+	white-space: nowrap;
+	display: inline-block;
+	vertical-align: middle;
+	margin: 0;
+}
+
+.model-manager .comfy-grid .model-label {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.model-manager .comfy-grid .model-label ::-webkit-scrollbar { 
+    width: 0;
+    height: 0;
+}
+
+.model-manager .comfy-grid .model-preview-top-right,
+.model-manager .comfy-grid .model-preview-top-left {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    top: 8px;
+}
+
+.model-manager .comfy-grid .model-preview-top-right {
+    right: 8px;
+}
+
+.model-manager .comfy-grid .model-preview-top-left {
+    left: 8px;
+}
+
+.model-manager .comfy-grid .model-button {
+    opacity: 0.65;
+}
+
+.model-manager .comfy-grid .model-button:hover {
+    opacity: 1;
+}
+
+.model-manager .comfy-grid .model-label {
+    user-select: text;
+}
+
+/* radio */
+.model-manager .comfy-radio-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    min-width: 0;
+}
+
+.model-manager .comfy-radio {
+    display: flex;
+    gap: 4px;
+    padding: 4px 16px;
+    color: var(--input-text);
+	border: 2px solid var(--border-color);
+    border-radius: 16px;
+    background-color: var(--comfy-input-bg);
+    font-size: 18px;
+}
+
+.model-manager .comfy-radio:has(> input[type="radio"]:checked) {
+	border-color: var(--border-color);
+	background-color: var(--comfy-menu-bg);
+}
+
+.model-manager .comfy-radio input[type="radio"]:checked + label {
+	color: var(--fg-color);
+}
+
+.model-manager .radio-input {
+	opacity: 0;
+	position: absolute;
+}
+
+/* model preview select */
+.model-preview-select-radio-container {
+    min-width: 0;
+    flex: 1;
+}
+
+.model-manager .model-preview-select-radio-container img {
+    position: relative;
+    width: 230px;
+    height: 345px;
+    text-align: center;
+    overflow: hidden;
+	border-radius: 8px;
+    object-fit: cover;
+}
+
+/* topbar */
+.model-manager .topbar-buttons {
+    position: absolute;
+    display: flex;
     top: 10px;
     right: 10px;
 }
 
-.model-manager .row {
-    position: sticky;
-    padding-top: 2px;
-    margin-top: -2px;
-    padding-bottom: 18px;
-    margin-bottom: -2px;
-    top: 0px;
-    background-color: #2e2e2e;
+.model-manager .topbar-buttons button {
+    width: 33px;
+    height: 33px;
+    padding: 1px 6px;
+}
+
+/* search dropdown */
+.model-manager .search-models {
+    display: flex;
+    flex-direction: row;
+    flex: 1;
+    min-width: 0;
+}
+
+.model-manager .model-select-dropdown {
+    min-width: 0;
+    overflow: auto;
+}
+
+.model-manager .search-text-area,
+.model-manager .plain-text-area,
+.model-manager .model-select-dropdown {
+	flex: 1;
+    min-height: 36px;
+    padding-block: 0;
+    min-width: 36px;
+}
+
+.model-manager .model-select-dropdown {
+    min-height: 40px;
+}
+
+.model-manager .search-dropdown {
+    position: absolute;
+    background-color: var(--bg-color);
+    border: 2px var(--border-color) solid;
+    color: var(--fg-color);
+    max-height: 30vh;
+    overflow: auto;
+    border-radius: 10px;
     z-index: 1;
 }
 
-.model-manager .table-head {
-    position: sticky;
-    top: 52px;
-    z-index: 1;
+.model-manager .search-dropdown:empty {
+    display: none;
 }
 
-.model-manager div[data-name="Model List"] .row {
-    align-items: flex-start;
+.model-manager .search-dropdown > p {
+    margin: 0;
+    padding: 0.85em 20px;
+    min-width: 0;
+}
+.model-manager .search-dropdown > p {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+.model-manager .search-dropdown > p::-webkit-scrollbar { 
+    display: none;  /* Safari and Chrome */
+}
+
+.model-manager .search-dropdown > p.search-dropdown-selected {
+    background-color: var(--border-color);
+}
+
+/* model manager settings */
+.model-manager .model-manager-settings > div,
+.model-manager .model-manager-settings > label {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0;
+}
+
+.model-manager .model-manager-settings button {
+    height: 40px;
+    width: 120px;
+}
+
+.model-manager .model-manager-settings input[type="number"] {
+    width: 50px;
+}
+
+.search-settings-text {
+    width: 100%;
 }
