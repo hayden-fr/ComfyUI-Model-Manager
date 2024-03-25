@@ -35,7 +35,21 @@ const modelNodeType = {
 };
 
 const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
-const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
+const IMAGE_EXTENSIONS = [
+    ".png", 
+    ".webp", 
+    ".jpeg", 
+    ".jpg", 
+    ".gif", 
+    ".apng", 
+
+    ".preview.png", 
+    ".preview.webp", 
+    ".preview.jpeg", 
+    ".preview.jpg", 
+    ".preview.gif", 
+    ".preview.apng", 
+]; // TODO: /model-manager/image/extensions
 
 class SearchPath {
     /**
@@ -1413,7 +1427,7 @@ class ModelInfoView {
             $: (el) => (this.elements.setPreviewButton = el),
             textContent: "Set as Preview",
             onclick: async(e) => {
-                const confirmation = window.confirm("Change preview image PERMANENTLY?");
+                const confirmation = window.confirm("Change preview image(s) PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
                     e.target.disabled = true;
