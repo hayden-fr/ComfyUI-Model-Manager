@@ -2352,11 +2352,11 @@ class DownloadTab {
                 id,
             );
         });
-        if (modelInfos.length === 0) {
+        if (modelInfosHtml.length === 0) {
             modelInfosHtml.push($el("div", ["No results found."]));
         }
         else {
-            if (modelInfos.length === 1) {
+            if (modelInfosHtml.length === 1) {
                 modelInfosHtml[0].open = true;
             }
             const label = $checkbox({
