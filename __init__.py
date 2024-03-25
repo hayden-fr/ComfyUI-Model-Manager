@@ -629,13 +629,15 @@ async def get_model_info(request):
 
         info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
         info["Base Model"] = metadata.get("ss_base_model_version", "")
-        info["Architecture"] = metadata.get("modelspec.architecture", "") # "stable-diffusion-xl-v1-base"
+        info["Architecture"] = metadata.get("modelspec.architecture", "")
+        info["Network Dimension"] = metadata.get("ss_network_dim", "") # features trained
+        info["Network Alpha"] = metadata.get("ss_network_alpha", "") # trained features applied
 
         clip_skip = metadata.get("ss_clip_skip", "")
-        if clip_skip == "None":
+        if clip_skip == "None" or clip_skip == "1": # assume 1 means no clip skip
             clip_skip = ""
-        info["Clip Skip"] = clip_skip # default 1 (disable clip skip)
-        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "") # "epsilon"
+        info["Clip Skip"] = clip_skip
+        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
 
         # it is unclear what these are
         #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
@@ -658,10 +660,10 @@ async def get_model_info(request):
             training_comment if training_comment != "None" else ""
         ).strip()
 
-    txt_file = abs_name + model_info_extension
+    info_text_file = abs_name + model_info_extension
     notes = ""
-    if os.path.isfile(txt_file):
-        with open(txt_file, 'r', encoding="utf-8") as f:
+    if os.path.isfile(info_text_file):
+        with open(info_text_file, 'r', encoding="utf-8") as f:
             notes = f.read()
     info["Notes"] = notes
 
