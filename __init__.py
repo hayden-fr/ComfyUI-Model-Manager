@@ -632,12 +632,11 @@ async def get_model_info(request):
         info["Architecture"] = metadata.get("modelspec.architecture", "")
         info["Network Dimension"] = metadata.get("ss_network_dim", "") # features trained
         info["Network Alpha"] = metadata.get("ss_network_alpha", "") # trained features applied
-
+        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
         clip_skip = metadata.get("ss_clip_skip", "")
         if clip_skip == "None" or clip_skip == "1": # assume 1 means no clip skip
             clip_skip = ""
         info["Clip Skip"] = clip_skip
-        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
 
         # it is unclear what these are
         #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
