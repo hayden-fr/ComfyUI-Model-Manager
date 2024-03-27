@@ -2150,16 +2150,18 @@ class DownloadTab {
             true,
         );
         
+        const default_name = (() => {
+            const filename = info["fileName"];
+            // TODO: only remove valid model file extensions
+            const i = filename.lastIndexOf(".");
+            return i === - 1 ? filename : filename.substring(0, i);
+        })();
         const el_filename = $el("input.plain-text-area", {
             type: "text",
             name: "model save file name",
             autocomplete: "off",
-            placeholder: (() => {
-                const filename = info["fileName"];
-                // TODO: only remove valid model file extensions
-                const i = filename.lastIndexOf(".");
-                return i === - 1 ? filename : filename.substring(0, i);
-            })(),
+            placeholder: default_name,
+            value: default_name,
         });
         
         const filepath = info["downloadFilePath"];

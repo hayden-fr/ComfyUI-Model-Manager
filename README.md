@@ -22,7 +22,7 @@ Download, browse and delete models in ComfyUI.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
   - Add `/` at the start of the search bar to see auto-complete suggestions.
-- Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models`.
+- Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models/`.
 - Sort for models (Date Created, Date Modified, Name).
 
 ### Model Info View
@@ -97,7 +97,7 @@ Download, browse and delete models in ComfyUI.
 - Filter directory dropdown
   - Filter directory content in auto-suggest dropdown (not clear how this should be implemented)
 - Filters dropdown
-  - Stable Diffusion model version, if applicable (Maybe dropdown list of "Base Models" is more pratical to impliment?)
+  - Stable Diffusion model version, if applicable (Maybe dropdown list of "Base Models" is more practical to implement?)
   - Favorites
 - Swap between `and` and `or` keyword search? (currently `and`)
 
