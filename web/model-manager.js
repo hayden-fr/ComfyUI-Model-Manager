@@ -2966,7 +2966,16 @@ app.registerExtension({
                 id: "comfyui-model-manager-button",
                 parent: document.querySelector(".comfy-menu"),
                 textContent: "Models",
-                onclick: () => { getInstance().show(); },
+                onclick: () => {
+                    const modelManager = getInstance();
+                    const style = modelManager.element.style;
+                    if (style.display === "" || style.display === "none") {
+                        modelManager.show();
+                    }
+                    else {
+                        modelManager.close();
+                    }
+                },
             })
         );
     },
