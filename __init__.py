@@ -559,6 +559,19 @@ def download_file(url, filename, overwrite):
     os.rename(filename_temp, filename)
 
 
+def bytes_to_size(total_bytes):
+    units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+    b = total_bytes
+    i = 0
+    while True:
+        b = b >> 10
+        if (b == 0): break
+        i = i + 1
+    if i >= len(units) or i == 0:
+        return str(total_bytes) + " " + units[0]
+    return "{:.2f}".format(total_bytes / (1 << (i * 10))) + " " + units[i]
+
+
 @server.PromptServer.instance.routes.get("/model-manager/model/info")
 async def get_model_info(request):
     model_path = request.query.get("path", None)
@@ -574,7 +587,7 @@ async def get_model_info(request):
     comfyui_directory, name = os.path.split(model_path)
     info["File Name"] = name
     info["File Directory"] = comfyui_directory
-    info["File Size"] = str(os.path.getsize(abs_path)) + " bytes"
+    info["File Size"] = bytes_to_size(os.path.getsize(abs_path))
     stats = pathlib.Path(abs_path).stat()
     date_format = "%Y-%m-%d %H:%M:%S"
     date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)

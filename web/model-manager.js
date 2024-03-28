@@ -1055,7 +1055,7 @@ class ModelGrid {
     }
     
     /**
-     * In-place sort. Returns an arrat alias.
+     * In-place sort. Returns an array alias.
      * @param {Array} list
      * @param {string} sortBy
      * @param {bool} [reverse=false]
@@ -1230,7 +1230,7 @@ class ModelGrid {
      * @returns {HTMLElement[]}
      */
     static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, modelInfoCallback) {
-        // TODO: seperate text and model logic; getting too messy
+        // TODO: separate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
@@ -1793,7 +1793,7 @@ class Civitai {
      * @param {string} id - Model ID.
      * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
      *
-     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+     * @returns {Promise<Object>} Dictionary containing received model info. Returns an empty if fails.
      */
     static async requestInfo(id, apiPath) {
         const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
@@ -1807,15 +1807,15 @@ class Civitai {
     }
     
     /**
-     * Extract file information from the given model version infomation.
+     * Extract file information from the given model version information.
      *
-     * @param {Object} modelVersionInfo - Model version infomation.
+     * @param {Object} modelVersionInfo - Model version information.
      * @param {(string|null)} [type=null] - Optional select by model type.
      * @param {(string|null)} [fp=null] - Optional select by floating point quantization.
      * @param {(string|null)} [size=null] - Optional select by sizing.
      * @param {(string|null)} [format=null] - Optional select by file format.
      *
-     * @returns {Object} - Extracted list of infomation on each file of the given model version.
+     * @returns {Object} - Extracted list of information on each file of the given model version.
      */
     static getModelFilesInfo(modelVersionInfo, type = null, fp = null, size = null, format = null) {
         const files = [];
@@ -1940,7 +1940,7 @@ class HuggingFace {
      * @param {string} id - Model ID.
      * @param {string} apiPath - API path.
      *
-     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+     * @returns {Promise<Object>} Dictionary containing received model info. Returns an empty if fails.
      */
     static async requestInfo(id, apiPath = "models") {
         const url = "https://huggingface.co/api/" + apiPath + "/" + id;
@@ -2061,7 +2061,7 @@ class DownloadTab {
     #updateModels = () => {};
     
     /**
-     * Tries to return the related ComfyUI model directory if unambigious.
+     * Tries to return the related ComfyUI model directory if unambiguous.
      *
      * @param {string | undefined} modelType - Model type.
      * @param {string | undefined} [fileType] - File type. Relevant for "Diffusers".
