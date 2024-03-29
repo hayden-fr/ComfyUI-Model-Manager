@@ -659,8 +659,8 @@ class DirectoryDropdown {
     /** @type {() => void} */
     #updateDropdown = null;
     
-    /** @type {DirectoryItem[]} */
-    #directories = null; // READ ONLY REFERENCE
+    /** @type {ModelData} */
+    #modelData = null; // READ ONLY
     
     /** @type {() => void} */
     #updateCallback = null;
@@ -669,15 +669,14 @@ class DirectoryDropdown {
     #submitCallback = null;
     
     /**
-     * @param {DirectoryItem[]} directories
+     * @param {ModelData} modelData
      * @param {HTMLInputElement} input
      * @param {() => void} updateDropdown
      * @param {() => void} [updateCallback= () => {}]
      * @param {() => Promise<void>} [submitCallback= () => {}]
-     * @param {String} [searchSeparator="/"]
      * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(directories, input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, searchSeparator = "/", showDirectoriesOnly = false) {
+    constructor(modelData, input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, showDirectoriesOnly = false) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -685,7 +684,7 @@ class DirectoryDropdown {
             },
         });
         this.element = dropdown;
-        this.#directories = directories;
+        this.#modelData = modelData;
         this.#input = input;
         this.#updateDropdown = updateDropdown;
         this.#updateCallback = updateCallback;
@@ -722,7 +721,7 @@ class DirectoryDropdown {
                         e.stopPropagation();
                         e.preventDefault(); // prevent cursor move
                         const input = e.target;
-                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
+                        DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
                         updateDropdown();
                         //updateCallback();
                         //submitCallback();
@@ -738,11 +737,11 @@ class DirectoryDropdown {
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
                     const input = e.target;
                     const oldFilterText = input.value;
-                    const iSep = oldFilterText.lastIndexOf(searchSeparator, oldFilterText.length - 2);
+                    const iSep = oldFilterText.lastIndexOf(modelData.searchSeparator, oldFilterText.length - 2);
                     const newFilterText = oldFilterText.substring(0, iSep + 1);
                     if (oldFilterText !== newFilterText) {
                         const delta = oldFilterText.substring(iSep + 1);
-                        let isMatch = delta[delta.length-1] === searchSeparator;
+                        let isMatch = delta[delta.length-1] === modelData.searchSeparator;
                         if (!isMatch) {
                             const options = dropdown.children;
                             for (let i = 0; i < options.length; i++) {
@@ -787,7 +786,7 @@ class DirectoryDropdown {
                     const input = e.target
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
-                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
+                        DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
                         updateDropdown();
                         updateCallback();
                     }
@@ -853,11 +852,12 @@ class DirectoryDropdown {
     }
     
     /**
-     * @param {string} searchSeparator
      * @param {string} [modelType = ""]
      */
-    update(searchSeparator, modelType = "") {
-        const directories = this.#directories;
+    update(modelType = "") {
+        // TODO: create a wrapper around ModelData.directories to make access easier
+        const directories = this.#modelData.directories;
+        const searchSeparator = this.#modelData.searchSeparator;
         const dropdown = this.element;
         const input = this.#input;
         const updateDropdown = this.#updateDropdown;
@@ -932,17 +932,36 @@ class DirectoryDropdown {
         let options = [];
         const lastWord = filter.substring(indexLastWord);
         const item = directories[cwd];
-        if (item["childIndex"] !== undefined) {
+        const cwdIsDir = item["childIndex"] !== undefined;
+        if (cwdIsDir) {
             const childIndex = item["childIndex"];
             const childCount = item["childCount"];
-            const items = directories.slice(childIndex, childIndex + childCount);
-            for (let i = 0; i < items.length; i++) {
-                const child = items[i];
+            const children = directories.slice(childIndex, childIndex + childCount);
+            for (let i = 0; i < children.length; i++) {
+                const child = children[i];
                 const grandChildCount = child["childCount"];
                 const isDir = grandChildCount !== undefined && grandChildCount !== null;
                 const itemName = child["name"];
-                if (itemName.startsWith(lastWord) && (!showDirectoriesOnly || (showDirectoriesOnly && isDir))) {
-                    options.push(itemName + (isDir ? searchSeparator : ""));
+                if (showDirectoriesOnly) {
+                    if (isDir && itemName.startsWith(lastWord)) {
+                        let existsDirectoryGrandchild = false;
+                        const grandChildIndex = child["childIndex"];
+                        const grandChildren = directories.slice(grandChildIndex, grandChildIndex + grandChildCount);
+                        for (let j = 0; j < grandChildren.length; j++) {
+                            const grandChild = grandChildren[j];
+                            const greatGrandChildCount = grandChild["childCount"];
+                            if (greatGrandChildCount !== undefined && greatGrandChildCount !== null) {
+                                existsDirectoryGrandchild = true;
+                                break;
+                            }
+                        }
+                        options.push(itemName + (existsDirectoryGrandchild ? searchSeparator : ""));
+                    }
+                }
+                else {
+                    if (itemName.startsWith(lastWord)) {
+                        options.push(itemName + (isDir && grandChildCount > 0 ? searchSeparator : ""));
+                    }
                 }
             }
         }
@@ -1423,18 +1442,14 @@ class ModelInfoView {
             placeholder: modelData.searchSeparator,
         });
         
+        /** @type {DirectoryDropdown} */
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
-            modelData.directories,
+            modelData,
             moveDestinationInput,
-            () => {
-                searchDropdown.update(
-                    modelData.searchSeparator,
-                );
-            },
+            () => searchDropdown.update(),
             () => {},
             () => {},
-            modelData.searchSeparator,
             true,
         );
         
@@ -2151,21 +2166,18 @@ class DownloadTab {
             placeholder: searchSeparator + "0",
             value: searchSeparator + "0",
         });
+        /** @type {DirectoryDropdown} */
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
-            modelData.directories,
+            modelData,
             el_saveDirectoryPath,
             () => {
                 const modelType = el_modelTypeSelect.value;
                 if (modelType === "") { return; }
-                searchDropdown.update(
-                    searchSeparator,
-                    modelType,
-                );
+                searchDropdown.update(modelType);
             },
             () => {},
             () => {},
-            searchSeparator,
             true,
         );
         
@@ -2490,10 +2502,7 @@ class ModelTab {
         };
         
         const updateDirectoryDropdown = () => {
-            this.directoryDropdown.update(
-                this.#modelData.searchSeparator,
-                this.elements.modelTypeSelect.value,
-            );
+            this.directoryDropdown.update(this.elements.modelTypeSelect.value);
             updatePreviousModelFilter();
         }
         
@@ -2530,12 +2539,11 @@ class ModelTab {
         this.updateModelGrid = updateModelGrid;
         
         const searchDropdown = new DirectoryDropdown(
-            modelData.directories,
+            modelData,
             searchInput,
             updateDirectoryDropdown,
             updatePreviousModelFilter,
             updateModelGrid,
-            modelData.searchSeparator,
             false,
         );
         this.directoryDropdown = searchDropdown;
