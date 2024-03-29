@@ -631,7 +631,7 @@ const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
 
 class ModelData {
     /** @type {string} */
-    searchSeparator = "/"; // TODO: other client or server code may be assuming this to always be "\"
+    searchSeparator = "/"; // TODO: other client or server code may be assuming this to always be "/"
     
     /** @type {string} */
     systemSeparator = null;
