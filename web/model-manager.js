@@ -1440,6 +1440,7 @@ class ModelInfoView {
             name: "move directory",
             autocomplete: "off",
             placeholder: modelData.searchSeparator,
+            value: modelData.searchSeparator,
         });
         
         /** @type {DirectoryDropdown} */
