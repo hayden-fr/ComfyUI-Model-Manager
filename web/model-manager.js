@@ -629,6 +629,22 @@ class ImageSelect {
 
 const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
 
+class ModelData {
+    /** @type {string} */
+    searchSeparator = "/";
+    
+    /** @type {string} */
+    systemSeparator = null;
+    
+    /** @type {Object} */
+    models = {};
+    
+    /** @type {DirectoryItem[]} */
+    directories = [];
+    
+    constructor() {}
+}
+
 class DirectoryDropdown {
     /** @type {HTMLDivElement} */
     element = null;
@@ -643,6 +659,9 @@ class DirectoryDropdown {
     /** @type {() => void} */
     #updateDropdown = null;
     
+    /** @type {DirectoryItem[]} */
+    #directories = null; // READ ONLY REFERENCE
+    
     /** @type {() => void} */
     #updateCallback = null;
     
@@ -650,6 +669,7 @@ class DirectoryDropdown {
     #submitCallback = null;
     
     /**
+     * @param {DirectoryItem[]} directories
      * @param {HTMLInputElement} input
      * @param {() => void} updateDropdown
      * @param {() => void} [updateCallback= () => {}]
@@ -657,7 +677,7 @@ class DirectoryDropdown {
      * @param {String} [searchSeparator="/"]
      * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, searchSeparator = "/", showDirectoriesOnly = false) {
+    constructor(directories, input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, searchSeparator = "/", showDirectoriesOnly = false) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -665,6 +685,7 @@ class DirectoryDropdown {
             },
         });
         this.element = dropdown;
+        this.#directories = directories;
         this.#input = input;
         this.#updateDropdown = updateDropdown;
         this.#updateCallback = updateCallback;
@@ -816,7 +837,7 @@ class DirectoryDropdown {
             },
         );
     }
-
+    
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
@@ -830,13 +851,13 @@ class DirectoryDropdown {
         const previousPath = oldFilterText.substring(0, iSep + 1);
         input.value = previousPath + selectedText;
     }
-
+    
     /**
-     * @param {DirectoryItem[]} directories
      * @param {string} searchSeparator
      * @param {string} [modelType = ""]
      */
-    update(directories, searchSeparator, modelType = "") {
+    update(searchSeparator, modelType = "") {
+        const directories = this.#directories;
         const dropdown = this.element;
         const input = this.#input;
         const updateDropdown = this.#updateDropdown;
@@ -960,7 +981,7 @@ class DirectoryDropdown {
             const selection = e.target;
             DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
             updateDropdown();
-            updateCallback();e.target
+            updateCallback();
             submitCallback();
         };
         const innerHtml = options.map((text) => {
@@ -1322,7 +1343,7 @@ class ModelGrid {
     
     /**
      * @param {HTMLDivElement} modelGrid
-     * @param {Object} models
+     * @param {ModelData} modelData
      * @param {HTMLSelectElement} modelSelect
      * @param {Object.<{value: string}>} previousModelType
      * @param {Object} settings
@@ -1330,11 +1351,10 @@ class ModelGrid {
      * @param {boolean} reverseSort
      * @param {Array} previousModelFilters
      * @param {HTMLInputElement} modelFilter
-     * @param {String} searchSeparator
-     * @param {String} systemSeparator
      * @param {(searchPath: string) => Promise<void>} modelInfoCallback
      */
-    static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, searchSeparator, systemSeparator, modelInfoCallback) {
+    static update(modelGrid, modelData, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, modelInfoCallback) {
+        const models = modelData.models;
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -1372,8 +1392,8 @@ class ModelGrid {
             modelList, 
             modelType, 
             settings, 
-            searchSeparator, 
-            systemSeparator,
+            modelData.searchSeparator, 
+            modelData.systemSeparator,
             modelInfoCallback,
         );
         modelGrid.append.apply(modelGrid, modelGridModels);
@@ -1393,29 +1413,28 @@ class ModelInfoView {
     previewSelect = null;
     
     /**
-     * @param {DirectoryItem[]} modelDirectories - Should be unique for every radio group.
+     * @param {ModelData} modelData
      * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
      */
-    constructor(modelDirectories, updateModels, searchSeparator) {
+    constructor(modelData, updateModels) {
         const moveDestinationInput = $el("input.search-text-area", {
             name: "move directory",
             autocomplete: "off",
-            placeholder: searchSeparator,
+            placeholder: modelData.searchSeparator,
         });
         
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
+            modelData.directories,
             moveDestinationInput,
             () => {
                 searchDropdown.update(
-                    modelDirectories,
-                    searchSeparator,
+                    modelData.searchSeparator,
                 );
             },
             () => {},
             () => {},
-            searchSeparator,
+            modelData.searchSeparator,
             true,
         );
         
@@ -1542,7 +1561,7 @@ class ModelInfoView {
                                 const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
                                 const newFile = (
                                     moveDestinationInput.value + 
-                                    searchSeparator + 
+                                    modelData.searchSeparator + 
                                     oldFileName
                                 );
                                 moved = await request(
@@ -2104,12 +2123,11 @@ class DownloadTab {
     /**
      * @param {Object} info
      * @param {String[]} modelTypes
-     * @param {DirectoryItem[]} modelDirectories
-     * @param {String} searchSeparator
+     * @param {ModelData} modelData
      * @param {int} id
      * @returns {HTMLDivElement}
      */
-    #modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
+    #modelInfo(info, modelTypes, modelData, id) {
         const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
@@ -2125,6 +2143,7 @@ class DownloadTab {
             return options;
         })());
         
+        const searchSeparator = modelData.searchSeparator;
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
             name: "save directory",
@@ -2134,12 +2153,12 @@ class DownloadTab {
         });
         let searchDropdown = null;
         searchDropdown = new DirectoryDropdown(
+            modelData.directories,
             el_saveDirectoryPath,
             () => {
                 const modelType = el_modelTypeSelect.value;
                 if (modelType === "") { return; }
                 searchDropdown.update(
-                    modelDirectories,
                     searchSeparator,
                     modelType,
                 );
@@ -2259,11 +2278,9 @@ class DownloadTab {
     }
     
     /**
-     * @param {Object} models
-     * @param {DirectoryItem[]} modelDirectories
-     * @param {string} searchSeparator
+     * @param {ModelData} modelData
      */
-    async search(models, modelDirectories, searchSeparator) {
+    async search(modelData) {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
 
@@ -2339,7 +2356,7 @@ class DownloadTab {
             return [];
         })();
         
-        const modelTypes = Object.keys(models);
+        const modelTypes = Object.keys(modelData.models);
         const modelInfosHtml = modelInfos.filter((modelInfo) => {
             const filename = modelInfo["fileName"];
             return MODEL_EXTENSIONS.find((ext) => {
@@ -2349,8 +2366,7 @@ class DownloadTab {
             return this.#modelInfo(
                 modelInfo,
                 modelTypes,
-                modelDirectories,
-                searchSeparator,
+                modelData,
                 id,
             );
         });
@@ -2371,14 +2387,12 @@ class DownloadTab {
     }
     
     /**
-     * @param {Object} models
-     * @param {DirectoryItem[]} modelDirectories
+     * @param {ModelData} modelData
      * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
      */
-    constructor(models, modelDirectories, updateModels, searchSeparator) {
+    constructor(modelData, updateModels) {
         this.#updateModels = updateModels;
-        const search = async() => this.search(models, modelDirectories, searchSeparator);
+        const search = async() => this.search(modelData);
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -2421,20 +2435,45 @@ class ModelTab {
         /** @type {HTMLInputElement} */ modelContentFilter: null,
     };
     
+    /** @type {Array} */
+    previousModelFilters = [];
+    
+    /** @type {Object.<{value: string}>} */
+    previousModelType = { value: null };
+    
     /** @type {DirectoryDropdown} */
     directoryDropdown = null;
     
+    /** @type {ModelData} */
+    #modelData = null;
+    
+    /** @type {ModelInfoView} */
+    #modelInfoView = null;
+    
+    /** @type {@param {() => Promise<void>}} */
+    #updateModels = null;
+    
+    /**  */
+    #settingsElements = null;
+    
+    /** @type {() => void} */
+    updateModelGrid = () => {};
+    
     /**
-     * @param {() => void} updateDirectoryDropdown
-     * @param {() => void} updatePreviousModelFilter
-     * @param {() => Promise<void>} updateModelGrid
      * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
+     * @param {ModelData} modelData
+     * @param {ModelInfoView} modelInfoView
+     * @param {any} settingsElements
      */
-    constructor(updateDirectoryDropdown, updatePreviousModelFilter, updateModelGrid, updateModels, searchSeparator) {
+    constructor(updateModels, modelData, modelInfoView, settingsElements) {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
+        
+        this.#updateModels = updateModels;
+        this.#modelData = modelData;
+        this.#modelInfoView = modelInfoView;
+        this.#settingsElements = settingsElements;
         
         const searchInput = $el("input.search-text-area", {
             $: (el) => (this.elements.modelContentFilter = el),
@@ -2444,12 +2483,59 @@ class ModelTab {
             placeholder: "example: /0/1.5/styles/clothing -.pt",
         });
         
+        const updatePreviousModelFilter = () => {
+            const modelType = this.elements.modelTypeSelect.value;
+            const value = this.elements.modelContentFilter.value;
+            this.previousModelFilters[modelType] = value;
+        };
+        
+        const updateDirectoryDropdown = () => {
+            this.directoryDropdown.update(
+                this.#modelData.searchSeparator,
+                this.elements.modelTypeSelect.value,
+            );
+            updatePreviousModelFilter();
+        }
+        
+        /**
+         * @param {string} searchPath
+         */
+        const showModelInfoView = async(searchPath) => {
+            this.#modelInfoView.update(
+                searchPath, 
+                this.#updateModels, 
+                this.#modelData.searchSeparator
+            ).then(() => {
+                this.#modelInfoView.show();
+            });
+        }
+        
+        const updateModelGrid = () => {
+            const sortValue = this.elements.modelSortSelect.value;
+            const reverseSort = sortValue[0] === "-";
+            const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
+            ModelGrid.update(
+                this.elements.modelGrid,
+                this.#modelData,
+                this.elements.modelTypeSelect,
+                this.previousModelType,
+                this.#settingsElements,
+                sortBy,
+                reverseSort,
+                this.previousModelFilters,
+                this.elements.modelContentFilter,
+                showModelInfoView,
+            );
+        }
+        this.updateModelGrid = updateModelGrid;
+        
         const searchDropdown = new DirectoryDropdown(
+            modelData.directories,
             searchInput,
             updateDirectoryDropdown,
             updatePreviousModelFilter,
             updateModelGrid,
-            searchSeparator,
+            modelData.searchSeparator,
             false,
         );
         this.directoryDropdown = searchDropdown;
@@ -2559,7 +2645,8 @@ class SettingsTab {
      */
     async reload(updateModels) {
         const data = await request("/model-manager/settings/load");
-        this.#setSettings(data["settings"], updateModels);
+        const settingsData = data["settings"];
+        this.#setSettings(settingsData, updateModels);
         buttonAlert(this.elements.reloadButton, true);
     }
     
@@ -2579,7 +2666,7 @@ class SettingsTab {
             }
             settingsData[setting] = value;
         }
-
+        
         const data = await request(
             "/model-manager/settings/save",
             {
@@ -2591,7 +2678,8 @@ class SettingsTab {
         });
         const success = data["success"];
         if (success) {
-            this.#setSettings(data["settings"], true);
+            const settingsData = data["settings"];
+            this.#setSettings(settingsData, true);
         }
         buttonAlert(this.elements.saveButton, success);
     }
@@ -2773,18 +2861,8 @@ class SidebarButtons {
 }
 
 class ModelManager extends ComfyDialog {
-    #data = {
-        /** @type {Object} */ models: {},
-        /** @type {DirectoryItem[]} */ modelDirectories: [],
-        /** @type {Array} */ previousModelFilters: [],
-        /** @type {Object.<{value: string}>} */ previousModelType: { value: null },
-    };
-    
-    /** @type {string} */
-    #searchSeparator = "/";
-    
-    /** @type {string} */
-    #systemSeparator = null;
+    /** @type {ModelData} */
+    #modelData = null;
     
     /** @type {ModelInfoView} */
     #modelInfoView = null;
@@ -2803,34 +2881,33 @@ class ModelManager extends ComfyDialog {
     
     constructor() {
         super();
+        
+        this.#modelData = new ModelData();
+        
         const modelInfoView = new ModelInfoView(
-            this.#data.modelDirectories, 
-            this.#modelTab_updateModels, 
-            this.#searchSeparator, 
+            this.#modelData,
+            this.#refreshModels,
         );
         this.#modelInfoView = modelInfoView;
         
-        const downloadTab = new DownloadTab(
-            this.#data.models,
-            this.#data.modelDirectories,
-            this.#modelTab_updateModels,
-            this.#searchSeparator,
+        const settingsTab = new SettingsTab(
+            this.#refreshModels,
         );
-        this.#downloadTab = DownloadTab;
+        this.#settingsTab = settingsTab;
         
         const modelTab = new ModelTab(
-            this.#modelTab_updateDirectoryDropdown,
-            this.#modelTab_updatePreviousModelFilter,
-            this.#modelTab_updateModelGrid,
-            this.#modelTab_updateModels,
-            this.#searchSeparator,
+            this.#refreshModels,
+            this.#modelData,
+            this.#modelInfoView,
+            this.#settingsTab.elements.settings, // TODO: decouple settingsData from elements?
         );
         this.#modelTab = modelTab;
         
-        const settingsTab = new SettingsTab(
-            this.#modelTab_updateModels, 
+        const downloadTab = new DownloadTab(
+            this.#modelData,
+            this.#refreshModels,
         );
-        this.#settingsTab = settingsTab;
+        this.#downloadTab = DownloadTab;
         
         const sidebarButtons = new SidebarButtons(this);
         this.#sidebarButtons = sidebarButtons;
@@ -2849,7 +2926,7 @@ class ModelManager extends ComfyDialog {
                             $el("button.icon-button", {
                                 textContent: "✖",
                                 onclick: () => {
-                                    if (modelInfoView.isVisible()) { // TODO: decouple
+                                    if (modelInfoView.isVisible()) { // TODO: decouple back and close
                                         this.close();
                                     }
                                     else {
@@ -2873,71 +2950,22 @@ class ModelManager extends ComfyDialog {
     
     #init() {
         this.#settingsTab.reload(false);
-        this.#modelTab_updateModels();
+        this.#refreshModels();
     }
     
-    #modelTab_updateModelGrid = () => {
-        const modelTab = this.#modelTab;
-        const sortValue = modelTab.elements.modelSortSelect.value;
-        const reverseSort = sortValue[0] === "-";
-        const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
-        ModelGrid.update(
-            modelTab.elements.modelGrid,
-            this.#data.models,
-            modelTab.elements.modelTypeSelect,
-            this.#data.previousModelType,
-            this.#settingsTab.elements.settings,
-            sortBy,
-            reverseSort,
-            this.#data.previousModelFilters,
-            modelTab.elements.modelContentFilter,
-            this.#searchSeparator,
-            this.#systemSeparator,
-            this.#modelTab_showModelInfo,
-        );
-    }
-    
-    #modelTab_updateModels = async() => {
-        this.#systemSeparator = await request("/model-manager/system-separator");
-        
+    #refreshModels = async() => {
+        const modelData = this.#modelData;
+        modelData.systemSeparator = await request("/model-manager/system-separator");
         const newModels = await request("/model-manager/models/list");
-        Object.assign(this.#data.models, newModels); // NOTE: do NOT create a new object
-        
+        Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
         const newModelDirectories = await request("/model-manager/models/directory-list");
-        this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
+        modelData.directories.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
-        this.#modelTab_updateModelGrid();
-    }
-    
-    #modelTab_updatePreviousModelFilter = () => {
-        const modelType = this.#modelTab.elements.modelTypeSelect.value;
-        const value = this.#modelTab.elements.modelContentFilter.value;
-        this.#data.previousModelFilters[modelType] = value;
-    };
-    
-    #modelTab_updateDirectoryDropdown = () => {
-        this.#modelTab.directoryDropdown.update(
-            this.#data.modelDirectories,
-            this.#searchSeparator,
-            this.#modelTab.elements.modelTypeSelect.value,
-        );
-        this.#modelTab_updatePreviousModelFilter();
-    }
-    
-    /**
-     * @param {string} searchPath
-     */
-    #modelTab_showModelInfo = async(searchPath) => {
-        this.#modelInfoView.update(
-            searchPath, 
-            this.#modelTab_updateModels, 
-            this.#searchSeparator
-        ).then(() => {
-            this.#modelInfoView.show();
-        });
+        this.#modelTab.updateModelGrid();
     }
 }
 
+/** @type {ModelManager | undefined} */
 let instance;
 
 /**
