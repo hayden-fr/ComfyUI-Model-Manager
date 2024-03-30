@@ -105,10 +105,9 @@ def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Mi
 def search_path_to_system_path(model_path):
     sep = os.path.sep
     model_path = os.path.normpath(model_path.replace("/", sep))
+    model_path = model_path.lstrip(sep)
 
-    isep0 = 0 if model_path[0] == sep else -1
-
-    isep1 = model_path.find(sep, isep0 + 1)
+    isep1 = model_path.find(sep, 0)
     if isep1 == -1 or isep1 == len(model_path):
         return (None, None)
 
@@ -116,7 +115,7 @@ def search_path_to_system_path(model_path):
     if isep2 == -1 or isep2 - isep1 == 1:
         isep2 = len(model_path)
 
-    model_path_type = model_path[isep0 + 1:isep1]
+    model_path_type = model_path[0:isep1]
     paths = folder_paths_get_folder_paths(model_path_type)
     if len(paths) == 0:
         return (None, None)

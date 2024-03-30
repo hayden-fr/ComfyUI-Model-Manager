@@ -655,9 +655,8 @@ class DirectoryDropdown {
     /** @type {HTMLInputElement} */
     #input = null;
     
-    // TODO: remove this
-    /** @type {() => void} */
-    #updateDropdown = null;
+    /** @type {() => string} */
+    #getModelType = null;
     
     /** @type {ModelData} */
     #modelData = null; // READ ONLY
@@ -668,15 +667,21 @@ class DirectoryDropdown {
     /** @type {() => Promise<void>} */
     #submitCallback = null;
     
+    /** @type {string} */
+    #currentPath = "/";
+    
+    /** @type {string} */
+    #deepestPreviousPath = "/";
+    
     /**
      * @param {ModelData} modelData
      * @param {HTMLInputElement} input
-     * @param {() => void} updateDropdown
+     * @param {Boolean} [showDirectoriesOnly=false]
+     * @param {() => string} [getModelType= () => { return ""; }]
      * @param {() => void} [updateCallback= () => {}]
      * @param {() => Promise<void>} [submitCallback= () => {}]
-     * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(modelData, input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, showDirectoriesOnly = false) {
+    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -686,13 +691,19 @@ class DirectoryDropdown {
         this.element = dropdown;
         this.#modelData = modelData;
         this.#input = input;
-        this.#updateDropdown = updateDropdown;
+        this.#getModelType = getModelType;
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
         
-        input.addEventListener("input", () => updateDropdown());
-        input.addEventListener("focus", () => updateDropdown());
+        input.addEventListener("input", () => {
+            this.#update();
+            updateCallback();
+        });
+        input.addEventListener("focus", () => {
+            this.#update();
+            updateCallback();
+        });
         input.addEventListener("blur", () => { dropdown.style.display = "none"; });
         input.addEventListener(
             "keydown",
@@ -722,8 +733,8 @@ class DirectoryDropdown {
                         e.preventDefault(); // prevent cursor move
                         const input = e.target;
                         DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
-                        updateDropdown();
-                        //updateCallback();
+                        this.#update();
+                        updateCallback();
                         //submitCallback();
                         /*
                         const options = dropdown.children;
@@ -756,8 +767,8 @@ class DirectoryDropdown {
                             e.stopPropagation();
                             e.preventDefault(); // prevent cursor move
                             input.value = newFilterText;
-                            updateDropdown();
-                            //updateCallback();
+                            this.#update();
+                            updateCallback();
                             //submitCallback();
                             /*
                             const options = dropdown.children;
@@ -787,7 +798,7 @@ class DirectoryDropdown {
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
                         DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
-                        updateDropdown();
+                        this.#update();
                         updateCallback();
                     }
                     submitCallback();
@@ -851,16 +862,13 @@ class DirectoryDropdown {
         input.value = previousPath + selectedText;
     }
     
-    /**
-     * @param {string} [modelType = ""]
-     */
-    update(modelType = "") {
+    #update() {
         // TODO: create a wrapper around ModelData.directories to make access easier
         const directories = this.#modelData.directories;
         const searchSeparator = this.#modelData.searchSeparator;
         const dropdown = this.element;
         const input = this.#input;
-        const updateDropdown = this.#updateDropdown;
+        const modelType = this.#getModelType();
         const updateCallback = this.#updateCallback;
         const submitCallback = this.#submitCallback;
         const showDirectoriesOnly = this.showDirectoriesOnly;
@@ -930,10 +938,15 @@ class DirectoryDropdown {
         }
 
         let options = [];
-        const lastWord = filter.substring(indexLastWord);
-        const item = directories[cwd];
-        const cwdIsDir = item["childIndex"] !== undefined;
-        if (cwdIsDir) {
+        let indexPathEnd = indexLastWord;
+        {
+            const lastWord = filter.substring(indexLastWord);
+            const item = directories[cwd];
+            if (item["childIndex"] === undefined) {
+                dropdown.style.display = "none";
+                return;
+            }
+            
             const childIndex = item["childIndex"];
             const childCount = item["childCount"];
             const children = directories.slice(childIndex, childIndex + childCount);
@@ -962,18 +975,20 @@ class DirectoryDropdown {
                     if (itemName.startsWith(lastWord)) {
                         options.push(itemName + (isDir && grandChildCount > 0 ? searchSeparator : ""));
                     }
+                    if (!isDir && itemName == lastWord) {
+                        indexPathEnd += searchSeparator.length + itemName.length + 1;
+                    }
                 }
-            }
-        }
-        else if (!showDirectoriesOnly) {
-            const filename = item["name"];
-            if (filename.startsWith(lastWord)) {
-                options.push(filename);
             }
         }
         if (options.length === 0) {
             dropdown.style.display = "none";
             return;
+        }
+        const path = filter.substring(0, indexPathEnd);
+        this.#currentPath = path;
+        if (!this.#deepestPreviousPath.startsWith(path)) {
+            this.#deepestPreviousPath = path;
         }
 
         const selection_select = (e) => {
@@ -999,7 +1014,7 @@ class DirectoryDropdown {
             e.stopPropagation();
             const selection = e.target;
             DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
-            updateDropdown();
+            this.#update();
             updateCallback();
             submitCallback();
         };
@@ -1443,14 +1458,9 @@ class ModelInfoView {
             value: modelData.searchSeparator,
         });
         
-        /** @type {DirectoryDropdown} */
-        let searchDropdown = null;
-        searchDropdown = new DirectoryDropdown(
+        const searchDropdown = new DirectoryDropdown(
             modelData,
             moveDestinationInput,
-            () => searchDropdown.update(),
-            () => {},
-            () => {},
             true,
         );
         
@@ -2138,47 +2148,34 @@ class DownloadTab {
     
     /**
      * @param {Object} info
-     * @param {String[]} modelTypes
      * @param {ModelData} modelData
      * @param {int} id
      * @returns {HTMLDivElement}
      */
-    #modelInfo(info, modelTypes, modelData, id) {
+    #modelInfo(info, modelData, id) {
         const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
         );
         
-        const el_modelTypeSelect = $el("select.model-select-dropdown", {
-            name: "model select dropdown",
-        }, (() => {
-            const options = [$el("option", { value: "" }, ["-- Model Type --"])];
-            modelTypes.forEach((modelType) => {
-                options.push($el("option", { value: modelType }, [modelType]));
-            });
-            return options;
-        })());
-        
+        const comfyUIModelType = (
+            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
+            ""
+        );
         const searchSeparator = modelData.searchSeparator;
+        const defaultBasePath = searchSeparator + (comfyUIModelType === "" ? "" : comfyUIModelType + searchSeparator + "0");
+        
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
             name: "save directory",
             autocomplete: "off",
-            placeholder: searchSeparator + "0",
-            value: searchSeparator + "0",
+            placeholder: defaultBasePath,
+            value: defaultBasePath,
         });
-        /** @type {DirectoryDropdown} */
-        let searchDropdown = null;
-        searchDropdown = new DirectoryDropdown(
+        const searchDropdown = new DirectoryDropdown(
             modelData,
             el_saveDirectoryPath,
-            () => {
-                const modelType = el_modelTypeSelect.value;
-                if (modelType === "") { return; }
-                searchDropdown.update(modelType);
-            },
-            () => {},
-            () => {},
             true,
         );
         
@@ -2208,9 +2205,6 @@ class DownloadTab {
                         style: { "margin-top": "8px" }
                     }, [
                         $el("div.row.tab-header-flex-block", [
-                            el_modelTypeSelect,
-                        ]),
-                        $el("div.row.tab-header-flex-block", [
                             el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
@@ -2220,11 +2214,7 @@ class DownloadTab {
                                 onclick: async (e) => {
                                     const formData = new FormData();
                                     formData.append("download", info["downloadUrl"]);
-                                    formData.append("path",
-                                        el_modelTypeSelect.value + 
-                                        searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
-                                        el_saveDirectoryPath.value
-                                    );
+                                    formData.append("path", el_saveDirectoryPath.value);
                                     formData.append("name", (() => {
                                         const filename = info["fileName"];
                                         const name = el_filename.value;
@@ -2269,23 +2259,6 @@ class DownloadTab {
                 ]),
             ]),
         ]);
-        
-        el_modelTypeSelect.selectedIndex = 0; // reset
-        const comfyUIModelType = (
-            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
-            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
-            null
-        );
-        if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
-            const modelTypeOptions = el_modelTypeSelect.children;
-            for (let i = 0; i < modelTypeOptions.length; i++) {
-                const option = modelTypeOptions[i];
-                if (option.value === comfyUIModelType) {
-                    el_modelTypeSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        }
         
         return modelInfo;
     }
@@ -2369,7 +2342,6 @@ class DownloadTab {
             return [];
         })();
         
-        const modelTypes = Object.keys(modelData.models);
         const modelInfosHtml = modelInfos.filter((modelInfo) => {
             const filename = modelInfo["fileName"];
             return MODEL_EXTENSIONS.find((ext) => {
@@ -2378,7 +2350,6 @@ class DownloadTab {
         }).map((modelInfo, id) => {
             return this.#modelInfo(
                 modelInfo,
-                modelTypes,
                 modelData,
                 id,
             );
@@ -2502,11 +2473,6 @@ class ModelTab {
             this.previousModelFilters[modelType] = value;
         };
         
-        const updateDirectoryDropdown = () => {
-            this.directoryDropdown.update(this.elements.modelTypeSelect.value);
-            updatePreviousModelFilter();
-        }
-        
         /**
          * @param {string} searchPath
          */
@@ -2542,10 +2508,10 @@ class ModelTab {
         const searchDropdown = new DirectoryDropdown(
             modelData,
             searchInput,
-            updateDirectoryDropdown,
+            false,
+            () => { return this.elements.modelTypeSelect.value; },
             updatePreviousModelFilter,
             updateModelGrid,
-            false,
         );
         this.directoryDropdown = searchDropdown;
         
