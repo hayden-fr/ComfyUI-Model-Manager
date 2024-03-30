@@ -1441,6 +1441,7 @@ class ModelInfoView {
     elements = {
         /** @type {HTMLDivElement} */ info: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
+        /** @type {HTMLInputElement} */  moveDestinationInput: null,
     };
     
     /** @type {ImageSelect} */
@@ -1457,6 +1458,7 @@ class ModelInfoView {
             placeholder: modelData.searchSeparator,
             value: modelData.searchSeparator,
         });
+        this.elements.moveDestinationInput = moveDestinationInput;
         
         const searchDropdown = new DirectoryDropdown(
             modelData,
@@ -1720,6 +1722,14 @@ class ModelInfoView {
                     ]),
                 ]),
             );
+        }
+        
+        const fileDirectory = info["File Directory"];
+        if (fileDirectory !== undefined && fileDirectory !== null && fileDirectory !== "") {
+            this.elements.moveDestinationInput.value = fileDirectory; // TODO: noise vs convenience
+        }
+        else {
+            this.elements.moveDestinationInput.value = searchSeparator;
         }
         
         const previewSelect = this.previewSelect;
