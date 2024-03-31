@@ -991,8 +991,6 @@ class DirectoryDropdown {
                 else if (e.key === "Enter") {
                     e.stopPropagation();
                     const input = e.target
-                    /*
-                    // enter is for search
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
                         DirectoryDropdown.selectionToInput(
@@ -1007,7 +1005,6 @@ class DirectoryDropdown {
                         }
                         updateCallback();
                     }
-                    */
                     await submitCallback();
                     input.blur();
                 }
