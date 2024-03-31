@@ -51,6 +51,30 @@ const IMAGE_EXTENSIONS = [
     ".preview.apng", 
 ]; // TODO: /model-manager/image/extensions
 
+/**
+ * @param {string} s
+ * @param {string} prefix
+ * @returns {string}
+ */
+function removePrefix(s, prefix) {
+    if (s.length >= prefix.length && s.startsWith(prefix)){
+        return s.substring(prefix.length);
+    }
+    return s;
+}
+
+/**
+ * @param {string} s
+ * @param {string} suffix
+ * @returns {string}
+ */
+function removeSuffix(s, suffix) {
+    if (s.length >= suffix.length && s.endsWith(suffix)){
+        return s.substring(0, s.length - suffix.length);
+    }
+    return s;
+}
+
 class SearchPath {
     /**
      * @param {string} path
@@ -621,13 +645,188 @@ class ImageSelect {
 }
 
 /**
- * @typedef {Object} DirectoryItem
- * @param {string} name
- * @param {number | undefined} childCount
- * @param {number | undefined} childIndex
+ * @typedef {Object} DirectoryItem 
+ * @property {String} name
+ * @property {number | undefined} childCount
+ * @property {number | undefined} childIndex
  */
 
-const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
+class ModelDirectories {
+    /** @type {DirectoryItem[]} */
+    data = [];
+
+    /**
+     * @returns {number}
+     */
+    rootIndex() {
+        return 0;
+    }
+
+    /**
+     * @param {any} index
+     * @returns {boolean}
+     */
+    isValidIndex(index) {
+        return typeof index === "number" && 0 <= index && index < this.data.length;
+    }
+
+    /**
+     * @param {number} index
+     * @returns {DirectoryItem}
+     */
+    getItem(index) {
+        if (!this.isValidIndex(index)) {
+            throw new Error(`Index '${index}' is not valid!`);
+        }
+        return this.data[index];
+    }
+
+    /**
+     * @param {DirectoryItem | number} item
+     * @returns {boolean}
+     */
+    isDirectory(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+        }
+        const childCount = item.childCount;
+        return childCount !== undefined && childCount != null;
+    }
+
+    /**
+     * @param {DirectoryItem | number} item
+     * @returns {boolean}
+     */
+    isEmpty(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+        }
+        if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        return item.childCount === 0;
+    }
+
+    /**
+     * Returns a slice of children from the directory list.
+     * @param {DirectoryItem | number} item
+     * @returns {DirectoryItem[]}
+     */
+    getChildren(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+            if (!this.isDirectory(item)) {
+                throw new Error("Item is not a directory!");
+            }
+        }
+        else if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        const count = item.childCount;
+        const index = item.childIndex;
+        return this.data.slice(index, index + count);
+    }
+
+    /**
+     * Returns index of child in parent directory. Returns -1 if DNE.
+     * @param {DirectoryItem | number} parent
+     * @param {string} name
+     * @returns {number}
+     */
+    findChildIndex(parent, name) {
+        const item = this.getItem(parent);
+        if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        const start = item.childIndex;
+        const children = this.getChildren(item);
+        const index = children.findIndex((item) => {
+            return item.name === name;
+        });
+        if (index === -1) {
+            return -1;
+        }
+        return index + start;
+    }
+    
+    /**
+     * Returns a list of matching search results and valid path.
+     * @param {string} filter
+     * @param {string} searchSeparator
+     * @param {boolean} directoriesOnly
+     * @returns {[string[], string]}
+     */
+    search(filter, searchSeparator, directoriesOnly) {
+        let cwd = this.rootIndex();
+        let indexLastWord = 1;
+        while (true) {
+            const indexNextWord = filter.indexOf(searchSeparator, indexLastWord);
+            if (indexNextWord === -1) {
+                // end of filter
+                break;
+            }
+
+            const item = this.getItem(cwd);
+            if (!this.isDirectory(item) || this.isEmpty(item)) {
+                break;
+            }
+
+            const word = filter.substring(indexLastWord, indexNextWord);
+            cwd = this.findChildIndex(cwd, word);
+            if (!this.isValidIndex(cwd)) {
+                return [[], ""];
+            }
+            indexLastWord = indexNextWord + 1;
+        }
+        //const cwdPath = filter.substring(0, indexLastWord);
+
+        const lastWord = filter.substring(indexLastWord);
+        const children = this.getChildren(cwd);
+        if (directoriesOnly) {
+            let indexPathEnd = indexLastWord;
+            const results = children.filter((child) => {
+                return (
+                    this.isDirectory(child) && 
+                    child.name.startsWith(lastWord)
+                );
+            }).map((directory) => {
+                const children = this.getChildren(directory);
+                const hasChildren = children.some((item) => {
+                    return this.isDirectory(item);
+                });
+                const suffix = hasChildren ? searchSeparator : "";
+                //const suffix = searchSeparator;
+                if (directory.name == lastWord) {
+                    indexPathEnd += searchSeparator.length + directory.name.length + 1;
+                }
+                return directory.name + suffix;
+            });
+            const path = filter.substring(0, indexPathEnd);
+            return [results, path];
+        }
+        else {
+            let indexPathEnd = indexLastWord;
+            const results = children.filter((child) => {
+                return child.name.startsWith(lastWord);
+            }).map((item) => {
+                const isDir = this.isDirectory(item);
+                const isNonEmptyDirectory = isDir && item.childCount > 0;
+                const suffix = isNonEmptyDirectory  ? searchSeparator : "";
+                //const suffix = isDir  ? searchSeparator : "";
+                if (!isDir && item.name == lastWord) {
+                    indexPathEnd += searchSeparator.length + item.name.length + 1;
+                }
+                return item.name + suffix;
+            });
+            const path = filter.substring(0, indexPathEnd);
+            return [results, path];
+        }
+    }
+}
+
+const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-dropdown-key-selected";
+const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-dropdown-mouse-selected";
+
 
 class ModelData {
     /** @type {string} */
@@ -639,10 +838,12 @@ class ModelData {
     /** @type {Object} */
     models = {};
     
-    /** @type {DirectoryItem[]} */
-    directories = [];
+    /** @type {ModelDirectories} */
+    directories = null;
     
-    constructor() {}
+    constructor() {
+        this.directories = new ModelDirectories();
+    }
 }
 
 class DirectoryDropdown {
@@ -668,10 +869,10 @@ class DirectoryDropdown {
     #submitCallback = null;
     
     /** @type {string} */
-    #currentPath = "/";
-    
-    /** @type {string} */
     #deepestPreviousPath = "/";
+    
+    /** @type {Any} */
+    #touchSelectionStart = null;
     
     /**
      * @param {ModelData} modelData
@@ -697,22 +898,28 @@ class DirectoryDropdown {
         this.showDirectoriesOnly = showDirectoriesOnly;
         
         input.addEventListener("input", () => {
-            this.#update();
+            const path = this.#updateOptions();
+            if (path !== undefined) {
+                this.#restoreSelectedOption(path);
+                this.#updateDeepestPath(path);
+            }
             updateCallback();
         });
         input.addEventListener("focus", () => {
-            this.#update();
+            const path = this.#updateOptions();
+            if (path !== undefined) {
+                this.#deepestPreviousPath = path;
+                this.#restoreSelectedOption(path);
+            }
             updateCallback();
         });
         input.addEventListener("blur", () => { dropdown.style.display = "none"; });
-        input.addEventListener(
-            "keydown",
-            (e) => {
+        input.addEventListener("keydown", async(e) => {
                 const options = dropdown.children;
                 let iSelection;
                 for (iSelection = 0; iSelection < options.length; iSelection++) {
                     const selection = options[iSelection];
-                    if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                    if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS)) {
                         break;
                     }
                 }
@@ -720,7 +927,7 @@ class DirectoryDropdown {
                     e.stopPropagation();
                     if (iSelection < options.length) {
                         const selection = options[iSelection];
-                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
                     else {
                         e.target.blur();
@@ -732,27 +939,31 @@ class DirectoryDropdown {
                         e.stopPropagation();
                         e.preventDefault(); // prevent cursor move
                         const input = e.target;
-                        DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
-                        this.#update();
-                        updateCallback();
-                        //submitCallback();
-                        /*
-                        const options = dropdown.children;
-                        if (options.length > 0) {
-                            // arrow key navigation
-                            options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const searchSeparator = modelData.searchSeparator;
+                        DirectoryDropdown.selectionToInput(
+                            input, 
+                            selection, 
+                            searchSeparator, 
+                            DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
+                        );
+                        const path = this.#updateOptions();
+                        if (path !== undefined) {
+                            this.#restoreSelectedOption(path);
+                            this.#updateDeepestPath(path);
                         }
-                        */
+                        updateCallback();
+                        //await submitCallback();
                     }
                 }
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
                     const input = e.target;
                     const oldFilterText = input.value;
-                    const iSep = oldFilterText.lastIndexOf(modelData.searchSeparator, oldFilterText.length - 2);
+                    const searchSeparator = modelData.searchSeparator;
+                    const iSep = oldFilterText.lastIndexOf(searchSeparator, oldFilterText.length - 2);
                     const newFilterText = oldFilterText.substring(0, iSep + 1);
                     if (oldFilterText !== newFilterText) {
                         const delta = oldFilterText.substring(iSep + 1);
-                        let isMatch = delta[delta.length-1] === modelData.searchSeparator;
+                        let isMatch = delta[delta.length-1] === searchSeparator;
                         if (!isMatch) {
                             const options = dropdown.children;
                             for (let i = 0; i < options.length; i++) {
@@ -767,28 +978,13 @@ class DirectoryDropdown {
                             e.stopPropagation();
                             e.preventDefault(); // prevent cursor move
                             input.value = newFilterText;
-                            this.#update();
+                            const path = this.#updateOptions();
+                            if (path !== undefined) {
+                                this.#restoreSelectedOption(path);
+                                this.#updateDeepestPath(path);
+                            }
                             updateCallback();
-                            //submitCallback();
-                            /*
-                            const options = dropdown.children;
-                            let isSelected = false;
-                            for (let i = 0; i < options.length; i++) {
-                                const option = options[i];
-                                if (option.innerText.startsWith(delta)) {
-                                    option.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-                                    isSelected = true;
-                                    break;
-                                }
-                            }
-                            if (!isSelected) {
-                                const options = dropdown.children;
-                                if (options.length > 0) {
-                                    // arrow key navigation
-                                    options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-                                }
-                            }
-                            */
+                            //await submitCallback();
                         }
                     }
                 }
@@ -797,11 +993,19 @@ class DirectoryDropdown {
                     const input = e.target
                     const selection = options[iSelection];
                     if (selection !== undefined && selection !== null) {
-                        DirectoryDropdown.selectionToInput(input, selection, modelData.searchSeparator);
-                        this.#update();
+                        DirectoryDropdown.selectionToInput(
+                            input, 
+                            selection, 
+                            modelData.searchSeparator, 
+                            DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
+                        );
+                        const path = this.#updateOptions();
+                        if (path !== undefined) {
+                            this.#updateDeepestPath(path);
+                        }
                         updateCallback();
                     }
-                    submitCallback();
+                    await submitCallback();
                     input.blur();
                 }
                 else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && dropdown.style.display !== "none") {
@@ -810,36 +1014,33 @@ class DirectoryDropdown {
                     let iNext = options.length;
                     if (iSelection < options.length) {
                         const selection = options[iSelection];
-                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                         const delta = e.key === "ArrowDown" ? 1 : -1;
                         iNext = iSelection + delta;
-                        if (0 <= iNext && iNext < options.length) {
-                            const selectionNext = options[iNext];
-                            selectionNext.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        if (iNext < 0) {
+                            iNext = options.length - 1;
                         }
+                        else if (iNext >= options.length) {
+                            iNext = 0;
+                        }
+                        const selectionNext = options[iNext];
+                        selectionNext.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
-                    else if (iSelection === options.length) {
+                    else if (iSelection === options.length) { // none
                         iNext = e.key === "ArrowDown" ? 0 : options.length-1;
-                        const selection = options[iNext]
-                        selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const selection = options[iNext];
+                        selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
                     if (0 <= iNext && iNext < options.length) {
-                        let dropdownTop = dropdown.scrollTop;
-                        const dropdownHeight = dropdown.offsetHeight;
-                        const selection = options[iNext];
-                        const selectionHeight = selection.offsetHeight;
-                        const selectionTop = selection.offsetTop;
-                        dropdownTop = Math.max(dropdownTop, selectionTop - dropdownHeight + selectionHeight);
-                        dropdownTop = Math.min(dropdownTop, selectionTop);
-                        dropdown.scrollTop = dropdownTop;
+                        DirectoryDropdown.#clampDropdownScrollTop(dropdown, options[iNext]);
                     }
                     else {
                         dropdown.scrollTop = 0;
                         const options = dropdown.children;
                         for (iSelection = 0; iSelection < options.length; iSelection++) {
                             const selection = options[iSelection];
-                            if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
-                                selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                            if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS)) {
+                                selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                             }
                         }
                     }
@@ -852,173 +1053,161 @@ class DirectoryDropdown {
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
      * @param {String} searchSeparator
+     * * @param {String} className
      */
-    static selectionToInput(input, selection, searchSeparator) {
-        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+    static selectionToInput(input, selection, searchSeparator, className) {
+        selection.classList.remove(className);
         const selectedText = selection.innerText;
         const oldFilterText = input.value;
         const iSep = oldFilterText.lastIndexOf(searchSeparator);
         const previousPath = oldFilterText.substring(0, iSep + 1);
         input.value = previousPath + selectedText;
     }
-    
-    #update() {
-        // TODO: create a wrapper around ModelData.directories to make access easier
-        const directories = this.#modelData.directories;
+
+    /**
+     * @param {string} path
+     */
+    #updateDeepestPath = (path) => {
+        const deepestPath = this.#deepestPreviousPath;
+        if (path.length > deepestPath.length || !deepestPath.startsWith(path)) {
+            this.#deepestPreviousPath = path;
+        }
+    };
+
+    /**
+         * @param {HTMLDivElement} dropdown
+         * @param {HTMLParagraphElement} selection
+         */
+    static #clampDropdownScrollTop = (dropdown, selection) => {
+        let dropdownTop = dropdown.scrollTop;
+        const dropdownHeight = dropdown.offsetHeight;
+        const selectionHeight = selection.offsetHeight;
+        const selectionTop = selection.offsetTop;
+        dropdownTop = Math.max(dropdownTop, selectionTop - dropdownHeight + selectionHeight);
+        dropdownTop = Math.min(dropdownTop, selectionTop);
+        dropdown.scrollTop = dropdownTop;
+    };
+
+    /**
+     * @param {string} path
+     */
+    #restoreSelectedOption(path) {
         const searchSeparator = this.#modelData.searchSeparator;
+        const deepest = this.#deepestPreviousPath;
+        if (deepest.length >= path.length && deepest.startsWith(path)) {
+            let name = deepest.substring(path.length);
+            name = removePrefix(name, searchSeparator);
+            const i1 = name.indexOf(searchSeparator);
+            if (i1 !== -1) {
+                name = name.substring(0, i1);
+            }
+            
+            const dropdown = this.element;
+            const options = dropdown.children;
+            let iSelection;
+            for (iSelection = 0; iSelection < options.length; iSelection++) {
+                const selection = options[iSelection];
+                let text = removeSuffix(selection.innerText, searchSeparator);
+                if (text === name) {
+                    selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
+                    dropdown.scrollTop = dropdown.scrollHeight; // snap to top
+                    DirectoryDropdown.#clampDropdownScrollTop(dropdown, selection);
+                    break;
+                }
+            }
+            if (iSelection === options.length) {
+                dropdown.scrollTop = 0;
+            }
+        }
+    }
+
+    /**
+     * Returns path if update was successful.
+     * @returns {string | undefined}
+     */
+    #updateOptions() {
         const dropdown = this.element;
         const input = this.#input;
-        const modelType = this.#getModelType();
-        const updateCallback = this.#updateCallback;
-        const submitCallback = this.#submitCallback;
-        const showDirectoriesOnly = this.showDirectoriesOnly;
 
+        const searchSeparator = this.#modelData.searchSeparator;
         const filter = input.value;
         if (filter[0] !== searchSeparator) {
             dropdown.style.display = "none";
-            return;
+            return undefined;
         }
 
-        let cwd = 0;
-        if (modelType !== "") {
-            const root = directories[0];
-            const rootChildIndex = root["childIndex"];
-            const rootChildCount = root["childCount"];
-            cwd = null;
-            for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
-                const modelDir = directories[i];
-                if (modelDir["name"] === modelType) {
-                    cwd = i;
-                    break;
-                }
-            }
-        }
-
-        // TODO: directories === undefined?
-        let indexLastWord = 1;
-        while (true) {
-            const indexNextWord = filter.indexOf(searchSeparator, indexLastWord);
-            if (indexNextWord === -1) {
-                // end of filter
-                break;
-            }
-
-            const item = directories[cwd];
-            const childCount = item["childCount"];
-            if (childCount === undefined) {
-                // file
-                break;
-            }
-            if (childCount === 0) {
-                // directory is empty
-                break;
-            }
-            const childIndex = item["childIndex"];
-            const items = directories.slice(childIndex, childIndex + childCount);
-
-            const word = filter.substring(indexLastWord, indexNextWord);
-            cwd = null;
-            for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-                const itemName = items[itemIndex]["name"];
-                if (itemName === word) {
-                    // directory exists
-                    cwd = childIndex + itemIndex;
-                    break;
-                }
-            }
-            if (cwd === null) {
-                // directory does not exist
-                break;
-            }
-            indexLastWord = indexNextWord + 1;
-        }
-        if (cwd === null) {
-            dropdown.style.display = "none";
-            return;
-        }
-
-        let options = [];
-        let indexPathEnd = indexLastWord;
-        {
-            const lastWord = filter.substring(indexLastWord);
-            const item = directories[cwd];
-            if (item["childIndex"] === undefined) {
-                dropdown.style.display = "none";
-                return;
-            }
-            
-            const childIndex = item["childIndex"];
-            const childCount = item["childCount"];
-            const children = directories.slice(childIndex, childIndex + childCount);
-            for (let i = 0; i < children.length; i++) {
-                const child = children[i];
-                const grandChildCount = child["childCount"];
-                const isDir = grandChildCount !== undefined && grandChildCount !== null;
-                const itemName = child["name"];
-                if (showDirectoriesOnly) {
-                    if (isDir && itemName.startsWith(lastWord)) {
-                        let existsDirectoryGrandchild = false;
-                        const grandChildIndex = child["childIndex"];
-                        const grandChildren = directories.slice(grandChildIndex, grandChildIndex + grandChildCount);
-                        for (let j = 0; j < grandChildren.length; j++) {
-                            const grandChild = grandChildren[j];
-                            const greatGrandChildCount = grandChild["childCount"];
-                            if (greatGrandChildCount !== undefined && greatGrandChildCount !== null) {
-                                existsDirectoryGrandchild = true;
-                                break;
-                            }
-                        }
-                        options.push(itemName + (existsDirectoryGrandchild ? searchSeparator : ""));
-                    }
-                }
-                else {
-                    if (itemName.startsWith(lastWord)) {
-                        options.push(itemName + (isDir && grandChildCount > 0 ? searchSeparator : ""));
-                    }
-                    if (!isDir && itemName == lastWord) {
-                        indexPathEnd += searchSeparator.length + itemName.length + 1;
-                    }
-                }
-            }
-        }
+        const modelType = this.#getModelType();
+        const searchPrefix = modelType !== "" ? searchSeparator + modelType : "";
+        const directories = this.#modelData.directories;
+        const [options, path] = directories.search(
+            searchPrefix + filter,
+            searchSeparator,
+            this.showDirectoriesOnly,
+        );
         if (options.length === 0) {
             dropdown.style.display = "none";
-            return;
-        }
-        const path = filter.substring(0, indexPathEnd);
-        this.#currentPath = path;
-        if (!this.#deepestPreviousPath.startsWith(path)) {
-            this.#deepestPreviousPath = path;
+            return undefined;
         }
 
         const selection_select = (e) => {
             const selection = e.target;
             if (e.movementX === 0 && e.movementY === 0) { return; }
-            if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+            if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS)) {
                 // assumes only one will ever selected at a time
                 e.stopPropagation();
                 const children = dropdown.children;
-                let iChild;
-                for (iChild = 0; iChild < children.length; iChild++) {
+                for (let iChild = 0; iChild < children.length; iChild++) {
                     const child = children[iChild];
-                    child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
                 }
-                selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
             }
         };
         const selection_deselect = (e) => {
             e.stopPropagation();
-            e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+            e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
         };
-        const selection_submit = (e) => {
+        const selection_submit = async(e) => {
             e.stopPropagation();
+            e.preventDefault();
             const selection = e.target;
-            DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
-            this.#update();
-            updateCallback();
-            submitCallback();
+            DirectoryDropdown.selectionToInput(
+                input, 
+                selection, 
+                searchSeparator, 
+                DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS
+            );
+            const path = this.#updateOptions(); // TODO: is this needed?
+            if (path !== undefined) {
+                this.#updateDeepestPath(path);
+            }
+            this.#updateCallback();
         };
-        const innerHtml = options.map((text) => {
+        const selection_touch = async(e) => {
+            const [startX, startY] = this.#touchSelectionStart;
+            const [endX, endY] = [
+                e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY
+            ];
+            if (startX === endX && startY === endY) {
+                const touch = e.changedTouches[0];
+                const box = dropdown.getBoundingClientRect();
+                if (touch.clientX >= box.left &&
+                    touch.clientX <= box.right &&
+                    touch.clientY >= box.top &&
+                    touch.clientY <= box.bottom) {
+                    selection_submit(e);
+                }
+            }
+        };
+        const touch_start = (e) => {
+            this.#touchSelectionStart = [
+                e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY
+            ];
+        };
+        dropdown.innerHTML = "";
+        dropdown.append.apply(dropdown, options.map((text) => {
             /** @type {HTMLParagraphElement} */
             const p = $el(
                 "p",
@@ -1027,21 +1216,24 @@ class DirectoryDropdown {
                     onmousemove: (e) => selection_select(e),
                     onmouseleave: (e) => selection_deselect(e),
                     onmousedown: (e) => selection_submit(e),
+                    ontouchstart: (e) => touch_start(e),
+                    ontouchmove: (e) => touch_move(e),
+                    ontouchend: (e) => selection_touch(e),
                 },
                 [
                     text
                 ]
             );
             return p;
-        });
-        dropdown.innerHTML = "";
-        dropdown.append.apply(dropdown, innerHtml);
+        }));
         // TODO: handle when dropdown is near the bottom of the window
         const inputRect = input.getBoundingClientRect();
         dropdown.style.width = inputRect.width + "px";
         dropdown.style.top = (input.offsetTop + inputRect.height) + "px";
         dropdown.style.left = input.offsetLeft + "px";
         dropdown.style.display = "block";
+
+        return path;
     }
 }
 
@@ -1726,9 +1918,11 @@ class ModelInfoView {
         
         const fileDirectory = info["File Directory"];
         if (fileDirectory !== undefined && fileDirectory !== null && fileDirectory !== "") {
+            this.elements.moveDestinationInput.placeholder = fileDirectory
             this.elements.moveDestinationInput.value = fileDirectory; // TODO: noise vs convenience
         }
         else {
+            this.elements.moveDestinationInput.placeholder = searchSeparator;
             this.elements.moveDestinationInput.value = searchSeparator;
         }
         
@@ -2214,54 +2408,54 @@ class DownloadTab {
                     $el("div", {
                         style: { "margin-top": "8px" }
                     }, [
+                        $el("button.icon-button", {
+                            textContent: "📥︎",
+                            onclick: async (e) => {
+                                const formData = new FormData();
+                                formData.append("download", info["downloadUrl"]);
+                                formData.append("path", el_saveDirectoryPath.value);
+                                formData.append("name", (() => {
+                                    const filename = info["fileName"];
+                                    const name = el_filename.value;
+                                    if (name === "") {
+                                        return filename;
+                                    }
+                                    const ext = MODEL_EXTENSIONS.find((ext) => {
+                                        return filename.endsWith(ext);
+                                    }) ?? "";
+                                    return name + ext;
+                                })());
+                                const image = downloadPreviewSelect.getImage();
+                                formData.append("image", image === imageUri() ? "" : image);
+                                formData.append("overwrite", this.elements.overwrite.checked);
+                                e.target.disabled = true;
+                                const [success, resultText] = await request(
+                                    "/model-manager/model/download",
+                                    {
+                                        method: "POST",
+                                        body: formData,
+                                    }
+                                ).then((data) => {
+                                    const success = data["success"];
+                                    if (!success) {
+                                        console.warn(data["invalid"]);
+                                    }
+                                    return [success, success ? "✔" : "📥︎"];
+                                }).catch((err) => {
+                                    return [false, "📥︎"];
+                                });
+                                if (success) {
+                                    this.#updateModels();
+                                }
+                                buttonAlert(e.target, success, "✔", "✖", resultText);
+                                e.target.disabled = success;
+                            },
+                        }),
                         $el("div.row.tab-header-flex-block", [
                             el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
                         $el("div.row.tab-header-flex-block", [
-                            $el("button.icon-button", {
-                                textContent: "📥︎",
-                                onclick: async (e) => {
-                                    const formData = new FormData();
-                                    formData.append("download", info["downloadUrl"]);
-                                    formData.append("path", el_saveDirectoryPath.value);
-                                    formData.append("name", (() => {
-                                        const filename = info["fileName"];
-                                        const name = el_filename.value;
-                                        if (name === "") {
-                                            return filename;
-                                        }
-                                        const ext = MODEL_EXTENSIONS.find((ext) => {
-                                            return filename.endsWith(ext);
-                                        }) ?? "";
-                                        return name + ext;
-                                    })());
-                                    const image = downloadPreviewSelect.getImage();
-                                    formData.append("image", image === imageUri() ? "" : image);
-                                    formData.append("overwrite", this.elements.overwrite.checked);
-                                    e.target.disabled = true;
-                                    const [success, resultText] = await request(
-                                        "/model-manager/model/download",
-                                        {
-                                            method: "POST",
-                                            body: formData,
-                                        }
-                                    ).then((data) => {
-                                        const success = data["success"];
-                                        if (!success) {
-                                            console.warn(data["invalid"]);
-                                        }
-                                        return [success, success ? "✔" : "📥︎"];
-                                    }).catch((err) => {
-                                        return [false, "📥︎"];
-                                    });
-                                    if (success) {
-                                        this.#updateModels();
-                                    }
-                                    buttonAlert(e.target, success, "✔", "✖", resultText);
-                                    e.target.disabled = success;
-                                },
-                            }),
                             el_filename,
                         ]),
                         downloadPreviewSelect.elements.radioGroup,
@@ -2944,7 +3138,7 @@ class ModelManager extends ComfyDialog {
         const newModels = await request("/model-manager/models/list");
         Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
         const newModelDirectories = await request("/model-manager/models/directory-list");
-        modelData.directories.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
+        modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
         this.#modelTab.updateModelGrid();
     }
