@@ -990,20 +990,22 @@ class DirectoryDropdown {
                 }
                 else if (e.key === "Enter") {
                     e.stopPropagation();
-                    const input = e.target
-                    const selection = options[iSelection];
-                    if (selection !== undefined && selection !== null) {
-                        DirectoryDropdown.selectionToInput(
-                            input, 
-                            selection, 
-                            modelData.searchSeparator, 
-                            DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
-                        );
-                        const path = this.#updateOptions();
-                        if (path !== undefined) {
-                            this.#updateDeepestPath(path);
+                    const input = e.target;
+                    if (dropdown.style.display !== "none") {
+                        const selection = options[iSelection];
+                        if (selection !== undefined && selection !== null) {
+                            DirectoryDropdown.selectionToInput(
+                                input, 
+                                selection, 
+                                modelData.searchSeparator, 
+                                DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
+                            );
+                            const path = this.#updateOptions();
+                            if (path !== undefined) {
+                                this.#updateDeepestPath(path);
+                            }
+                            updateCallback();
                         }
-                        updateCallback();
                     }
                     await submitCallback();
                     input.blur();
