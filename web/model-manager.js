@@ -112,18 +112,28 @@ class SearchPath {
 /**
  * @param {string | undefined} [searchPath=undefined]
  * @param {string | undefined} [dateImageModified=undefined]
- *
+ * @param {string | undefined} [width=undefined]
+ * @param {string | undefined} [height=undefined]
  * @returns {string}
  */
-function imageUri(imageSearchPath = undefined, dateImageModified = undefined) {
+function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined) {
     const path = imageSearchPath ?? "no-preview";
     const date = dateImageModified;
     let uri = `/model-manager/preview/get?uri=${path}`;
+    if (width !== undefined && width !== null) {
+        uri += `&width=${width}`;
+    }
+    if (height !== undefined && height !== null) {
+        uri += `&height=${height}`;
+    }
     if (date !== undefined && date !== null) {
         uri += `&v=${date}`;
     }
     return uri;
 }
+const PREVIEW_NONE_URI = imageUri();
+const PREVIEW_THUMBNAIL_WIDTH = 320;
+const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
  * @param {(...args) => void} callback
@@ -334,31 +344,54 @@ class ImageSelect {
     /** @type {string} */
     #name = null;
     
-    /** @returns {string|File} */
-    getImage() {
+    /** @returns {Promise<string> | Promise<File>} */
+    async getImage() {
         const name = this.#name;
         const value = document.querySelector(`input[name="${name}"]:checked`).value;
         const elements = this.elements;
         switch (value) {
             case this.#PREVIEW_DEFAULT:
                 const children = elements.defaultPreviews.children;
-                const noImage = imageUri();
+                const noImage = PREVIEW_NONE_URI;
+                let url = "";
                 for (let i = 0; i < children.length; i++) {
                     const child = children[i];
                     if (child.style.display !== "none" && 
                         child.nodeName === "IMG" && 
                         !child.src.endsWith(noImage)
                     ) {
-                        return child.src;
+                        url = child.src;
                     }
                 }
-                return "";
+                if (url.startsWith(Civitai.imageUrlPrefix())) {
+                    url = await Civitai.getFullSizeImageUrl(url).catch((err) => {
+                        console.warn(err);
+                        return url;
+                    });
+                }
+                return url;
             case this.#PREVIEW_URL:
-                return elements.customUrl.value;
+                const value = elements.customUrl.value;
+                if (value.startsWith(Civitai.imagePostUrlPrefix())) {
+                    try {
+                        const imageInfo = await Civitai.getImageInfo(value);
+                        const items = imageInfo["items"];
+                        if (items.length === 0) {
+                            console.warn("Civitai /api/v1/images returned 0 items.");
+                            return value;
+                        }
+                        return items[0]["url"];
+                    }
+                    catch (error) {
+                        console.error("Failed to get image info from Civitai!", error);
+                        return value;
+                    }
+                }
+                return value;
             case this.#PREVIEW_UPLOAD:
                 return elements.uploadFile.files[0] ?? "";
             case this.#PREVIEW_NONE:
-                return imageUri();
+                return PREVIEW_NONE_URI;
         }
         return "";
     }
@@ -382,7 +415,7 @@ class ImageSelect {
                 }
             }
             else {
-                el.src = imageUri();
+                el.src = PREVIEW_NONE_URI;
             }
         });
         this.checkDefault();
@@ -448,19 +481,19 @@ class ImageSelect {
      */
     constructor(radioGroupName, defaultPreviews = []) {
         if (defaultPreviews === undefined | defaultPreviews === null | defaultPreviews.length === 0) {
-            defaultPreviews = [imageUri()];
+            defaultPreviews = [PREVIEW_NONE_URI];
         }
         this.#name = radioGroupName;
         
         const el_defaultUri = $el("div", {
             $: (el) => (this.elements.defaultUrl = el),
             style: { display: "none" },
-            "data-noimage": imageUri(),
+            "data-noimage": PREVIEW_NONE_URI,
         });
         
         const el_defaultPreviewNoImage = $el("img", {
             $: (el) => (this.elements.defaultPreviewNoImage = el),
-            src: imageUri(),
+            src: PREVIEW_NONE_URI,
             style: { display: "none" },
             loading: "lazy",
         });
@@ -478,7 +511,7 @@ class ImageSelect {
                     style: { display: "none" },
                     loading: "lazy",
                     onerror: (e) => {
-                        e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                        e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
                     },
                 });
             });
@@ -490,10 +523,10 @@ class ImageSelect {
         
         const el_uploadPreview = $el("img", {
             $: (el) => (this.elements.uploadPreview = el),
-            src: imageUri(),
+            src: PREVIEW_NONE_URI,
             style: { display : "none" },
             onerror: (e) => {
-                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
             },
         });
         const el_uploadFile = $el("input", {
@@ -520,10 +553,10 @@ class ImageSelect {
         
         const el_customUrlPreview = $el("img", {
             $: (el) => (this.elements.customUrlPreview = el),
-            src: imageUri(),
+            src: PREVIEW_NONE_URI,
             style: { display: "none" },
             onerror: (e) => {
-                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
             },
         });
         const el_customUrl = $el("input.search-text-area", {
@@ -540,8 +573,28 @@ class ImageSelect {
             el_customUrl,
             $el("button.icon-button", {
                 textContent: "🔍︎",
-                onclick: (e) => {
-                    el_customUrlPreview.src = el_customUrl.value;
+                onclick: async (e) => {
+                    const value = el_customUrl.value;
+                    if (value.startsWith(Civitai.imagePostUrlPrefix())) {
+                        el_customUrlPreview.src = await Civitai.getImageInfo(value)
+                        .then((imageInfo) => {
+                            const items = imageInfo["items"];
+                            if (items.length > 0) {
+                                return items[0]["url"];
+                            }
+                            else {
+                                console.warn("Civitai /api/v1/images returned 0 items.");
+                                return value;
+                            }
+                        })
+                        .catch((error) => {
+                            console.error("Failed to get image info from Civitai!", error);
+                            return value;
+                        });
+                    }
+                    else {
+                        el_customUrlPreview.src = value;
+                    }
                 },
             }),
         ]);
@@ -1534,8 +1587,14 @@ class ModelGrid {
                 );
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
-                        src: imageUri(previewInfo?.path, previewInfo?.dateModified),
+                        src: imageUri(
+                            previewInfo?.path, 
+                            previewInfo?.dateModified, 
+                            PREVIEW_THUMBNAIL_WIDTH, 
+                            PREVIEW_THUMBNAIL_HEIGHT, 
+                        ),
                         draggable: false,
+                        loading: "lazy",
                     }),
                     $el("div.model-preview-overlay", {
                         ondragend: (e) => dragAdd(e),
@@ -1674,8 +1733,8 @@ class ModelInfoView {
                     e.target.disabled = true;
                     const container = this.elements.info;
                     const path = container.dataset.path;
-                    const imageUrl = previewSelect.getImage();
-                    if (imageUrl === imageUri()) {
+                    const imageUrl = await previewSelect.getImage();
+                    if (imageUrl === PREVIEW_NONE_URI) {
                         const encodedPath = encodeURIComponent(path);
                         updatedPreview = await request(
                             `/model-manager/preview/delete?path=${encodedPath}`,
@@ -1713,7 +1772,7 @@ class ModelInfoView {
                     if (updatedPreview) {
                         updateModels();
                         const previewSelect = this.previewSelect;
-                        previewSelect.elements.defaultUrl.dataset.noimage = imageUri();
+                        previewSelect.elements.defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
                         previewSelect.resetModelInfoPreview();
                         this.element.style.display = "none";
                     }
@@ -1936,7 +1995,7 @@ class ModelInfoView {
             defaultUrl.dataset.noimage = imageUri(imagePath, imageDateModified);
         }
         else {
-            defaultUrl.dataset.noimage = imageUri();
+            defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
         }
         previewSelect.resetModelInfoPreview();
         const setPreviewButton = this.elements.setPreviewButton;
@@ -2111,8 +2170,6 @@ class Civitai {
     }
     
     /**
-     * 
-     *
      * @param {string} stringUrl - Model url.
      *
      * @returns {Promise<Object>} - Download information for the given url.
@@ -2180,6 +2237,73 @@ class Civitai {
         }
         else {
             return {};
+        }
+    }
+    
+    /**
+     * @returns {string}
+     */
+    static imagePostUrlPrefix() {
+        return "https://civitai.com/images/";
+    }
+    
+    /**
+     * @returns {string}
+     */
+    static imageUrlPrefix() {
+        return "https://image.civitai.com/";
+    }
+    
+    /**
+     * @param {string} stringUrl - https://civitai.com/images/{imageId}.
+     *
+     * @returns {Promise<Object>} - Image information.
+     */
+    static async getImageInfo(stringUrl) {
+        const imagePostUrlPrefix = Civitai.imagePostUrlPrefix();
+        if (!stringUrl.startsWith(imagePostUrlPrefix)) {
+            return {};
+        }
+        const id = stringUrl.substring(imagePostUrlPrefix.length).match(/^\d+/)[0];
+        const url = `https://civitai.com/api/v1/images?imageId=${id}`;
+        try {
+            return await request(url);
+        }
+        catch (error) {
+            console.error("Failed to get image info from Civitai!", error);
+            return {};
+        }
+    }
+    
+    /**
+     * @param {string} stringUrl - https://image.civitai.com/...
+     *
+     * @returns {Promise<string>}
+     */
+    static async getFullSizeImageUrl(stringUrl) {
+        const imageUrlPrefix = Civitai.imageUrlPrefix();
+        if (!stringUrl.startsWith(imageUrlPrefix)) {
+            return "";
+        }
+        const i0 = stringUrl.lastIndexOf("/");
+        const i1 = stringUrl.lastIndexOf(".");
+        if (i0 === -1 || i1 === -1) {
+            return "";
+        }
+        const id = parseInt(stringUrl.substring(i0 + 1, i1)).toString();
+        const url = `https://civitai.com/api/v1/images?imageId=${id}`;
+        try {
+            const imageInfo = await request(url);
+            const items = imageInfo["items"];
+            if (items.length === 0) {
+                console.warn("Civitai /api/v1/images returned 0 items.");
+                return stringUrl;
+            }
+            return items[0]["url"];
+        }
+        catch (error) {
+            console.error("Failed to get image info from Civitai!", error);
+            return stringUrl;
         }
     }
 }
@@ -2427,8 +2551,8 @@ class DownloadTab {
                                     }) ?? "";
                                     return name + ext;
                                 })());
-                                const image = downloadPreviewSelect.getImage();
-                                formData.append("image", image === imageUri() ? "" : image);
+                                const image = await downloadPreviewSelect.getImage();
+                                formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);
                                 e.target.disabled = true;
                                 const [success, resultText] = await request(
