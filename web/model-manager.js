@@ -1302,7 +1302,7 @@ class ModelGrid {
      * @returns {int}
      */
     static modelWidgetIndex(nodeType) {
-        return 0;
+        return nodeType === undefined ? -1 : 0;
     }
     
     /**
@@ -1396,7 +1396,7 @@ class ModelGrid {
             const nodeType = modelNodeType[modelType];
             const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             let node = LiteGraph.createNode(nodeType, null, []);
-            if (node) {
+            if (widgetIndex !== -1 && node) {
                 node.widgets[widgetIndex].value = path;
                 const selectedNodes = app.canvas.selected_nodes;
                 let isSelectedNode = false;
@@ -1425,7 +1425,7 @@ class ModelGrid {
                 const selectedNode = selectedNodes[i];
                 const nodeType = modelNodeType[modelType];
                 const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
-                const target = selectedNode.widgets[widgetIndex].element;
+                const target = selectedNode?.widgets[widgetIndex]?.element;
                 if (target && target.type === "textarea") {
                     target.value = ModelGrid.insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                     success = true;
@@ -1438,41 +1438,72 @@ class ModelGrid {
         }
         buttonAlert(event.target, success, "✔", "✖", "✚");
     }
-    
+
+    static #getWidgetComboIndices(node, value) {
+        const widgetIndices = [];
+        node?.widgets?.forEach((widget, index) => {
+            if (widget.type === "combo" && widget.options.values?.includes(value)) {
+                widgetIndices.push(index);
+            }
+        });
+        return widgetIndices;
+    }
+
     /**
      * @param {Event} event
      * @param {string} modelType
      * @param {string} path
      * @param {boolean} removeEmbeddingExtension
-     * @param {boolean} strictDragToAdd
+     * @param {boolean} strictlyOnWidget
      */
-    static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictDragToAdd) {
+    static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictlyOnWidget) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
-            const nodeType = modelNodeType[modelType];
-            const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
-            const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
+            const node = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
-            let draggedOnNode = nodeAtPos && nodeAtPos.type === nodeType;
-            if (strictDragToAdd) {
-                const draggedOnWidget = app.canvas.processNodeWidgets(nodeAtPos, pos, event) === nodeAtPos.widgets[widgetIndex];
-                draggedOnNode = draggedOnNode && draggedOnWidget;
+            let widgetIndex = -1;
+            if (widgetIndex === -1) {
+                const widgetIndices = this.#getWidgetComboIndices(node, path);
+                if (widgetIndices.length === 0) {
+                    widgetIndex = -1;
+                }
+                else if (widgetIndices.length === 1) {
+                    widgetIndex = widgetIndices[0];
+                    if (strictlyOnWidget) {
+                        const draggedWidget = app.canvas.processNodeWidgets(node, pos, event);
+                        const widget =  node.widgets[widgetIndex];
+                        if (draggedWidget != widget) { // != check NOT same object
+                            widgetIndex = -1;
+                        }
+                    }
+                }
+                else {
+                    // ambiguous widget (strictlyOnWidget always true)
+                    const draggedWidget = app.canvas.processNodeWidgets(node, pos, event);
+                    widgetIndex = widgetIndices.findIndex((index) => {
+                        return draggedWidget == node.widgets[index]; // == check same object
+                    });
+                }
             }
 
-            if (draggedOnNode) {
-                let node = nodeAtPos;
+            if (widgetIndex !== -1) {
                 node.widgets[widgetIndex].value = path;
                 app.canvas.selectNode(node);
             }
             else {
-                let node = LiteGraph.createNode(nodeType, null, []);
-                if (node) {
-                    node.pos[0] = pos[0];
-                    node.pos[1] = pos[1];
-                    node.widgets[widgetIndex].value = path;
-                    app.graph.add(node, {doProcessChange: true});
-                    app.canvas.selectNode(node);
+                const expectedNodeType = modelNodeType[modelType];
+                const newNode = LiteGraph.createNode(expectedNodeType, null, []);
+                let newWidgetIndex = ModelGrid.modelWidgetIndex(expectedNodeType);
+                if (newWidgetIndex === -1) {
+                    newWidgetIndex = this.#getWidgetComboIndices(newNode, path)[0] ?? -1;
+                }
+                if (newNode !== undefined && newNode !== null && newWidgetIndex !== -1) {
+                    newNode.pos[0] = pos[0];
+                    newNode.pos[1] = pos[1];
+                    newNode.widgets[newWidgetIndex].value = path;
+                    app.graph.add(newNode, {doProcessChange: true});
+                    app.canvas.selectNode(newNode);
                 }
             }
             event.stopPropagation();
@@ -1512,9 +1543,11 @@ class ModelGrid {
         else if (nodeType) {
             const node = LiteGraph.createNode(nodeType, null, []);
             const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
-            node.widgets[widgetIndex].value = path;
-            app.canvas.copyToClipboard([node]);
-            success = true;
+            if (widgetIndex !== -1) {
+                node.widgets[widgetIndex].value = path;
+                app.canvas.copyToClipboard([node]);
+                success = true;
+            }
         }
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
