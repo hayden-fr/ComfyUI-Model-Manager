@@ -1693,12 +1693,16 @@ class ModelInfoView {
     
     elements = {
         /** @type {HTMLDivElement} */ info: null,
+        /** @type {HTMLTextAreaElement} */ notes: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
         /** @type {HTMLInputElement} */  moveDestinationInput: null,
     };
     
     /** @type {ImageSelect} */
     previewSelect = null;
+    
+    /** @type {string} */
+    #savedNotesValue = null;
     
     /**
      * @param {ModelData} modelData
@@ -1892,9 +1896,58 @@ class ModelInfoView {
         this.element.removeAttribute("style");
     }
     
-    /** @returns {void} */
-    hide() {
+    /** @returns {Promise<void>} */
+    async hide() {
+        const notes = this.elements.notes;
+        if (notes !== undefined && notes !== null) {
+            const noteValue = this.elements.notes.value;
+            const savedNotesValue = this.#savedNotesValue;
+            if (noteValue.trim() !== savedNotesValue.trim()) {
+                const saveChanges = window.confirm("Save notes?");
+                if (saveChanges) {
+                    const saved = await this.#saveNotes(noteValue);
+                    if (!saved) {
+                        window.alert("Failed to save notes!");
+                        return;
+                    }
+                    this.#savedNotesValue = "";
+                }
+                else {
+                    const discardChanges = window.confirm("Discard changes?");
+                    if (!discardChanges) {
+                        return;
+                    }
+                }
+            }
+        }
+        
         this.element.style.display = "none";
+    }
+    
+    /**
+     * @param {string} newValue
+     * @returns {Promise<boolean>}
+     */
+    async #saveNotes(newValue) {
+        return request(
+            "/model-manager/notes/save",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    "path": this.elements.info.dataset.path,
+                    "notes": newValue,
+                }),
+            }
+        ).then((result) => {
+            const success = result["success"];
+            if (success) {
+                this.#savedNotesValue = newValue;
+            }
+            return success;
+        })
+        .catch((err) => {
+            return false;
+        });
     }
     
     /**
@@ -2043,30 +2096,18 @@ class ModelInfoView {
                         else {
                             if (key === "Notes") {
                                 elements.push($el("h2", [key + ":"]));
-                                const noteArea = $el("textarea.comfy-multiline-input", {
+                                const notes = $el("textarea.comfy-multiline-input", {
                                     name: "model notes",
                                     value: value, 
                                     rows: 10,
                                 });
-                                elements.push(noteArea);
+                                this.elements.notes = notes;
+                                this.#savedNotesValue = value;
+                                elements.push(notes);
                                 elements.push($el("button", {
                                     textContent: "Save Notes",
-                                    onclick: (e) => {
-                                        const saved = request(
-                                            "/model-manager/notes/save",
-                                            {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    "path": this.elements.info.dataset.path,
-                                                    "notes": noteArea.value,
-                                                }),
-                                            }
-                                        ).then((result) => {
-                                            return result["success"];
-                                        })
-                                        .catch((err) => {
-                                            return false;
-                                        });
+                                    onclick: async (e) => {
+                                        const saved = await this.#saveNotes(notes.value);
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
@@ -3230,12 +3271,12 @@ class ModelManager extends ComfyDialog {
                             sidebarButtons.element,
                             $el("button.icon-button", {
                                 textContent: "✖",
-                                onclick: () => {
+                                onclick: async() => {
                                     if (modelInfoView.isVisible()) { // TODO: decouple back and close
                                         this.close();
                                     }
                                     else {
-                                        modelInfoView.hide();
+                                        await modelInfoView.hide();
                                     }
                                 },
                             }),
