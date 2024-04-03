@@ -14,6 +14,7 @@ Download, browse and delete models in ComfyUI.
 - View multiple models associated with a url.
 - Select a download directory.
 - Optionally also download a model preview image (a default image along side the model, from another url or locally uploaded).
+- Optionally also download descriptions as a note (`.txt` file).
 - Civitai and HuggingFace API token configurable in `server_settings.yaml`.
 
 ### Models Tab
@@ -38,8 +39,9 @@ Download, browse and delete models in ComfyUI.
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Right, left, top and bottom toggleable sidebar modes.
 - Drag a model onto the graph to add a new node.
-- Drag a model onto an existing node to set the model field.
-- Drag an embedding onto a text area to add it to the end.
+- Drag a model onto an existing node to set the model field. (Must be exact on input if multiple inputs use model name text.)
+- Drag an embedding onto a text area, or highlight any number of nodes, to add it to the end.
+- Drag preview image in model info onto the graph to load embedded workflow.
 
 ### Settings Tab
 
@@ -57,13 +59,12 @@ Download, browse and delete models in ComfyUI.
 
 ### Download Model
 
-- Checkbox to optionally save description in `.txt` file for Civitai. (what about "About Model"?)
 - Server setting to enable creating new folders (on download, on move).
 
 ### Download Model Info
 
 - Auto-save notes? (requires debounce and save confirmation)
-- Load workflow from preview (Should be easy to add with ComfyUI built-in clipboard.)
+- Load workflow from preview (Should be easy to add with ComfyUI built-in clipboard. Already works with drag.)
 - Default weights on add/drag? (optional override on drag?)
 - Optional (re)download `📥︎` model info from the internet and cache the text file locally. (requires checksum?)
   - Radio buttons to swap between downloaded and server view.
