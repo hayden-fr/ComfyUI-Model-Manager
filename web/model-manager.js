@@ -2132,11 +2132,10 @@ class ModelInfoView {
                                 const notes = $el("textarea.comfy-multiline-input", {
                                     name: "model notes",
                                     value: value, 
-                                    rows: 10,
+                                    rows: 12,
                                 });
                                 this.elements.notes = notes;
                                 this.#savedNotesValue = value;
-                                elements.push(notes);
                                 elements.push($el("button", {
                                     textContent: "Save Notes",
                                     onclick: async (e) => {
@@ -2149,6 +2148,7 @@ class ModelInfoView {
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
+                                elements.push(notes);
                             }
                             else if (key === "Description") {
                                 if (value !== "") {
@@ -3170,6 +3170,7 @@ class SettingsTab {
                         $: (el) => (settings["model-search-always-append"] = el),
                         name: "always include in model search",
                         placeholder: "example: -nsfw",
+                        rows: "6",
                     }),
                 ]),
             ]),
@@ -3292,6 +3293,9 @@ class SidebarButtons {
 }
 
 class ModelManager extends ComfyDialog {
+    /** @type {HTMLDivElement} */
+    element = null;
+    
     /** @type {ModelData} */
     #modelData = null;
     
@@ -3339,10 +3343,16 @@ class ModelManager extends ComfyDialog {
             this.#settingsTab.elements.settings,
             this.#refreshModels,
         );
-        this.#downloadTab = DownloadTab;
+        this.#downloadTab = downloadTab;
         
         const sidebarButtons = new SidebarButtons(this);
         this.#sidebarButtons = sidebarButtons;
+        
+        const tabs = $tabs([
+            $tab("Download", [downloadTab.element]),
+            $tab("Models", [modelTab.element]),
+            $tab("Settings", [settingsTab.element]),
+        ]);
         
         this.element = $el(
             "div.comfy-modal.model-manager",
@@ -3368,14 +3378,24 @@ class ModelManager extends ComfyDialog {
                             }),
                         ]
                     ),
-                    $tabs([
-                        $tab("Download", [downloadTab.element]),
-                        $tab("Models", [modelTab.element]),
-                        $tab("Settings", [settingsTab.element]),
-                    ]),
+                    tabs,
                 ]),
             ]
         );
+        
+        new ResizeObserver(() => {
+            if (this.element.style.display === "none") {
+                return;
+            }
+            const minWidth = 768; // magic value (could easily break)
+            const managerRect = this.element.getBoundingClientRect();
+            const isNarrow = managerRect.width < minWidth;
+            let texts = isNarrow ? ["📥︎", "📁", "⚙"] : ["Download", "Models", "Settings"];
+            const tabHeaders = tabs.children[0];
+            texts.forEach((text, i) => {
+                tabHeaders.children[i].innerText = text;
+            });
+        }).observe(this.element);
         
         this.#init();
     }

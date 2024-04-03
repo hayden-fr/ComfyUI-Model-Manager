@@ -41,11 +41,11 @@
 }
 
 .model-manager textarea {
-    width: 100%;
-    font-size: 1.2em;
     border: solid 2px var(--border-color);
     border-radius: 8px;
+    font-size: 1.2em;
     resize: vertical;
+    width: 100%;
 }
 
 .model-manager input[type="file"] {
