@@ -239,8 +239,14 @@
     word-wrap: break-word;
 }
 
-.model-manager [data-name="Download"] .download-settings {
+.model-manager [data-name="Download"] .download-settings-wrapper {
     flex: 1;
+}
+
+.model-manager [data-name="Download"] .download-settings {
+    display: flex;
+    flex-direction: column;
+    row-gap: 8px;
 }
 
 .model-manager .download-model-infos {

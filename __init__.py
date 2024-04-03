@@ -185,6 +185,7 @@ def ui_rules():
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
+        Rule("download-save-description-as-text-file", False, bool),
     ]
 
 
@@ -232,6 +233,7 @@ async def save_ui_settings(request):
     rules = ui_rules()
     validated_settings = config_loader.validated(rules, settings)
     success = config_loader.yaml_save(ui_settings_uri, rules, validated_settings)
+    print("Saved file: " + ui_settings_uri)
     return web.json_response({
         "success": success,
         "settings": validated_settings if success else "",
@@ -920,6 +922,7 @@ async def move_model(request):
         return web.json_response({ "success": False })
     try:
         shutil.move(old_file, new_file)
+        print("Moved file: " + new_file)
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
         return web.json_response({ "success": False })
@@ -928,8 +931,10 @@ async def move_model(request):
     for extension in preview_extensions + (model_info_extension,):
         old_file = old_file_without_extension + extension
         if os.path.isfile(old_file):
+            new_file = new_file_without_extension + extension
             try:
-                shutil.move(old_file, new_file_without_extension + extension)
+                shutil.move(old_file, new_file)
+                print("Moved file: " + new_file)
             except ValueError as e:
                 print(e, file=sys.stderr, flush=True)
 
@@ -942,6 +947,7 @@ def delete_same_name_files(path_without_extension, extensions, keep_extension=No
         file = path_without_extension + extension
         if os.path.isfile(file):
             os.remove(file)
+            print("Deleted file: " + file)
 
 
 @server.PromptServer.instance.routes.post("/model-manager/model/delete")
@@ -965,6 +971,7 @@ async def delete_model(request):
     if os.path.isfile(model_path):
         os.remove(model_path)
         result["success"] = True
+        print("Deleted file: " + model_path)
 
         delete_same_name_files(path_and_name, preview_extensions)
         delete_same_name_files(path_and_name, (model_info_extension,))
@@ -994,6 +1001,7 @@ async def set_notes(request):
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(text)
+            print("Saved file: " + filename)
         except ValueError as e:
             print(e, file=sys.stderr, flush=True)
             web.json_response({ "success": False })

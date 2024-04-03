@@ -175,6 +175,31 @@ function buttonAlert(element, success, successText = "", failureText = "", reset
     }, 1000, element, name, resetText);
 }
 
+/**
+ * 
+ * @param {string} modelPath
+ * @param {string} newValue
+ * @returns {Promise<boolean>}
+ */
+async function saveNotes(modelPath, newValue) {
+    return request(
+        "/model-manager/notes/save",
+        {
+            method: "POST",
+            body: JSON.stringify({
+                "path": modelPath,
+                "notes": newValue,
+            }),
+        }
+    ).then((result) => {
+        return result["success"];
+    })
+    .catch((err) => {
+        console.warn(err);
+        return false;
+    });
+}
+
 class Tabs {
     /** @type {Record<string, HTMLDivElement>} */
     #head = {};
@@ -1938,7 +1963,8 @@ class ModelInfoView {
             if (noteValue.trim() !== savedNotesValue.trim()) {
                 const saveChanges = window.confirm("Save notes?");
                 if (saveChanges) {
-                    const saved = await this.#saveNotes(noteValue);
+                    const path = this.elements.info.dataset.path;
+                    const saved = await saveNotes(path, noteValue);
                     if (!saved) {
                         window.alert("Failed to save notes!");
                         return;
@@ -1955,32 +1981,6 @@ class ModelInfoView {
         }
         
         this.element.style.display = "none";
-    }
-    
-    /**
-     * @param {string} newValue
-     * @returns {Promise<boolean>}
-     */
-    async #saveNotes(newValue) {
-        return request(
-            "/model-manager/notes/save",
-            {
-                method: "POST",
-                body: JSON.stringify({
-                    "path": this.elements.info.dataset.path,
-                    "notes": newValue,
-                }),
-            }
-        ).then((result) => {
-            const success = result["success"];
-            if (success) {
-                this.#savedNotesValue = newValue;
-            }
-            return success;
-        })
-        .catch((err) => {
-            return false;
-        });
     }
     
     /**
@@ -2140,7 +2140,12 @@ class ModelInfoView {
                                 elements.push($el("button", {
                                     textContent: "Save Notes",
                                     onclick: async (e) => {
-                                        const saved = await this.#saveNotes(notes.value);
+                                        const path = this.elements.info.dataset.path;
+                                        const newValue = notes.value;
+                                        const saved = await saveNotes(path, newValue);
+                                        if (saved) {
+                                            this.#savedNotesValue = newValue;
+                                        }
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
@@ -2240,6 +2245,7 @@ class Civitai {
                 return image["url"];
             }),
             "name": modelVersionInfo["name"],
+            "description": modelVersionInfo["description"] ?? "",
         };
     }
     
@@ -2275,6 +2281,7 @@ class Civitai {
             return {
                 "name": modelVersionInfo["model"]["name"],
                 "type": modelVersionInfo["model"]["type"],
+                "description": modelVersionInfo["description"] ?? "",
                 "versions": [filesInfo]
             }
         }
@@ -2306,7 +2313,8 @@ class Civitai {
             return {
                 "name": modelInfo["name"],
                 "type": modelInfo["type"],
-                "versions": modelVersions
+                "description": modelInfo["description"] ?? "",
+                "versions": modelVersions,
             }
         }
         else {
@@ -2506,8 +2514,50 @@ class DownloadTab {
         /** @type {HTMLInputElement} */ overwrite: null,
     };
     
+    /** @type {DOMParser} */
+    #domParser = null;
+    
     /** @type {() => Promise<void>} */
     #updateModels = () => {};
+    
+    /**
+     * @param {ModelData} modelData
+     * @param {any} settings
+     * @param {() => Promise<void>} updateModels
+     */
+    constructor(modelData, settings, updateModels) {
+        this.#domParser = new DOMParser();
+        this.#updateModels = updateModels;
+        const search = async() => this.search(modelData, settings);
+        $el("div.tab-header", {
+            $: (el) => (this.element = el),
+        }, [
+            $el("div.row.tab-header-flex-block", [
+                $el("input.search-text-area", {
+                    $: (el) => (this.elements.url = el),
+                    type: "text",
+                    name: "model download url",
+                    autocomplete: "off",
+                    placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
+                    onkeydown: (e) => {
+                        if (e.key === "Enter") {
+                            e.stopPropagation();
+                            search();
+                        }
+                    },
+                }),
+                $el("button.icon-button", {
+                    onclick: () => search(),
+                    textContent: "🔍︎",
+                }),
+            ]),
+            $el("div.download-model-infos", {
+                $: (el) => (this.elements.infos = el),
+            }, [
+                $el("div", ["Input a URL to select a model to download."]),
+            ]),
+        ]);
+    }
     
     /**
      * Tries to return the related ComfyUI model directory if unambiguous.
@@ -2554,9 +2604,10 @@ class DownloadTab {
      * @param {Object} info
      * @param {ModelData} modelData
      * @param {int} id
+     * @param {any} settings
      * @returns {HTMLDivElement}
      */
-    #modelInfo(info, modelData, id) {
+    #modelInfo(info, modelData, id, settings) {
         const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
@@ -2604,17 +2655,13 @@ class DownloadTab {
                 style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
             }, [
                 downloadPreviewSelect.elements.previews,
-                $el("div.download-settings", [
-                    $el("div", {
-                        style: { "margin-top": "8px" }
-                    }, [
+                $el("div.download-settings-wrapper", [
+                    $el("div.download-settings", [
                         $el("button.icon-button", {
                             textContent: "📥︎",
                             onclick: async (e) => {
-                                const formData = new FormData();
-                                formData.append("download", info["downloadUrl"]);
-                                formData.append("path", el_saveDirectoryPath.value);
-                                formData.append("name", (() => {
+                                const pathDirectory = el_saveDirectoryPath.value;
+                                const modelName = (() => {
                                     const filename = info["fileName"];
                                     const name = el_filename.value;
                                     if (name === "") {
@@ -2624,7 +2671,11 @@ class DownloadTab {
                                         return filename.endsWith(ext);
                                     }) ?? "";
                                     return name + ext;
-                                })());
+                                })();
+                                const formData = new FormData();
+                                formData.append("download", info["downloadUrl"]);
+                                formData.append("path", pathDirectory);
+                                formData.append("name", modelName);
                                 const image = await downloadPreviewSelect.getImage();
                                 formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);
@@ -2645,6 +2696,14 @@ class DownloadTab {
                                     return [false, "📥︎"];
                                 });
                                 if (success) {
+                                    const description = info["description"];
+                                    if (settings["download-save-description-as-text-file"].checked && description !== "") {
+                                        const modelPath = pathDirectory + searchSeparator + modelName;
+                                        const saved = await saveNotes(modelPath, description);
+                                        if (!saved) {
+                                            console.warn("Description was note saved as notes!");
+                                        }
+                                    }
                                     this.#updateModels();
                                 }
                                 buttonAlert(e.target, success, "✔", "✖", resultText);
@@ -2669,8 +2728,9 @@ class DownloadTab {
     
     /**
      * @param {ModelData} modelData
+     * @param {any} settings
      */
-    async search(modelData) {
+    async search(modelData, settings) {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
 
@@ -2683,8 +2743,11 @@ class DownloadTab {
                 }
                 const infos = [];
                 const type = civitaiInfo["type"];
+                const modelInfo = civitaiInfo["description"]?? "";
                 civitaiInfo["versions"].forEach((version) => {
                     const images = version["images"];
+                    const versionDescription = version["description"]??"";
+                    const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
                     version["files"].forEach((file) => {
                         infos.push({
                             "images": images,
@@ -2692,6 +2755,7 @@ class DownloadTab {
                             "modelType": type,
                             "downloadUrl": file["downloadUrl"],
                             "downloadFilePath": "",
+                            "description": description,
                             "details": {
                                 "fileSizeKB": file["sizeKB"],
                                 "fileType": file["type"],
@@ -2724,6 +2788,7 @@ class DownloadTab {
                         "modelType": "",
                         "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
                         "downloadFilePath": file.substring(0, indexSep + 1),
+                        "description": "",
                         "details": {
                             "fileSizeKB": undefined, // TODO: too hard?
                         },
@@ -2739,6 +2804,7 @@ class DownloadTab {
                         "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
                         "downloadUrl": file["download"],
                         "downloadFilePath": "",
+                        "description": file["description"],
                         "details": {},
                     };
                 });
@@ -2756,6 +2822,7 @@ class DownloadTab {
                 modelInfo,
                 modelData,
                 id,
+                settings,
             );
         });
         if (modelInfosHtml.length === 0) {
@@ -2765,50 +2832,17 @@ class DownloadTab {
             if (modelInfosHtml.length === 1) {
                 modelInfosHtml[0].open = true;
             }
-            const label = $checkbox({
-                $: (el) => { this.elements.overwrite = el; },
-                textContent: "Overwrite Existing Files",
-            });
-            modelInfosHtml.unshift(label);
+            
+            const downloadSettings = $el("div", [
+                $checkbox({
+                    $: (el) => { this.elements.overwrite = el; },
+                    textContent: "Overwrite Existing Files.",
+                    checked: false,
+                }),
+            ]);
+            modelInfosHtml.unshift(downloadSettings);
         }
         infosHtml.append.apply(infosHtml, modelInfosHtml);
-    }
-    
-    /**
-     * @param {ModelData} modelData
-     * @param {() => Promise<void>} updateModels
-     */
-    constructor(modelData, updateModels) {
-        this.#updateModels = updateModels;
-        const search = async() => this.search(modelData);
-        $el("div.tab-header", {
-            $: (el) => (this.element = el),
-        }, [
-            $el("div.row.tab-header-flex-block", [
-                $el("input.search-text-area", {
-                    $: (el) => (this.elements.url = el),
-                    type: "text",
-                    name: "model download url",
-                    autocomplete: "off",
-                    placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
-                    onkeydown: (e) => {
-                        if (e.key === "Enter") {
-                            e.stopPropagation();
-                            search();
-                        }
-                    },
-                }),
-                $el("button.icon-button", {
-                    onclick: () => search(),
-                    textContent: "🔍︎",
-                }),
-            ]),
-            $el("div.download-model-infos", {
-                $: (el) => (this.elements.infos = el),
-            }, [
-                $el("div", ["Input a URL to select a model to download."]),
-            ]),
-        ]);
     }
 }
 
@@ -2986,6 +3020,8 @@ class SettingsTab {
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
+            
+            /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
         },
     };
     
@@ -3164,6 +3200,11 @@ class SettingsTab {
                 }),
                 $el("p", ["Add model offset"]),
             ]),
+            $el("h2", ["Download"]),
+            $checkbox({
+                $: (el) => (settings["download-save-description-as-text-file"] = el),
+                textContent: "Save descriptions as notes (in .txt file).",
+            }),
         ]);
     }
 }
@@ -3284,6 +3325,7 @@ class ModelManager extends ComfyDialog {
         
         const downloadTab = new DownloadTab(
             this.#modelData,
+            this.#settingsTab.elements.settings,
             this.#refreshModels,
         );
         this.#downloadTab = DownloadTab;
