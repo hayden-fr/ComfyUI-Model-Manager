@@ -3390,7 +3390,7 @@ class ModelManager extends ComfyDialog {
             const minWidth = 768; // magic value (could easily break)
             const managerRect = this.element.getBoundingClientRect();
             const isNarrow = managerRect.width < minWidth;
-            let texts = isNarrow ? ["📥︎", "📁", "⚙"] : ["Download", "Models", "Settings"];
+            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"];
             const tabHeaders = tabs.children[0];
             texts.forEach((text, i) => {
                 tabHeaders.children[i].innerText = text;
