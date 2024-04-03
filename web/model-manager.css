@@ -234,9 +234,31 @@
 
 /* download tab */
 
-.model-manager [data-name="Download"] summary {
+.model-manager .download-model-infos {
+    display: flex;
+    flex-direction: column;
+    padding: 16px 0;
+    row-gap: 10px;
+}
+
+.model-manager .download-details summary {
+    background-color: var(--comfy-menu-bg);
+    border-radius: 16px;
     padding: 16px;
     word-wrap: break-word;
+}
+
+.model-manager .download-details[open] summary {
+    background-color: var(--border-color);
+}
+
+.model-manager .download-details > div {
+    column-gap: 8px;
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 8px;
+    row-gap: 16px;
 }
 
 .model-manager [data-name="Download"] .download-settings-wrapper {
@@ -246,11 +268,7 @@
 .model-manager [data-name="Download"] .download-settings {
     display: flex;
     flex-direction: column;
-    row-gap: 8px;
-}
-
-.model-manager .download-model-infos {
-    padding: 16px 0;
+    row-gap: 16px;
 }
 
 /* models tab */
@@ -404,6 +422,11 @@
 .model-preview-select-radio-container {
     min-width: 0;
     flex: 1;
+}
+
+.model-preview-select-radio-inputs > div {
+    height: 40px;
+    padding: 16px 0 8px 0;
 }
 
 .model-manager .model-preview-select-radio-container img {

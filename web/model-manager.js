@@ -714,7 +714,7 @@ class ImageSelect {
             $: (el) => (this.elements.radioGroup = el),
         }, [
             $el("div.row.tab-header-flex-block", [el_radioButtons]),
-            $el("div", [
+            $el("div.model-preview-select-radio-inputs", [
                 el_custom,
                 el_upload,
             ]),
@@ -2500,8 +2500,97 @@ class HuggingFace {
             "baseDownloadUrl": baseDownloadUrl,
             "modelFiles": modelFiles,
             "images": images,
+            "name": modelId,
         };
     }
+}
+
+/**
+ * @param {string} urlText 
+ * @returns {Promise<[string, any[]]>} [name, modelInfos]
+ */
+async function getModelInfos(urlText) {
+    // TODO: class for proper return type
+    return await (async () => {
+        if (urlText.startsWith("https://civitai.com")) {
+            const civitaiInfo = await Civitai.getFilteredInfo(urlText);
+            if (Object.keys(civitaiInfo).length === 0) {
+                return ["", []];
+            }
+            const name = civitaiInfo["name"];
+            const infos = [];
+            const type = civitaiInfo["type"];
+            const modelInfo = civitaiInfo["description"]?? "";
+            civitaiInfo["versions"].forEach((version) => {
+                const images = version["images"];
+                const versionDescription = version["description"]??"";
+                const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
+                version["files"].forEach((file) => {
+                    infos.push({
+                        "images": images,
+                        "fileName": file["name"],
+                        "modelType": type,
+                        "downloadUrl": file["downloadUrl"],
+                        "downloadFilePath": "",
+                        "description": description,
+                        "details": {
+                            "fileSizeKB": file["sizeKB"],
+                            "fileType": file["type"],
+                            "fp": file["fp"],
+                            "quant": file["size"],
+                            "fileFormat": file["format"],
+                        },
+                    });
+                });
+            });
+            return [name, infos];
+        }
+        if (urlText.startsWith("https://huggingface.co")) {
+            const hfInfo = await HuggingFace.getFilteredInfo(urlText);
+            if (Object.keys(hfInfo).length === 0) {
+                return ["", []];
+            }
+            const files = hfInfo["modelFiles"];
+            if (files.length === 0) {
+                return ["", []];
+            }
+            const name = hfInfo["name"];
+            const baseDownloadUrl = hfInfo["baseDownloadUrl"];
+            const infos = hfInfo["modelFiles"].map((file) => {
+                const indexSep = file.lastIndexOf("/");
+                const filename = file.substring(indexSep + 1);
+                return {
+                    "images": hfInfo["images"],
+                    "fileName": filename,
+                    "modelType": "",
+                    "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
+                    "downloadFilePath": file.substring(0, indexSep + 1),
+                    "description": "",
+                    "details": {
+                        "fileSizeKB": undefined, // TODO: too hard?
+                    },
+                };
+            });
+            return [name, infos];
+        }
+        if (urlText.endsWith(".json")) {
+            const indexInfo = await request(urlText).catch(() => []);
+            const name = urlText.substring(math.max(urlText.lastIndexOf("/"), 0));
+            const infos = indexInfo.map((file) => {
+                return {
+                    "images": [],
+                    "fileName": file["name"],
+                    "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                    "downloadUrl": file["download"],
+                    "downloadFilePath": "",
+                    "description": file["description"],
+                    "details": {},
+                };
+            });
+            return [name, infos];
+        }
+        return ["", []];
+    })();
 }
 
 class DownloadTab {
@@ -2528,7 +2617,7 @@ class DownloadTab {
     constructor(modelData, settings, updateModels) {
         this.#domParser = new DOMParser();
         this.#updateModels = updateModels;
-        const search = async() => this.search(modelData, settings);
+        const update = async() => { await this.#update(modelData, settings); };
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -2539,15 +2628,15 @@ class DownloadTab {
                     name: "model download url",
                     autocomplete: "off",
                     placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
-                    onkeydown: (e) => {
+                    onkeydown: async (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
-                            search();
+                            await update();
                         }
                     },
                 }),
                 $el("button.icon-button", {
-                    onclick: () => search(),
+                    onclick: async () => { await update(); },
                     textContent: "🔍︎",
                 }),
             ]),
@@ -2607,7 +2696,7 @@ class DownloadTab {
      * @param {any} settings
      * @returns {HTMLDivElement}
      */
-    #modelInfo(info, modelData, id, settings) {
+    #modelInfoHtml(info, modelData, id, settings) {
         const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
@@ -2651,9 +2740,7 @@ class DownloadTab {
         const filepath = info["downloadFilePath"];
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
-            $el("div", {
-                style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
-            }, [
+            $el("div", [
                 downloadPreviewSelect.elements.previews,
                 $el("div.download-settings-wrapper", [
                     $el("div.download-settings", [
@@ -2725,100 +2812,20 @@ class DownloadTab {
         
         return modelInfo;
     }
-    
+
     /**
      * @param {ModelData} modelData
      * @param {any} settings
      */
-    async search(modelData, settings) {
-        const infosHtml = this.elements.infos;
-        infosHtml.innerHTML = "";
-
-        const urlText = this.elements.url.value;
-        const modelInfos = await (async () => {
-            if (urlText.startsWith("https://civitai.com")) {
-                const civitaiInfo = await Civitai.getFilteredInfo(urlText);
-                if (Object.keys(civitaiInfo).length === 0) {
-                    return [];
-                }
-                const infos = [];
-                const type = civitaiInfo["type"];
-                const modelInfo = civitaiInfo["description"]?? "";
-                civitaiInfo["versions"].forEach((version) => {
-                    const images = version["images"];
-                    const versionDescription = version["description"]??"";
-                    const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
-                    version["files"].forEach((file) => {
-                        infos.push({
-                            "images": images,
-                            "fileName": file["name"],
-                            "modelType": type,
-                            "downloadUrl": file["downloadUrl"],
-                            "downloadFilePath": "",
-                            "description": description,
-                            "details": {
-                                "fileSizeKB": file["sizeKB"],
-                                "fileType": file["type"],
-                                "fp": file["fp"],
-                                "quant": file["size"],
-                                "fileFormat": file["format"],
-                            },
-                        });
-                    });
-                });
-                return infos;
-            }
-            if (urlText.startsWith("https://huggingface.co")) {
-                const hfInfo = await HuggingFace.getFilteredInfo(urlText);
-                if (Object.keys(hfInfo).length === 0) {
-                    return [];
-                }
-                const files = hfInfo["modelFiles"];
-                if (files.length === 0) {
-                    return [];
-                }
-                
-                const baseDownloadUrl = hfInfo["baseDownloadUrl"];
-                return hfInfo["modelFiles"].map((file) => {
-                    const indexSep = file.lastIndexOf("/");
-                    const filename = file.substring(indexSep + 1);
-                    return {
-                        "images": hfInfo["images"],
-                        "fileName": filename,
-                        "modelType": "",
-                        "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
-                        "downloadFilePath": file.substring(0, indexSep + 1),
-                        "description": "",
-                        "details": {
-                            "fileSizeKB": undefined, // TODO: too hard?
-                        },
-                    };
-                });
-            }
-            if (urlText.endsWith(".json")) {
-                const indexInfo = await request(urlText).catch(() => []);
-                return indexInfo.map((file) => {
-                    return {
-                        "images": [],
-                        "fileName": file["name"],
-                        "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
-                        "downloadUrl": file["download"],
-                        "downloadFilePath": "",
-                        "description": file["description"],
-                        "details": {},
-                    };
-                });
-            }
-            return [];
-        })();
-        
+    async #update(modelData, settings) {
+        const [name, modelInfos] = await getModelInfos(this.elements.url.value);
         const modelInfosHtml = modelInfos.filter((modelInfo) => {
             const filename = modelInfo["fileName"];
             return MODEL_EXTENSIONS.find((ext) => {
                 return filename.endsWith(ext);
             }) ?? false;
         }).map((modelInfo, id) => {
-            return this.#modelInfo(
+            return this.#modelInfoHtml(
                 modelInfo,
                 modelData,
                 id,
@@ -2833,15 +2840,19 @@ class DownloadTab {
                 modelInfosHtml[0].open = true;
             }
             
-            const downloadSettings = $el("div", [
+            const header = $el("div", [
+                $el("h1", [name]),
                 $checkbox({
                     $: (el) => { this.elements.overwrite = el; },
                     textContent: "Overwrite Existing Files.",
                     checked: false,
                 }),
             ]);
-            modelInfosHtml.unshift(downloadSettings);
+            modelInfosHtml.unshift(header);
         }
+
+        const infosHtml = this.elements.infos;
+        infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
     }
 }
