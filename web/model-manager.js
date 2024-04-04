@@ -1675,7 +1675,7 @@ class ModelGrid {
                     ]),
                     $el("div.model-label", {
                         ondragend: (e) => dragAdd(e),
-                        draggable: true,
+                        draggable: false,
                     }, [
                         $el("p", [showModelExtension ? item.name : SearchPath.splitExtension(item.name)[0]])
                     ]),
