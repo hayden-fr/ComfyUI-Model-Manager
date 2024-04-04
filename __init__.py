@@ -277,6 +277,7 @@ async def get_model_preview(request):
     uri = request.query.get("uri")
     image_path = no_preview_image
     image_type = "png"
+    file_name = os.path.split(no_preview_image)[1]
     if uri != "no-preview":
         sep = os.path.sep
         uri = uri.replace("/" if sep == "\\" else "/", sep)
@@ -285,9 +286,11 @@ async def get_model_preview(request):
         if os.path.exists(path):
             image_path = path
             image_type = extension.rsplit(".", 1)[1]
+            file_name = os.path.split(head)[1] + "." + image_type
         elif os.path.exists(head) and head.endswith(".safetensors"):
             image_path = head
             image_type = extension.rsplit(".", 1)[1]
+            file_name = os.path.splitext(os.path.split(head)[1])[0] + "." + image_type
 
     w = request.query.get("width")
     h = request.query.get("height")
@@ -340,7 +343,13 @@ async def get_model_preview(request):
             image.save(image_bytes, format=image.format, exif=exif, pnginfo=metadata)
             image_data = image_bytes.getvalue()
 
-    return web.Response(body=image_data, content_type="image/" + image_type)
+    return web.Response(
+        headers={
+            "Content-Disposition": f"inline; filename={file_name}",
+        },
+        body=image_data,
+        content_type="image/" + image_type,
+    )
 
 
 @server.PromptServer.instance.routes.get("/model-manager/image/extensions")
