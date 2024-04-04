@@ -200,84 +200,6 @@ async function saveNotes(modelPath, newValue) {
     });
 }
 
-class Tabs {
-    /** @type {Record<string, HTMLDivElement>} */
-    #head = {};
-    /** @type {Record<string, HTMLDivElement>} */
-    #body = {};
-    
-    /**
-     * @param {HTMLDivElement[]} tabs
-     */
-    constructor(tabs) {
-        const head = [];
-        const body = [];
-        
-        tabs.forEach((el, index) => {
-            const name = el.getAttribute("data-name");
-            
-            /** @type {HTMLDivElement} */
-            const tag = $el(
-                "div.head-item",
-                { onclick: () => this.active(name) },
-                [name]
-            );
-                
-            if (index === 0) {
-                this.#active = name;
-            }
-            
-            this.#head[name] = tag;
-            head.push(tag);
-            this.#body[name] = el;
-            body.push(el);
-        });
-        
-        this.element = $el("div.comfy-tabs", [
-            $el("div.comfy-tabs-head", head),
-            $el("div.comfy-tabs-body", body),
-        ]);
-        
-        this.active(this.#active);
-    }
-    
-    #active = undefined;
-    
-    /**
-     * @param {string} name
-     */
-    active(name) {
-        this.#active = name;
-        Object.keys(this.#head).forEach((key) => {
-            if (name === key) {
-                this.#head[key].classList.add("active");
-                this.#body[key].style.display = "";
-            } else {
-                this.#head[key].classList.remove("active");
-                this.#body[key].style.display = "none";
-            }
-        });
-    }
-}
-
-/**
- * @param {Record<HTMLDivElement, Any>} tabs
- * @returns {HTMLDivElement[]}
- */
-function $tabs(tabs) {
-    const instance = new Tabs(tabs);
-    return instance.element;
-}
-
-/**
- * @param {string} name
- * @param {HTMLDivElement[]} el
- * @returns {HTMLDivElement}
- */
-function $tab(name, el) {
-    return $el("div", { dataset: { name } }, el);
-}
-
 /**
  * @returns {HTMLLabelElement}
  */
@@ -3357,11 +3279,47 @@ class ModelManager extends ComfyDialog {
         const sidebarButtons = new SidebarButtons(this);
         this.#sidebarButtons = sidebarButtons;
         
-        const tabs = $tabs([
-            $tab("Download", [downloadTab.element]),
-            $tab("Models", [modelTab.element]),
-            $tab("Settings", [settingsTab.element]),
-        ]);
+        /** @type {Record<string, HTMLDivElement>} */
+        const head = {};
+        
+        /** @type {Record<string, HTMLDivElement>} */
+        const body = {};
+        
+        /** @type {HTMLDivElement[]} */
+        const contents = [
+            $el("div", { dataset: { name: "Download" } }, [downloadTab.element]),
+            $el("div", { dataset: { name: "Models" } }, [modelTab.element]),
+            $el("div", { dataset: { name: "Settings" } }, [settingsTab.element]),
+        ];
+        
+        const tabs = contents.map((content) => {
+            const name = content.getAttribute("data-name");
+            /** @type {HTMLDivElement} */
+            const tab = $el(
+                "div.head-item",
+                {
+                    onclick: () => {
+                        const ACTIVE_TAB_CLASS = "active";
+                        Object.keys(head).forEach((key) => {
+                            if (name === key) {
+                                head[key].classList.add(ACTIVE_TAB_CLASS);
+                                body[key].style.display = "";
+                            } else {
+                                head[key].classList.remove(ACTIVE_TAB_CLASS);
+                                body[key].style.display = "none";
+                            }
+                        });
+                    },
+                },
+                [
+                    name,
+                ],
+            );
+            head[name] = tab;
+            body[name] = content;
+            return tab;
+        });
+        tabs[0]?.click();
         
         this.element = $el(
             "div.comfy-modal.model-manager",
@@ -3387,7 +3345,10 @@ class ModelManager extends ComfyDialog {
                             }),
                         ]
                     ),
-                    tabs,
+                    $el("div.comfy-tabs", [
+                        $el("div.comfy-tabs-head", tabs),
+                        $el("div.comfy-tabs-body", contents),
+                    ]),
                 ]),
             ]
         );
@@ -3400,9 +3361,8 @@ class ModelManager extends ComfyDialog {
             const managerRect = this.element.getBoundingClientRect();
             const isNarrow = managerRect.width < minWidth;
             let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"];
-            const tabHeaders = tabs.children[0];
             texts.forEach((text, i) => {
-                tabHeaders.children[i].innerText = text;
+                tabs[i].innerText = text;
             });
         }).observe(this.element);
         
