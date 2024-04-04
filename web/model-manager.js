@@ -1605,7 +1605,7 @@ class ModelGrid {
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
-                if (showAddButton) {
+                if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
                     buttons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
