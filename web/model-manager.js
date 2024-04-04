@@ -3239,9 +3239,15 @@ class SidebarButtons {
         const modelManager = this.#modelManager.element;
         const sidebarButtons = this.element.children;
 
+        const buttonActiveState = "sidebar-button-active";
+        for (let i = 0; i < sidebarButtons.length; i++) {
+            sidebarButtons[i].classList.remove(buttonActiveState);
+        }
+
         let buttonIndex;
         for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            if (sidebarButtons[buttonIndex] === button) {
+            const sidebarButton = sidebarButtons[buttonIndex];
+            if (sidebarButton === button) {
                 break;
             }
         }
@@ -3259,6 +3265,8 @@ class SidebarButtons {
         if (stateIndex != buttonIndex) {
             const newSidebarState = sidebarStates[buttonIndex];
             modelManager.classList.add(newSidebarState);
+            const sidebarButton = sidebarButtons[buttonIndex];
+            sidebarButton.classList.add(buttonActiveState);
         }
     }
     

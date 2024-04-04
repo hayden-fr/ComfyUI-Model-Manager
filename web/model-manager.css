@@ -35,6 +35,11 @@
     left: 75%;
 }
 
+.model-manager .sidebar-buttons .sidebar-button-active {
+    border-color: var(--fg-color);
+    color: var(--fg-color);
+}
+
 /* common */
 .model-manager h1 {
     min-width: 0;
