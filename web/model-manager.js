@@ -2951,6 +2951,7 @@ class ModelTab {
                 this.elements.modelContentFilter,
                 showModelInfoView,
             );
+            this.element.scrollTop = 0;
         }
         this.updateModelGrid = updateModelGrid;
         
