@@ -1508,10 +1508,10 @@ class ModelGrid {
      * @param {Object.<HTMLInputElement>} settingsElements
      * @param {String} searchSeparator
      * @param {String} systemSeparator
-     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
      * @returns {HTMLElement[]}
      */
-    static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, modelInfoCallback) {
+    static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, showModelInfo) {
         // TODO: separate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
@@ -1591,7 +1591,7 @@ class ModelGrid {
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "ⓘ",
-                            onclick: async() => modelInfoCallback(searchPath),
+                            onclick: async() => { await showModelInfo(searchPath) },
                             draggable: false,
                         }),
                     ]),
@@ -1618,9 +1618,9 @@ class ModelGrid {
      * @param {boolean} reverseSort
      * @param {Array} previousModelFilters
      * @param {HTMLInputElement} modelFilter
-     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
      */
-    static update(modelGrid, modelData, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, modelInfoCallback) {
+    static update(modelGrid, modelData, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, showModelInfo) {
         const models = modelData.models;
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
@@ -1661,7 +1661,7 @@ class ModelGrid {
             settings, 
             modelData.searchSeparator, 
             modelData.systemSeparator,
-            modelInfoCallback,
+            showModelInfo,
         );
         modelGrid.append.apply(modelGrid, modelGridModels);
     }
@@ -1873,36 +1873,58 @@ class ModelInfoView {
     
     /** @returns {void} */
     show() {
-        this.element.removeAttribute("style");
+        this.element.style = "";
+        this.element.scrollTop = 0;
     }
     
-    /** @returns {Promise<void>} */
-    async hide() {
-        const notes = this.elements.notes;
-        if (notes !== undefined && notes !== null) {
-            const noteValue = this.elements.notes.value;
-            const savedNotesValue = this.#savedNotesValue;
-            if (noteValue.trim() !== savedNotesValue.trim()) {
-                const saveChanges = window.confirm("Save notes?");
-                if (saveChanges) {
-                    const path = this.elements.info.dataset.path;
-                    const saved = await saveNotes(path, noteValue);
-                    if (!saved) {
-                        window.alert("Failed to save notes!");
-                        return;
-                    }
-                    this.#savedNotesValue = "";
-                }
-                else {
-                    const discardChanges = window.confirm("Discard changes?");
-                    if (!discardChanges) {
-                        return;
-                    }
-                }
+    /**
+     * @param {boolean}
+     * @returns {Promise<boolean>}
+     */
+    async trySave(promptUser) {
+        const noteValue = this.elements.notes.value;
+        const savedNotesValue = this.#savedNotesValue;
+        if (noteValue.trim() === savedNotesValue.trim()) {
+            return true;
+        }
+        const saveChanges = !promptUser || window.confirm("Save notes?");
+        if (saveChanges) {
+            const path = this.elements.info.dataset.path;
+            const saved = await saveNotes(path, noteValue);
+            if (!saved) {
+                window.alert("Failed to save notes!");
+                return false;
+            }
+            this.#savedNotesValue = noteValue;
+        }
+        else {
+            const discardChanges = window.confirm("Discard changes?");
+            if (!discardChanges) {
+                return false;
+            }
+            else {
+                this.elements.notes.value = savedNotesValue;
             }
         }
-        
+        return true;
+    }
+    
+    /**
+     * @param {boolean?} promptSave
+     * @returns {Promise<boolean>}
+     */
+    async tryHide(promptSave = true) {
+        const notes = this.elements.notes;
+        if (promptSave && notes !== undefined && notes !== null) {
+            const saved = await this.trySave(promptSave);
+            if (!saved) {
+                return false;
+            }
+            this.#savedNotesValue = "";
+            this.elements.notes.value = "";
+        }
         this.element.style.display = "none";
+        return true;
     }
     
     /**
@@ -2061,12 +2083,7 @@ class ModelInfoView {
                                 elements.push($el("button", {
                                     textContent: "Save Notes",
                                     onclick: async (e) => {
-                                        const path = this.elements.info.dataset.path;
-                                        const newValue = notes.value;
-                                        const saved = await saveNotes(path, newValue);
-                                        if (saved) {
-                                            this.#savedNotesValue = newValue;
-                                        }
+                                        const saved = await this.trySave(false);
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
@@ -2802,9 +2819,6 @@ class ModelTab {
     /** @type {ModelData} */
     #modelData = null;
     
-    /** @type {ModelInfoView} */
-    #modelInfoView = null;
-    
     /** @type {@param {() => Promise<void>}} */
     #updateModels = null;
     
@@ -2817,17 +2831,16 @@ class ModelTab {
     /**
      * @param {() => Promise<void>} updateModels
      * @param {ModelData} modelData
-     * @param {ModelInfoView} modelInfoView
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
      * @param {any} settingsElements
      */
-    constructor(updateModels, modelData, modelInfoView, settingsElements) {
+    constructor(updateModels, modelData, showModelInfo, settingsElements) {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
         
         this.#updateModels = updateModels;
         this.#modelData = modelData;
-        this.#modelInfoView = modelInfoView;
         this.#settingsElements = settingsElements;
         
         const searchInput = $el("input.search-text-area", {
@@ -2844,19 +2857,6 @@ class ModelTab {
             this.previousModelFilters[modelType] = value;
         };
         
-        /**
-         * @param {string} searchPath
-         */
-        const showModelInfoView = async(searchPath) => {
-            this.#modelInfoView.update(
-                searchPath, 
-                this.#updateModels, 
-                this.#modelData.searchSeparator
-            ).then(() => {
-                this.#modelInfoView.show();
-            });
-        }
-        
         const updateModelGrid = () => {
             const sortValue = this.elements.modelSortSelect.value;
             const reverseSort = sortValue[0] === "-";
@@ -2871,7 +2871,7 @@ class ModelTab {
                 reverseSort,
                 this.previousModelFilters,
                 this.elements.modelContentFilter,
-                showModelInfoView,
+                showModelInfo,
             );
             this.element.parentElement.scrollTop = 0;
         }
@@ -3242,8 +3242,14 @@ class ModelManager extends ComfyDialog {
     /** @type {SettingsTab} */
     #settingsTab = null;
     
-    /** @type {SidebarButtons} */
-    #sidebarButtons = null;
+    /** @type {HTMLDivElement} */
+    #tabs = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabContents = null;
+    
+    /** @type {HTMLButtonElement} */
+    #closeModelInfoButton = null;
     
     constructor() {
         super();
@@ -3261,10 +3267,29 @@ class ModelManager extends ComfyDialog {
         );
         this.#settingsTab = settingsTab;
         
+        const ACTIVE_TAB_CLASS = "active";
+        
+        /**
+         * @param {searchPath: string}
+         * @return {Promise<void>}
+         */
+        const showModelInfo = async(searchPath) => {
+            await this.#modelInfoView.update(
+                searchPath, 
+                this.#refreshModels, 
+                this.#modelData.searchSeparator
+            ).then(() => {
+                this.#tabs.style.display = "none";
+                this.#tabContents.style.display = "none";
+                this.#closeModelInfoButton.style.display = "";
+                this.#modelInfoView.show();
+            });
+        }
+        
         const modelTab = new ModelTab(
             this.#refreshModels,
             this.#modelData,
-            this.#modelInfoView,
+            showModelInfo,
             this.#settingsTab.elements.settings, // TODO: decouple settingsData from elements?
         );
         this.#modelTab = modelTab;
@@ -3277,7 +3302,6 @@ class ModelManager extends ComfyDialog {
         this.#downloadTab = downloadTab;
         
         const sidebarButtons = new SidebarButtons(this);
-        this.#sidebarButtons = sidebarButtons;
         
         /** @type {Record<string, HTMLDivElement>} */
         const head = {};
@@ -3295,11 +3319,8 @@ class ModelManager extends ComfyDialog {
         const tabs = contents.map((content) => {
             const name = content.getAttribute("data-name");
             /** @type {HTMLDivElement} */
-            const tab = $el(
-                "div.head-item",
-                {
+            const tab = $el("div.head-item", {
                     onclick: () => {
-                        const ACTIVE_TAB_CLASS = "active";
                         Object.keys(head).forEach((key) => {
                             if (name === key) {
                                 head[key].classList.add(ACTIVE_TAB_CLASS);
@@ -3311,9 +3332,7 @@ class ModelManager extends ComfyDialog {
                         });
                     },
                 },
-                [
-                    name,
-                ],
+                [name],
             );
             head[name] = tab;
             body[name] = content;
@@ -3321,50 +3340,67 @@ class ModelManager extends ComfyDialog {
         });
         tabs[0]?.click();
         
-        this.element = $el(
+        const closeManagerButton = $el("button.icon-button", {
+            textContent: "✖",
+            onclick: async() => {
+                const saved = await modelInfoView.trySave(true);
+                if (saved) {
+                    this.close();
+                }
+            }
+        });
+        
+        const closeModelInfoButton = $el("button.icon-button", {
+            $: (el) => (this.#closeModelInfoButton = el),
+            style: { display: "none" },
+            textContent: "⬅",
+            onclick: async() => { await this.#tryHideModelInfo(true); },
+        });
+        
+        const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
+                $: (el) => (this.element = el),
                 parent: document.body,
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
-                    modelInfoView.element,
-                    $el("div.topbar-buttons",
-                        [
-                            sidebarButtons.element,
-                            $el("button.icon-button", {
-                                textContent: "✖",
-                                onclick: async() => {
-                                    if (modelInfoView.isVisible()) { // TODO: decouple back and close
-                                        this.close();
-                                    }
-                                    else {
-                                        await modelInfoView.hide();
-                                    }
-                                },
-                            }),
-                        ]
-                    ),
-                    $el("div.comfy-tabs", [
-                        $el("div.comfy-tabs-head", tabs),
-                        $el("div.comfy-tabs-body", contents),
+                    $el("div.model-manager-panel", [
+                        $el("div.model-manager-head", [
+                            $el("div.topbar-right", [
+                                closeManagerButton,
+                                closeModelInfoButton,
+                                sidebarButtons.element,
+                            ]),
+                            $el("div.topbar-left", [
+                                $el("div.model-manager-tabs", {
+                                    $: (el) => (this.#tabs = el),
+                                }, tabs),
+                            ]),
+                        ]),
+                        $el("div.model-manager-body", [
+                            $el("div.model-manager-tab-contents", {
+                                $: (el) => (this.#tabContents = el),
+                            }, contents),
+                            modelInfoView.element,
+                        ]),
                     ]),
                 ]),
             ]
         );
         
         new ResizeObserver(() => {
-            if (this.element.style.display === "none") {
+            if (modelManager.style.display === "none") {
                 return;
             }
             const minWidth = 768; // magic value (could easily break)
-            const managerRect = this.element.getBoundingClientRect();
+            const managerRect = modelManager.getBoundingClientRect();
             const isNarrow = managerRect.width < minWidth;
-            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"];
+            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"]; // magic values
             texts.forEach((text, i) => {
                 tabs[i].innerText = text;
             });
-        }).observe(this.element);
+        }).observe(modelManager);
         
         this.#init();
     }
@@ -3383,6 +3419,23 @@ class ModelManager extends ComfyDialog {
         modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
         this.#modelTab.updateModelGrid();
+        await this.#tryHideModelInfo(false);
+    }
+    
+    /**
+     * @param {boolean} promptSave 
+     * @returns {Promise<boolean>}
+     */
+    #tryHideModelInfo = async(promptSave) => {
+        if (this.#tabContents.style.display === "none") {
+            if (!await this.#modelInfoView.tryHide(promptSave)) {
+                return false;
+            }
+            this.#closeModelInfoButton.style.display = "none";
+            this.#tabs.style.display = "";
+            this.#tabContents.style.display = "";
+        }
+        return true;
     }
 }
 

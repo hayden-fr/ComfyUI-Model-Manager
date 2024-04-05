@@ -5,7 +5,7 @@
     height: 100%;
     max-width: unset;
     max-height: unset;
-    padding: 10px;
+    padding: 8px;
     color: var(--bg-color);
     z-index: 2000;
 }
@@ -153,61 +153,57 @@
 /* sidebar buttons */
 .model-manager .sidebar-buttons {
     overflow: hidden;
-    padding-right: 10px;
     color: var(--input-text);
 }
 
-/* tabs */
-.model-manager .comfy-tabs {
+/* main content */
+.model-manager .model-manager-panel {
     color: var(--fg-color);
 }
 
-.model-manager .comfy-tabs-head {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+.model-manager .model-manager-tabs {
     border-bottom: 2px solid var(--border-color);
+    display: flex;
+    gap: 4px;
 }
 
-.model-manager .comfy-tabs-head .head-item {
-    padding: 8px 12px;
+.model-manager .model-manager-tabs .head-item {
+    background-color: var(--comfy-menu-bg);
     border: 2px solid var(--border-color);
     border-bottom: none;
     border-top-left-radius: 8px;
     border-top-right-radius: 8px;
-    background-color: var(--comfy-menu-bg);
     cursor: pointer;
+    padding: 8px 12px;
     margin-bottom: 0px;
     z-index: 1;
 }
 
-.model-manager .comfy-tabs-head .head-item.active {
+.model-manager .model-manager-tabs .head-item.active {
     background-color: var(--comfy-input-bg);
     cursor: default;
     position: relative;
     z-index: 1;
 }
 
-.model-manager .comfy-tabs-body {
+.model-manager .model-manager-body {
     background-color: var(--bg-color);
-    border: 2px solid var(--border-color);
-    border-top: none;
     padding: 16px 0px;
 }
 
-.model-manager .comfy-tabs {
+.model-manager .model-manager-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
-.model-manager .comfy-tabs-body {
+.model-manager .model-manager-body {
     flex: 1;
     overflow: hidden;
 }
 
-.model-manager .comfy-tabs-body > div {
+.model-manager .model-manager-body > div {
     position: relative;
     height: 100%;
     width: auto;
@@ -218,12 +214,9 @@
 /* model info view */
 .model-manager .model-info-view {
     background-color: var(--bg-color);
-    border: 2px solid var(--border-color);
-    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     height: 100%;
-    margin-top: 40px;
     overflow-wrap: break-word;
     overflow-y: auto;
     padding: 20px;
@@ -446,23 +439,33 @@
 
 /* topbar */
 .model-manager .topbar-buttons {
-    position: absolute;
     display: flex;
-    top: 10px;
-    right: 10px;
+    float: right;
 }
 
 .model-manager .topbar-buttons button {
-    width: 33px;
     height: 33px;
     padding: 1px 6px;
+    width: 33px;
+}
+
+.model-manager .model-manager-head .topbar-left {
+    display: flex;
+    float: left;
+}
+
+.model-manager .model-manager-head .topbar-right {
+    column-gap: 4px;
+    display: flex;
+    flex-direction: row-reverse;
+    float: right;
 }
 
 /* search dropdown */
 .model-manager .search-models {
     display: flex;
-    flex-direction: row;
     flex: 1;
+    flex-direction: row;
     min-width: 0;
 }
 
