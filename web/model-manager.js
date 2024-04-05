@@ -1866,11 +1866,6 @@ class ModelInfoView {
         ]);
     }
     
-    /** @returns {boolean} */
-    isVisible() {
-        return this.element.style.display === "none";
-    }
-    
     /** @returns {void} */
     show() {
         this.element.style = "";
@@ -1882,6 +1877,10 @@ class ModelInfoView {
      * @returns {Promise<boolean>}
      */
     async trySave(promptUser) {
+        if (this.element.style.display === "none") {
+            return true;
+        }
+        
         const noteValue = this.elements.notes.value;
         const savedNotesValue = this.#savedNotesValue;
         if (noteValue.trim() === savedNotesValue.trim()) {
