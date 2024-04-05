@@ -36,8 +36,8 @@
 }
 
 .model-manager .sidebar-buttons .sidebar-button-active {
-    border-color: var(--fg-color);
-    color: var(--fg-color);
+    overflow: hidden;
+    color: var(--input-text);
 }
 
 /* common */
@@ -154,6 +154,9 @@
 .model-manager .sidebar-buttons {
     overflow: hidden;
     color: var(--input-text);
+    display: flex;
+    flex-direction: row-reverse;
+    flex-wrap: wrap;
 }
 
 /* main content */

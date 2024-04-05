@@ -3042,6 +3042,12 @@ class SettingsTab {
             $: (el) => (this.element = el),
         }, [
             $el("h1", ["Settings"]),
+            $el("a", {
+                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
+                }, [
+                    "File bugs and issues here."
+                ]
+            ),
             $el("div", [
                 $el("button", {
                     $: (el) => (this.elements.reloadButton = el),
@@ -3174,7 +3180,7 @@ class SidebarButtons {
             }
         }
 
-        const sidebarStates = ["sidebar-left", "sidebar-bottom", "sidebar-top", "sidebar-right"];
+        const sidebarStates = ["sidebar-right", "sidebar-top", "sidebar-bottom", "sidebar-left"]; // TODO: magic numbers
         let stateIndex;
         for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
             const state = sidebarStates[stateIndex];
@@ -3202,12 +3208,9 @@ class SidebarButtons {
             $: (el) => (this.element = el),
         },
         [
+            
             $el("button.icon-button", {
-                textContent: "◧",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬓",
+                textContent: "◨",
                 onclick: (event) => this.#setSidebar(event),
             }),
             $el("button.icon-button", {
@@ -3215,7 +3218,11 @@ class SidebarButtons {
                 onclick: (event) => this.#setSidebar(event),
             }),
             $el("button.icon-button", {
-                textContent: "◨",
+                textContent: "⬓",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+            $el("button.icon-button", {
+                textContent: "◧",
                 onclick: (event) => this.#setSidebar(event),
             }),
         ]);
