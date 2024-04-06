@@ -1,14 +1,26 @@
 /* model manager */
 .model-manager {
+    background-color: var(--comfy-menu-bg);
     box-sizing: border-box;
-    width: 100%;
-    height: 100%;
-    max-width: unset;
-    max-height: unset;
-    padding: 8px;
     color: var(--bg-color);
-    z-index: 2000;
+    font-family: monospace;
+    font-size: 15px;
+    height: 100%;
+    padding: 8px;
+    position: fixed;
     overflow: hidden;
+    top: 0;
+    left: 0;
+    width: 100%;
+    z-index: 2000;
+    
+    /*override comfy-modal settings*/
+    border-radius: 0;
+    box-shadow: none;
+    justify-content: unset;
+    max-height: unset;
+    max-width: unset;
+    transform: none;
 }
 
 .model-manager .comfy-modal-content {
@@ -18,22 +30,22 @@
 
 .model-manager.sidebar-left {
     width: 50%;
-    left: 25%;
+    left: 0%;
 }
 
 .model-manager.sidebar-top {
     height: 50%;
-    top: 25%;
+    top: 0%;
 }
 
 .model-manager.sidebar-bottom {
     height: 50%;
-    top: 75%;
+    top: 50%;
 }
 
 .model-manager.sidebar-right {
     width: 50%;
-    left: 75%;
+    left: 50%;
 }
 
 .model-manager .sidebar-buttons .sidebar-button-active {
@@ -80,11 +92,6 @@
     width: 100%;
 }
 
-.comfy-table a {
-    color: #007acc;
-    text-decoration: none;
-}
-
 .model-manager ::-webkit-scrollbar {
     width: 16px;
 }
@@ -113,7 +120,7 @@
    font-style: italic; 
 }
 
-.icon-button {
+.model-manager .icon-button {
     height: 40px;
     width: 40px;
     line-height: 1.15;
@@ -424,12 +431,12 @@
 }
 
 /* model preview select */
-.model-preview-select-radio-container {
+.model-manager .model-preview-select-radio-container {
     min-width: 0;
     flex: 1;
 }
 
-.model-preview-select-radio-inputs > div {
+.model-manager .model-preview-select-radio-inputs > div {
     height: 40px;
     padding: 16px 0 8px 0;
 }
@@ -550,6 +557,6 @@
     width: 50px;
 }
 
-.search-settings-text {
+.model-manager .search-settings-text {
     width: 100%;
 }
