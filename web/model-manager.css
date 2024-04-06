@@ -44,7 +44,7 @@
 
 /* common */
 .model-manager h1 {
-    min-width: 0;
+    overflow-wrap: break-word;
 }
 
 .model-manager textarea {
