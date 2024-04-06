@@ -1060,7 +1060,8 @@ class DirectoryDropdown {
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
      * @param {String} searchSeparator
-     * * @param {String} className
+     * @param {String} className
+     * @returns {boolean} changed
      */
     static selectionToInput(input, selection, searchSeparator, className) {
         selection.classList.remove(className);
@@ -1068,7 +1069,9 @@ class DirectoryDropdown {
         const oldFilterText = input.value;
         const iSep = oldFilterText.lastIndexOf(searchSeparator);
         const previousPath = oldFilterText.substring(0, iSep + 1);
-        input.value = previousPath + selectedText;
+        const newFilterText = previousPath + selectedText;
+        input.value = newFilterText;
+        return newFilterText !== oldFilterText;
     }
 
     /**
@@ -1156,7 +1159,7 @@ class DirectoryDropdown {
             return undefined;
         }
 
-        const selection_select = (e) => {
+        const mouse_selection_select = (e) => {
             const selection = e.target;
             if (e.movementX === 0 && e.movementY === 0) { return; }
             if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS)) {
@@ -1170,7 +1173,7 @@ class DirectoryDropdown {
                 selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
             }
         };
-        const selection_deselect = (e) => {
+        const mouse_selection_deselect = (e) => {
             e.stopPropagation();
             e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
         };
@@ -1178,19 +1181,25 @@ class DirectoryDropdown {
             e.stopPropagation();
             e.preventDefault();
             const selection = e.target;
-            DirectoryDropdown.selectionToInput(
+            const changed = DirectoryDropdown.selectionToInput(
                 input, 
                 selection, 
                 searchSeparator, 
                 DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS
             );
-            const path = this.#updateOptions(); // TODO: is this needed?
-            if (path !== undefined) {
-                this.#updateDeepestPath(path);
+            if (!changed) {
+                dropdown.style.display = "none";
+                input.blur();
+            }
+            else {
+                const path = this.#updateOptions(); // TODO: is this needed?
+                if (path !== undefined) {
+                    this.#updateDeepestPath(path);
+                }
             }
             this.#updateCallback();
         };
-        const selection_touch = async(e) => {
+        const touch_selection_select = async(e) => {
             const [startX, startY] = this.#touchSelectionStart;
             const [endX, endY] = [
                 e.changedTouches[0].clientX,
@@ -1219,13 +1228,13 @@ class DirectoryDropdown {
             const p = $el(
                 "p",
                 {
-                    onmouseenter: (e) => selection_select(e),
-                    onmousemove: (e) => selection_select(e),
-                    onmouseleave: (e) => selection_deselect(e),
+                    onmouseenter: (e) => mouse_selection_select(e),
+                    onmousemove: (e) => mouse_selection_select(e),
+                    onmouseleave: (e) => mouse_selection_deselect(e),
                     onmousedown: (e) => selection_submit(e),
                     ontouchstart: (e) => touch_start(e),
                     ontouchmove: (e) => touch_move(e),
-                    ontouchend: (e) => selection_touch(e),
+                    ontouchend: (e) => touch_selection_select(e),
                 },
                 [
                     text
