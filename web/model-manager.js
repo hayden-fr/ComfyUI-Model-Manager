@@ -182,7 +182,7 @@ function buttonAlert(element, success, successText = "", failureText = "", reset
  * @returns {Promise<boolean>}
  */
 async function saveNotes(modelPath, newValue) {
-    return request(
+    return await request(
         "/model-manager/notes/save",
         {
             method: "POST",
@@ -192,7 +192,12 @@ async function saveNotes(modelPath, newValue) {
             }),
         }
     ).then((result) => {
-        return result["success"];
+        const saved = result["success"];
+        const message = result["alert"];
+        if (message !== undefined) {
+            window.alert(message);
+        }
+        return saved;
     })
     .catch((err) => {
         console.warn(err);
@@ -1728,6 +1733,10 @@ class ModelInfoView {
                             }
                         )
                         .then((result) => {
+                            const message = result["alert"];
+                            if (message !== undefined) {
+                                window.alert(message);
+                            }
                             return result["success"];
                         })
                         .catch((err) => {
@@ -1747,6 +1756,10 @@ class ModelInfoView {
                             }
                         )
                         .then((result) => {
+                            const message = result["alert"];
+                            if (message !== undefined) {
+                                window.alert(message);
+                            }
                             return result["success"];
                         })
                         .catch((err) => {
@@ -1794,7 +1807,11 @@ class ModelInfoView {
                                 )
                                 .then((result) => {
                                     const deleted = result["success"];
-                                    if (deleted) 
+                                    const message = result["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
+                                    }
+                                    if (deleted)
                                     {
                                         container.innerHTML = "";
                                         this.element.style.display = "none";
@@ -1841,6 +1858,10 @@ class ModelInfoView {
                                 )
                                 .then((result) => {
                                     const moved = result["success"];
+                                    const message = result["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
+                                    }
                                     if (moved)
                                     {
                                         moveDestinationInput.value = "";
@@ -1934,11 +1955,22 @@ class ModelInfoView {
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
         const info = await request(`/model-manager/model/info?path=${path}`)
+        .then((result) => {
+            const success = result["success"];
+            const message = result["alert"];
+            if (message !== undefined) {
+                window.alert(message);
+            }
+            if (!success) {
+                return undefined;
+            }
+            return result["info"];
+        })
         .catch((err) => {
             console.log(err);
-            return null;
+            return undefined;
         });
-        if (info === null) {
+        if (info === undefined || info === null) {
             return;
         }
         const infoHtml = this.elements.info;
@@ -1985,6 +2017,10 @@ class ModelInfoView {
                                     )
                                     .then((result) => {
                                         const renamed = result["success"];
+                                        const message = result["alert"];
+                                        if (message !== undefined) {
+                                            window.alert(message);
+                                        }
                                         if (renamed)
                                         {
                                             container.innerHTML = "";
@@ -2713,8 +2749,9 @@ class DownloadTab {
                                     }
                                 ).then((data) => {
                                     const success = data["success"];
-                                    if (!success) {
-                                        console.warn(data["invalid"]);
+                                    const message = data["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
                                     }
                                     return [success, success ? "✔" : "📥︎"];
                                 }).catch((err) => {
@@ -3053,13 +3090,13 @@ class SettingsTab {
                     $: (el) => (this.elements.reloadButton = el),
                     type: "button",
                     textContent: "Reload", // ⟳
-                    onclick: () => this.reload(true),
+                    onclick: async () => { await this.reload(true); },
                 }),
                 $el("button", {
                     $: (el) => (this.elements.saveButton = el),
                     type: "button",
                     textContent: "Save", // 💾︎
-                    onclick: () => this.save(),
+                    onclick: async () => { await this.save(); },
                 }),
             ]),
             /*

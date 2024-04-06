@@ -425,14 +425,20 @@ async def set_model_preview(request):
         return web.json_response({ "success": True })
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
-        return web.json_response({ "success": False })
+        return web.json_response({
+            "success": False,
+            "alert": "Failed to set preview!\n\n" + str(e),
+        })
 
 
 @server.PromptServer.instance.routes.post("/model-manager/preview/delete")
 async def delete_model_preview(request):
+    result = { "success": False }
+    
     model_path = request.query.get("path", None)
     if model_path is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
     model_path, model_type = search_path_to_system_path(model_path)
@@ -440,7 +446,8 @@ async def delete_model_preview(request):
     path_and_name, _ = split_valid_ext(model_path, model_extensions)
     delete_same_name_files(path_and_name, preview_extensions)
 
-    return web.json_response({ "success": True })
+    result["success"] = True
+    return web.json_response(result)
 
 
 @server.PromptServer.instance.routes.get("/model-manager/models/list")
@@ -653,7 +660,7 @@ def download_file(url, filename, overwrite):
 
     total_size = int(rh.headers.get("Content-Length", 0)) # TODO: pass in total size earlier
 
-    print("Download file: " + filename)
+    print("Downloading file: " + url)
     if total_size != 0:
         print("Download file size: " + str(total_size))
 
@@ -683,6 +690,7 @@ def download_file(url, filename, overwrite):
     if overwrite and os.path.isfile(filename):
         os.remove(filename)
     os.rename(filename_temp, filename)
+    print("Saved file: " + filename)
 
 
 def bytes_to_size(total_bytes):
@@ -700,14 +708,18 @@ def bytes_to_size(total_bytes):
 
 @server.PromptServer.instance.routes.get("/model-manager/model/info")
 async def get_model_info(request):
+    result = { "success": False }
+
     model_path = request.query.get("path", None)
     if model_path is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
     abs_path, model_type = search_path_to_system_path(model_path)
     if abs_path is None:
-        return web.json_response({})
+        result["alert"] = "Invalid model path!"
+        return web.json_response(result)
 
     info = {}
     comfyui_directory, name = os.path.split(model_path)
@@ -832,7 +844,9 @@ async def get_model_info(request):
         tags.sort(key=lambda x: x[1], reverse=True)
         info["Tags"] = tags
 
-    return web.json_response(info)
+    result["success"] = True
+    result["info"] = info
+    return web.json_response(result)
 
 
 @server.PromptServer.instance.routes.get("/model-manager/system-separator")
@@ -843,10 +857,7 @@ async def get_system_separator(request):
 @server.PromptServer.instance.routes.post("/model-manager/model/download")
 async def download_model(request):
     formdata = await request.post()
-    result = {
-        "success": False,
-        "invalid": None,
-    }
+    result = { "success": False }
 
     overwrite = formdata.get("overwrite", "false").lower()
     overwrite = True if overwrite == "true" else False
@@ -854,26 +865,30 @@ async def download_model(request):
     model_path = formdata.get("path", "/0")
     directory, model_type = search_path_to_system_path(model_path)
     if directory is None:
-        result["invalid"] = "path"
+        result["alert"] = "Invalid save path!"
         return web.json_response(result)
 
     download_uri = formdata.get("download")
     if download_uri is None:
-        result["invalid"] = "download"
+        result["alert"] = "Invalid download url!"
         return web.json_response(result)
 
     name = formdata.get("name")
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
-    _, model_extension = split_valid_ext(name, model_extensions)
+    name_head, model_extension = split_valid_ext(name, model_extensions)
+    name_without_extension = os.path.split(name_head)[1]
+    if name_without_extension == "":
+        result["alert"] = "Cannot have empty model name!"
+        return web.json_response(result)
     if model_extension == "":
-        result["invalid"] = "name"
+        result["alert"] = "Unrecognized model extension!"
         return web.json_response(result)
     file_name = os.path.join(directory, name)
     try:
         download_file(download_uri, file_name, overwrite)
     except Exception as e:
         print(e, file=sys.stderr, flush=True)
-        result["invalid"] = "model"
+        result["alert"] = "Failed to download model!\n\n" + str(e)
         return web.json_response(result)
 
     image = formdata.get("image")
@@ -886,7 +901,7 @@ async def download_model(request):
             })
         except Exception as e:
             print(e, file=sys.stderr, flush=True)
-            result["invalid"] = "preview"
+            result["alert"] = "Failed to download preview!\n\n" + str(e)
 
     result["success"] = True
     return web.json_response(result)
@@ -895,48 +910,60 @@ async def download_model(request):
 @server.PromptServer.instance.routes.post("/model-manager/model/move")
 async def move_model(request):
     body = await request.json()
+    result = { "success": False }
 
     old_file = body.get("oldFile", None)
     if old_file is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "No model was given!"
+        return web.json_response(result)
     old_file, old_model_type = search_path_to_system_path(old_file)
     if not os.path.isfile(old_file):
-        return web.json_response({ "success": False })
+        result["alert"] = "Model does not exist!"
+        return web.json_response(result)
     old_model_extensions = folder_paths_get_supported_pt_extensions(old_model_type)
     old_file_without_extension, model_extension = split_valid_ext(old_file, old_model_extensions)
     if model_extension == "":
-        # cannot move arbitrary files
-        return web.json_response({ "success": False })
+        result["alert"] = "Invalid model extension!"
+        return web.json_response(result)
 
     new_file = body.get("newFile", None)
     if new_file is None or new_file == "":
-        # cannot have empty name
-        return web.json_response({ "success": False })
+        result["alert"] = "New model name was invalid!"
+        return web.json_response(result)
     new_file, new_model_type = search_path_to_system_path(new_file)
     if not new_file.endswith(model_extension):
-        return web.json_response({ "success": False })
+        result["alert"] = "Cannot change model extension!"
+        return web.json_response(result)
     if os.path.isfile(new_file):
-        # cannot overwrite existing file
-        return web.json_response({ "success": False })
+        result["alert"] = "Cannot overwrite existing model!"
+        return web.json_response(result)
     new_model_extensions = folder_paths_get_supported_pt_extensions(new_model_type)
     new_file_without_extension, new_model_extension = split_valid_ext(new_file, new_model_extensions)
     if model_extension != new_model_extension:
-        # cannot change extension
-        return web.json_response({ "success": False })
-    new_file_dir, _ = os.path.split(new_file)
+        result["alert"] = "Cannot change model extension!"
+        return web.json_response(result)
+    new_file_dir, new_file_name = os.path.split(new_file)
     if not os.path.isdir(new_file_dir):
-        return web.json_response({ "success": False })
+        result["alert"] = "Destination directory does not exist!"
+        return web.json_response(result)
+    new_name_without_extension = os.path.splitext(new_file_name)[0]
+    if new_file_name == new_name_without_extension or new_name_without_extension == "":
+        result["alert"] = "New model name was empty!"
+        return web.json_response(result)
 
     if old_file == new_file:
-        return web.json_response({ "success": False })
+        # no-op
+        result["success"] = True
+        return web.json_response(result)
     try:
         shutil.move(old_file, new_file)
         print("Moved file: " + new_file)
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
-        return web.json_response({ "success": False })
+        result["alert"] = "Failed to move model!\n\n" + str(e)
+        return web.json_response(result)
 
-    # TODO: this could overwrite existing files in destination...
+    # TODO: this could overwrite existing files in destination; do a check beforehand?
     for extension in preview_extensions + (model_info_extension,):
         old_file = old_file_without_extension + extension
         if os.path.isfile(old_file):
@@ -946,8 +973,14 @@ async def move_model(request):
                 print("Moved file: " + new_file)
             except ValueError as e:
                 print(e, file=sys.stderr, flush=True)
+                msg = result.get("alert","")
+                if msg == "":
+                    result["alert"] = "Failed to move model resource file!\n\n" + str(e)
+                else:
+                    result["alert"] = msg + "\n" + str(e)
 
-    return web.json_response({ "success": True })
+    result["success"] = True
+    return web.json_response(result)
 
 
 def delete_same_name_files(path_without_extension, extensions, keep_extension=None):
@@ -965,16 +998,18 @@ async def delete_model(request):
 
     model_path = request.query.get("path", None)
     if model_path is None:
+        result["alert"] = "Missing model path!"
         return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
     model_path, model_type = search_path_to_system_path(model_path)
     if model_path is None:
+        result["alert"] = "Invalid model path!"
         return web.json_response(result)
 
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     path_and_name, model_extension = split_valid_ext(model_path, model_extensions)
     if model_extension == "":
-        # cannot delete arbitrary files
+        result["alert"] = "Cannot delete file!"
         return web.json_response(result)
 
     if os.path.isfile(model_path):
@@ -991,14 +1026,17 @@ async def delete_model(request):
 @server.PromptServer.instance.routes.post("/model-manager/notes/save")
 async def set_notes(request):
     body = await request.json()
+    result = { "success": False }
 
     text = body.get("notes", None)
     if type(text) is not str:
-        return web.json_response({ "success": False })
+        result["alert"] = "Invalid note!"
+        return web.json_response(result)
 
     model_path = body.get("path", None)
     if type(model_path) is not str:
-        return web.json_response({ "success": False })
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
     model_path, model_type = search_path_to_system_path(model_path)
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     file_path_without_extension, _ = split_valid_ext(model_path, model_extensions)
@@ -1013,9 +1051,11 @@ async def set_notes(request):
             print("Saved file: " + filename)
         except ValueError as e:
             print(e, file=sys.stderr, flush=True)
-            web.json_response({ "success": False })
+            result["alert"] = "Failed to save notes!\n\n" + str(e)
+            web.json_response(result)
 
-    return web.json_response({ "success": True })
+    result["success"] = True
+    return web.json_response(result)
 
 
 WEB_DIRECTORY = "web"

@@ -452,6 +452,13 @@
     width: 33px;
 }
 
+.model-manager .model-manager-head {
+    display: flex;
+    flex-direction: row-reverse; /* `row` to swap topbar direction */
+    justify-content: space-between;
+    align-items: flex-end;
+}
+
 .model-manager .model-manager-head .topbar-left {
     display: flex;
     float: left;
@@ -460,7 +467,7 @@
 .model-manager .model-manager-head .topbar-right {
     column-gap: 4px;
     display: flex;
-    flex-direction: row-reverse;
+    flex-direction: row-reverse; /* `row` to swap topbar direction */
     float: right;
 }
 
