@@ -2645,7 +2645,7 @@ class DownloadTab {
             $el("div.download-model-infos", {
                 $: (el) => (this.elements.infos = el),
             }, [
-                $el("div", ["Input a URL to select a model to download."]),
+                $el("h1", ["Input a URL to select a model to download."]),
             ]),
         ]);
     }
@@ -2842,7 +2842,7 @@ class DownloadTab {
             );
         });
         if (modelInfosHtml.length === 0) {
-            modelInfosHtml.push($el("div", ["No results found."]));
+            modelInfosHtml.push($el("h1", ["No models found."]));
         }
         else {
             if (modelInfosHtml.length === 1) {

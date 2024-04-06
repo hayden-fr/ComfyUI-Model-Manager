@@ -8,6 +8,7 @@
     padding: 8px;
     color: var(--bg-color);
     z-index: 2000;
+    overflow: hidden;
 }
 
 .model-manager .comfy-modal-content {
