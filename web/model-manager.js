@@ -503,6 +503,33 @@ class ImageSelect {
             el_uploadFile,
         ]);
         
+        /**
+         * @param {string} url 
+         * @returns {Promise<string>}
+         */
+        const getCustomPreviewUrl = async (url) => {
+            if (url.startsWith(Civitai.imagePostUrlPrefix())) {
+                return await Civitai.getImageInfo(url)
+                .then((imageInfo) => {
+                    const items = imageInfo["items"];
+                    if (items.length > 0) {
+                        return items[0]["url"];
+                    }
+                    else {
+                        console.warn("Civitai /api/v1/images returned 0 items.");
+                        return url;
+                    }
+                })
+                .catch((error) => {
+                    console.error("Failed to get image info from Civitai!", error);
+                    return url;
+                });
+            }
+            else {
+                return url;
+            }
+        };
+        
         const el_customUrlPreview = $el("img", {
             $: (el) => (this.elements.customUrlPreview = el),
             src: PREVIEW_NONE_URI,
@@ -517,6 +544,14 @@ class ImageSelect {
             name: "custom preview image url",
             autocomplete: "off",
             placeholder: "https://custom-image-preview.png",
+            onkeydown: async (e) => {
+                if (e.key === "Enter") {
+                    const value = e.target.value;
+                    el_customUrlPreview.src = await getCustomPreviewUrl(value);
+                    e.stopPropagation();
+                    e.target.blur();
+                }
+            },
         });
         const el_custom = $el("div.row.tab-header-flex-block", {
             $: (el) => (this.elements.custom = el),
@@ -527,26 +562,9 @@ class ImageSelect {
                 textContent: "🔍︎",
                 onclick: async (e) => {
                     const value = el_customUrl.value;
-                    if (value.startsWith(Civitai.imagePostUrlPrefix())) {
-                        el_customUrlPreview.src = await Civitai.getImageInfo(value)
-                        .then((imageInfo) => {
-                            const items = imageInfo["items"];
-                            if (items.length > 0) {
-                                return items[0]["url"];
-                            }
-                            else {
-                                console.warn("Civitai /api/v1/images returned 0 items.");
-                                return value;
-                            }
-                        })
-                        .catch((error) => {
-                            console.error("Failed to get image info from Civitai!", error);
-                            return value;
-                        });
-                    }
-                    else {
-                        el_customUrlPreview.src = value;
-                    }
+                    el_customUrlPreview.src = await getCustomPreviewUrl(value);
+                    e.stopPropagation();
+                    el_customUrl.blur();
                 },
             }),
         ]);
@@ -2615,6 +2633,7 @@ class DownloadTab {
                         if (e.key === "Enter") {
                             e.stopPropagation();
                             await update();
+                            e.target.blur();
                         }
                     },
                 }),
@@ -2718,6 +2737,12 @@ class DownloadTab {
             autocomplete: "off",
             placeholder: default_name,
             value: default_name,
+            onkeydown: (e) => {
+                if (e.key === "Enter") {
+                    e.stopPropagation();
+                    e.target.blur();
+                }
+            },
         });
         
         const filepath = info["downloadFilePath"];
