@@ -36,8 +36,9 @@
 }
 
 .model-manager .sidebar-buttons .sidebar-button-active {
+    border-color: var(--fg-color);
+    color: var(--fg-color);
     overflow: hidden;
-    color: var(--input-text);
 }
 
 /* common */
@@ -165,9 +166,9 @@
 }
 
 .model-manager .model-manager-tabs {
-    border-bottom: 2px solid var(--border-color);
     display: flex;
     gap: 4px;
+    height: 40px;
 }
 
 .model-manager .model-manager-tabs .head-item {
@@ -183,7 +184,7 @@
 }
 
 .model-manager .model-manager-tabs .head-item.active {
-    background-color: var(--comfy-input-bg);
+    background-color: var(--bg-color);
     cursor: default;
     position: relative;
     z-index: 1;
@@ -191,6 +192,7 @@
 
 .model-manager .model-manager-body {
     background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
     padding: 16px 0px;
 }
 
