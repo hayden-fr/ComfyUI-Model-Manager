@@ -1044,6 +1044,7 @@ async def set_notes(request):
     if text.isspace() or text == "":
         if os.path.exists(filename):
             os.remove(filename)
+            print("Deleted file: " + filename)
     else:
         try:
             with open(filename, "w", encoding="utf-8") as f:
