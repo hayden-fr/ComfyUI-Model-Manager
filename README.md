@@ -50,3 +50,8 @@ Download, browse and delete models in ComfyUI.
   - Text to always search.
   - Show/Hide add embedding extension.
 - Colors follow ComfyUI's current theme.
+
+### Known Issues
+
+- Pinch to Zoom can cause an invisible scrolling bug.
+- After adding/renaming/deleting models, the webpage needs to be reloaded to update the model lists. (Can this be automated?)
