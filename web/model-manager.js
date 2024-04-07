@@ -2628,7 +2628,7 @@ class DownloadTab {
                     type: "text",
                     name: "model download url",
                     autocomplete: "off",
-                    placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
+                    placeholder: "Search URL...",
                     onkeydown: async (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
@@ -2918,7 +2918,7 @@ class ModelTab {
             type: "text",
             name: "model search",
             autocomplete: "off",
-            placeholder: "example: /0/1.5/styles/clothing -.pt",
+            placeholder: "/Search...",
         });
         
         const updatePreviousModelFilter = () => {
@@ -3168,7 +3168,7 @@ class SettingsTab {
                     $el("textarea.comfy-multiline-input", {
                         $: (el) => (settings["model-search-always-append"] = el),
                         name: "always include in model search",
-                        placeholder: "example: -nsfw",
+                        placeholder: "example: /0/sd1.5/styles \"pastel style\" -3d",
                         rows: "6",
                     }),
                 ]),
