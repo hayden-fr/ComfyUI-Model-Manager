@@ -445,9 +445,9 @@ class ImageSelect {
         
         const el_defaultPreviewNoImage = $el("img", {
             $: (el) => (this.elements.defaultPreviewNoImage = el),
+            loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
             src: PREVIEW_NONE_URI,
             style: { display: "none" },
-            loading: "lazy",
         });
         
         const el_defaultPreviews = $el("div", {
@@ -459,9 +459,9 @@ class ImageSelect {
         }, (() => {
             const imgs = defaultPreviews.map((url) => {
                 return $el("img", {
+                    loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
                     src: url,
                     style: { display: "none" },
-                    loading: "lazy",
                     onerror: (e) => {
                         e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
                     },
@@ -1599,6 +1599,7 @@ class ModelGrid {
                 );
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
+                        loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
                         src: imageUri(
                             previewInfo?.path, 
                             previewInfo?.dateModified, 
@@ -1606,7 +1607,6 @@ class ModelGrid {
                             PREVIEW_THUMBNAIL_HEIGHT, 
                         ),
                         draggable: false,
-                        loading: "lazy",
                     }),
                     $el("div.model-preview-overlay", {
                         ondragend: (e) => dragAdd(e),
