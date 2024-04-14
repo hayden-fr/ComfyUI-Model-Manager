@@ -1273,6 +1273,7 @@ class DirectoryDropdown {
 
 const MODEL_SORT_DATE_CREATED = "dateCreated";
 const MODEL_SORT_DATE_MODIFIED = "dateModified";
+const MODEL_SORT_SIZE_BYTES = "sizeBytes";
 const MODEL_SORT_DATE_NAME = "name";
 
 class ModelGrid {
@@ -1353,6 +1354,9 @@ class ModelGrid {
                 break;
             case MODEL_SORT_DATE_CREATED:
                 compareFn = (a, b) => { return b[MODEL_SORT_DATE_CREATED] - a[MODEL_SORT_DATE_CREATED]; };
+                break;
+            case MODEL_SORT_SIZE_BYTES:
+                compareFn = (a, b) => { return b[MODEL_SORT_SIZE_BYTES] - a[MODEL_SORT_SIZE_BYTES]; };
                 break;
             default:
                 console.warn("Invalid filter sort value: '" + sortBy + "'");
@@ -2977,12 +2981,14 @@ class ModelTab {
                             onchange: () => updateModelGrid(),
                         },
                         [
-                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest to newest)"]),
-                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest first)"]),
+                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest first)"]),
                             $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
                             $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
+                            $el("option", { value: MODEL_SORT_SIZE_BYTES }, ["Size (largest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_SIZE_BYTES }, ["Size (smallest first)"]),
                         ],
                     ),
                 ]),

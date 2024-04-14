@@ -497,6 +497,7 @@ async def get_model_list(request):
                             break
                     abs_path = os.path.join(cwd, model)
                     stats = pathlib.Path(abs_path).stat()
+                    sizeBytes = stats.st_size
                     model_modified = stats.st_mtime_ns
                     model_created = stats.st_ctime_ns
                     if use_safetensor_thumbnail and image is None and model_ext == ".safetensors":
@@ -513,12 +514,21 @@ async def get_model_list(request):
                                     image = model + image_ext
                                     image_modified = model_modified
                     rel_path = "" if cwd == model_base_path else os.path.relpath(cwd, model_base_path)
-                    info = (model, image, base_path_index, rel_path, model_modified, model_created, image_modified)
+                    info = (
+                        model, 
+                        image, 
+                        base_path_index, 
+                        rel_path, 
+                        model_modified,
+                        model_created, 
+                        image_modified, 
+                        sizeBytes, 
+                    )
                     file_infos.append(info)
-        file_infos.sort(key=lambda tup: tup[4], reverse=True) # TODO: remove sort; sorted on client
+        #file_infos.sort(key=lambda tup: tup[4], reverse=True) # TODO: remove sort; sorted on client
 
         model_items = []
-        for model, image, base_path_index, rel_path, model_modified, model_created, image_modified in file_infos:
+        for model, image, base_path_index, rel_path, model_modified, model_created, image_modified, sizeBytes in file_infos:
             item = {
                 "name": model,
                 "path": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # relative logical path
@@ -527,6 +537,7 @@ async def get_model_list(request):
                 "dateCreated": model_created,
                 #"dateLastUsed": "", # TODO: track server-side, send increment client-side
                 #"countUsed": 0, # TODO: track server-side, send increment client-side
+                "sizeBytes": sizeBytes,
             }
             if image is not None:
                 raw_post = os.path.join(model_type, str(base_path_index), rel_path, image)
