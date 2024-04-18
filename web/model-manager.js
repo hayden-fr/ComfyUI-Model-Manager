@@ -35,7 +35,45 @@ const modelNodeType = {
 };
 
 const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
-const IMAGE_EXTENSIONS = [".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp"]; // TODO: ask server for?
+const IMAGE_EXTENSIONS = [
+    ".png", 
+    ".webp", 
+    ".jpeg", 
+    ".jpg", 
+    ".gif", 
+    ".apng", 
+
+    ".preview.png", 
+    ".preview.webp", 
+    ".preview.jpeg", 
+    ".preview.jpg", 
+    ".preview.gif", 
+    ".preview.apng", 
+]; // TODO: /model-manager/image/extensions
+
+/**
+ * @param {string} s
+ * @param {string} prefix
+ * @returns {string}
+ */
+function removePrefix(s, prefix) {
+    if (s.length >= prefix.length && s.startsWith(prefix)){
+        return s.substring(prefix.length);
+    }
+    return s;
+}
+
+/**
+ * @param {string} s
+ * @param {string} suffix
+ * @returns {string}
+ */
+function removeSuffix(s, suffix) {
+    if (s.length >= suffix.length && s.endsWith(suffix)){
+        return s.substring(0, s.length - suffix.length);
+    }
+    return s;
+}
 
 class SearchPath {
     /**
@@ -74,18 +112,28 @@ class SearchPath {
 /**
  * @param {string | undefined} [searchPath=undefined]
  * @param {string | undefined} [dateImageModified=undefined]
- *
+ * @param {string | undefined} [width=undefined]
+ * @param {string | undefined} [height=undefined]
  * @returns {string}
  */
-function imageUri(imageSearchPath = undefined, dateImageModified = undefined) {
+function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined) {
     const path = imageSearchPath ?? "no-preview";
     const date = dateImageModified;
     let uri = `/model-manager/preview/get?uri=${path}`;
+    if (width !== undefined && width !== null) {
+        uri += `&width=${width}`;
+    }
+    if (height !== undefined && height !== null) {
+        uri += `&height=${height}`;
+    }
     if (date !== undefined && date !== null) {
         uri += `&v=${date}`;
     }
     return uri;
 }
+const PREVIEW_NONE_URI = imageUri();
+const PREVIEW_THUMBNAIL_WIDTH = 320;
+const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
  * @param {(...args) => void} callback
@@ -127,82 +175,34 @@ function buttonAlert(element, success, successText = "", failureText = "", reset
     }, 1000, element, name, resetText);
 }
 
-class Tabs {
-    /** @type {Record<string, HTMLDivElement>} */
-    #head = {};
-    /** @type {Record<string, HTMLDivElement>} */
-    #body = {};
-    
-    /**
-     * @param {HTMLDivElement[]} tabs
-     */
-    constructor(tabs) {
-        const head = [];
-        const body = [];
-        
-        tabs.forEach((el, index) => {
-            const name = el.getAttribute("data-name");
-            
-            /** @type {HTMLDivElement} */
-            const tag = $el(
-                "div.head-item",
-                { onclick: () => this.active(name) },
-                [name]
-            );
-                
-            if (index === 0) {
-                this.#active = name;
-            }
-            
-            this.#head[name] = tag;
-            head.push(tag);
-            this.#body[name] = el;
-            body.push(el);
-        });
-        
-        this.element = $el("div.comfy-tabs", [
-            $el("div.comfy-tabs-head", head),
-            $el("div.comfy-tabs-body", body),
-        ]);
-        
-        this.active(this.#active);
-    }
-    
-    #active = undefined;
-    
-    /**
-     * @param {string} name
-     */
-    active(name) {
-        this.#active = name;
-        Object.keys(this.#head).forEach((key) => {
-            if (name === key) {
-                this.#head[key].classList.add("active");
-                this.#body[key].style.display = "";
-            } else {
-                this.#head[key].classList.remove("active");
-                this.#body[key].style.display = "none";
-            }
-        });
-    }
-}
-
 /**
- * @param {Record<HTMLDivElement, Any>} tabs
- * @returns {HTMLDivElement[]}
+ * 
+ * @param {string} modelPath
+ * @param {string} newValue
+ * @returns {Promise<boolean>}
  */
-function $tabs(tabs) {
-    const instance = new Tabs(tabs);
-    return instance.element;
-}
-
-/**
- * @param {string} name
- * @param {HTMLDivElement[]} el
- * @returns {HTMLDivElement}
- */
-function $tab(name, el) {
-    return $el("div", { dataset: { name } }, el);
+async function saveNotes(modelPath, newValue) {
+    return await request(
+        "/model-manager/notes/save",
+        {
+            method: "POST",
+            body: JSON.stringify({
+                "path": modelPath,
+                "notes": newValue,
+            }),
+        }
+    ).then((result) => {
+        const saved = result["success"];
+        const message = result["alert"];
+        if (message !== undefined) {
+            window.alert(message);
+        }
+        return saved;
+    })
+    .catch((err) => {
+        console.warn(err);
+        return false;
+    });
 }
 
 /**
@@ -296,31 +296,54 @@ class ImageSelect {
     /** @type {string} */
     #name = null;
     
-    /** @returns {string|File} */
-    getImage() {
+    /** @returns {Promise<string> | Promise<File>} */
+    async getImage() {
         const name = this.#name;
         const value = document.querySelector(`input[name="${name}"]:checked`).value;
         const elements = this.elements;
         switch (value) {
             case this.#PREVIEW_DEFAULT:
                 const children = elements.defaultPreviews.children;
-                const noImage = imageUri();
+                const noImage = PREVIEW_NONE_URI;
+                let url = "";
                 for (let i = 0; i < children.length; i++) {
                     const child = children[i];
                     if (child.style.display !== "none" && 
                         child.nodeName === "IMG" && 
                         !child.src.endsWith(noImage)
                     ) {
-                        return child.src;
+                        url = child.src;
                     }
                 }
-                return "";
+                if (url.startsWith(Civitai.imageUrlPrefix())) {
+                    url = await Civitai.getFullSizeImageUrl(url).catch((err) => {
+                        console.warn(err);
+                        return url;
+                    });
+                }
+                return url;
             case this.#PREVIEW_URL:
-                return elements.customUrl.value;
+                const value = elements.customUrl.value;
+                if (value.startsWith(Civitai.imagePostUrlPrefix())) {
+                    try {
+                        const imageInfo = await Civitai.getImageInfo(value);
+                        const items = imageInfo["items"];
+                        if (items.length === 0) {
+                            console.warn("Civitai /api/v1/images returned 0 items.");
+                            return value;
+                        }
+                        return items[0]["url"];
+                    }
+                    catch (error) {
+                        console.error("Failed to get image info from Civitai!", error);
+                        return value;
+                    }
+                }
+                return value;
             case this.#PREVIEW_UPLOAD:
                 return elements.uploadFile.files[0] ?? "";
             case this.#PREVIEW_NONE:
-                return imageUri();
+                return PREVIEW_NONE_URI;
         }
         return "";
     }
@@ -344,7 +367,7 @@ class ImageSelect {
                 }
             }
             else {
-                el.src = imageUri();
+                el.src = PREVIEW_NONE_URI;
             }
         });
         this.checkDefault();
@@ -410,21 +433,21 @@ class ImageSelect {
      */
     constructor(radioGroupName, defaultPreviews = []) {
         if (defaultPreviews === undefined | defaultPreviews === null | defaultPreviews.length === 0) {
-            defaultPreviews = [imageUri()];
+            defaultPreviews = [PREVIEW_NONE_URI];
         }
         this.#name = radioGroupName;
         
         const el_defaultUri = $el("div", {
             $: (el) => (this.elements.defaultUrl = el),
             style: { display: "none" },
-            "data-noimage": imageUri(),
+            "data-noimage": PREVIEW_NONE_URI,
         });
         
         const el_defaultPreviewNoImage = $el("img", {
             $: (el) => (this.elements.defaultPreviewNoImage = el),
-            src: imageUri(),
+            loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
+            src: PREVIEW_NONE_URI,
             style: { display: "none" },
-            loading: "lazy",
         });
         
         const el_defaultPreviews = $el("div", {
@@ -436,11 +459,11 @@ class ImageSelect {
         }, (() => {
             const imgs = defaultPreviews.map((url) => {
                 return $el("img", {
+                    loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
                     src: url,
                     style: { display: "none" },
-                    loading: "lazy",
                     onerror: (e) => {
-                        e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                        e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
                     },
                 });
             });
@@ -452,10 +475,10 @@ class ImageSelect {
         
         const el_uploadPreview = $el("img", {
             $: (el) => (this.elements.uploadPreview = el),
-            src: imageUri(),
+            src: PREVIEW_NONE_URI,
             style: { display : "none" },
             onerror: (e) => {
-                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
             },
         });
         const el_uploadFile = $el("input", {
@@ -480,12 +503,39 @@ class ImageSelect {
             el_uploadFile,
         ]);
         
+        /**
+         * @param {string} url 
+         * @returns {Promise<string>}
+         */
+        const getCustomPreviewUrl = async (url) => {
+            if (url.startsWith(Civitai.imagePostUrlPrefix())) {
+                return await Civitai.getImageInfo(url)
+                .then((imageInfo) => {
+                    const items = imageInfo["items"];
+                    if (items.length > 0) {
+                        return items[0]["url"];
+                    }
+                    else {
+                        console.warn("Civitai /api/v1/images returned 0 items.");
+                        return url;
+                    }
+                })
+                .catch((error) => {
+                    console.error("Failed to get image info from Civitai!", error);
+                    return url;
+                });
+            }
+            else {
+                return url;
+            }
+        };
+        
         const el_customUrlPreview = $el("img", {
             $: (el) => (this.elements.customUrlPreview = el),
-            src: imageUri(),
+            src: PREVIEW_NONE_URI,
             style: { display: "none" },
             onerror: (e) => {
-                e.target.src = el_defaultUri.dataset.noimage ?? imageUri();
+                e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
             },
         });
         const el_customUrl = $el("input.search-text-area", {
@@ -494,6 +544,14 @@ class ImageSelect {
             name: "custom preview image url",
             autocomplete: "off",
             placeholder: "https://custom-image-preview.png",
+            onkeydown: async (e) => {
+                if (e.key === "Enter") {
+                    const value = e.target.value;
+                    el_customUrlPreview.src = await getCustomPreviewUrl(value);
+                    e.stopPropagation();
+                    e.target.blur();
+                }
+            },
         });
         const el_custom = $el("div.row.tab-header-flex-block", {
             $: (el) => (this.elements.custom = el),
@@ -502,8 +560,11 @@ class ImageSelect {
             el_customUrl,
             $el("button.icon-button", {
                 textContent: "🔍︎",
-                onclick: (e) => {
-                    el_customUrlPreview.src = el_customUrl.value;
+                onclick: async (e) => {
+                    const value = el_customUrl.value;
+                    el_customUrlPreview.src = await getCustomPreviewUrl(value);
+                    e.stopPropagation();
+                    el_customUrl.blur();
                 },
             }),
         ]);
@@ -598,7 +659,7 @@ class ImageSelect {
             $: (el) => (this.elements.radioGroup = el),
         }, [
             $el("div.row.tab-header-flex-block", [el_radioButtons]),
-            $el("div", [
+            $el("div.model-preview-select-radio-inputs", [
                 el_custom,
                 el_upload,
             ]),
@@ -607,13 +668,206 @@ class ImageSelect {
 }
 
 /**
- * @typedef {Object} DirectoryItem
- * @param {string} name
- * @param {number | undefined} childCount
- * @param {number | undefined} childIndex
+ * @typedef {Object} DirectoryItem 
+ * @property {String} name
+ * @property {number | undefined} childCount
+ * @property {number | undefined} childIndex
  */
 
-const DROPDOWN_DIRECTORY_SELECTION_CLASS = "search-dropdown-selected";
+class ModelDirectories {
+    /** @type {DirectoryItem[]} */
+    data = [];
+
+    /**
+     * @returns {number}
+     */
+    rootIndex() {
+        return 0;
+    }
+
+    /**
+     * @param {any} index
+     * @returns {boolean}
+     */
+    isValidIndex(index) {
+        return typeof index === "number" && 0 <= index && index < this.data.length;
+    }
+
+    /**
+     * @param {number} index
+     * @returns {DirectoryItem}
+     */
+    getItem(index) {
+        if (!this.isValidIndex(index)) {
+            throw new Error(`Index '${index}' is not valid!`);
+        }
+        return this.data[index];
+    }
+
+    /**
+     * @param {DirectoryItem | number} item
+     * @returns {boolean}
+     */
+    isDirectory(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+        }
+        const childCount = item.childCount;
+        return childCount !== undefined && childCount != null;
+    }
+
+    /**
+     * @param {DirectoryItem | number} item
+     * @returns {boolean}
+     */
+    isEmpty(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+        }
+        if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        return item.childCount === 0;
+    }
+
+    /**
+     * Returns a slice of children from the directory list.
+     * @param {DirectoryItem | number} item
+     * @returns {DirectoryItem[]}
+     */
+    getChildren(item) {
+        if (typeof item === "number") {
+            item = this.getItem(item);
+            if (!this.isDirectory(item)) {
+                throw new Error("Item is not a directory!");
+            }
+        }
+        else if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        const count = item.childCount;
+        const index = item.childIndex;
+        return this.data.slice(index, index + count);
+    }
+
+    /**
+     * Returns index of child in parent directory. Returns -1 if DNE.
+     * @param {DirectoryItem | number} parent
+     * @param {string} name
+     * @returns {number}
+     */
+    findChildIndex(parent, name) {
+        const item = this.getItem(parent);
+        if (!this.isDirectory(item)) {
+            throw new Error("Item is not a directory!");
+        }
+        const start = item.childIndex;
+        const children = this.getChildren(item);
+        const index = children.findIndex((item) => {
+            return item.name === name;
+        });
+        if (index === -1) {
+            return -1;
+        }
+        return index + start;
+    }
+    
+    /**
+     * Returns a list of matching search results and valid path.
+     * @param {string} filter
+     * @param {string} searchSeparator
+     * @param {boolean} directoriesOnly
+     * @returns {[string[], string]}
+     */
+    search(filter, searchSeparator, directoriesOnly) {
+        let cwd = this.rootIndex();
+        let indexLastWord = 1;
+        while (true) {
+            const indexNextWord = filter.indexOf(searchSeparator, indexLastWord);
+            if (indexNextWord === -1) {
+                // end of filter
+                break;
+            }
+
+            const item = this.getItem(cwd);
+            if (!this.isDirectory(item) || this.isEmpty(item)) {
+                break;
+            }
+
+            const word = filter.substring(indexLastWord, indexNextWord);
+            cwd = this.findChildIndex(cwd, word);
+            if (!this.isValidIndex(cwd)) {
+                return [[], ""];
+            }
+            indexLastWord = indexNextWord + 1;
+        }
+        //const cwdPath = filter.substring(0, indexLastWord);
+
+        const lastWord = filter.substring(indexLastWord);
+        const children = this.getChildren(cwd);
+        if (directoriesOnly) {
+            let indexPathEnd = indexLastWord;
+            const results = children.filter((child) => {
+                return (
+                    this.isDirectory(child) && 
+                    child.name.startsWith(lastWord)
+                );
+            }).map((directory) => {
+                const children = this.getChildren(directory);
+                const hasChildren = children.some((item) => {
+                    return this.isDirectory(item);
+                });
+                const suffix = hasChildren ? searchSeparator : "";
+                //const suffix = searchSeparator;
+                if (directory.name == lastWord) {
+                    indexPathEnd += searchSeparator.length + directory.name.length + 1;
+                }
+                return directory.name + suffix;
+            });
+            const path = filter.substring(0, indexPathEnd);
+            return [results, path];
+        }
+        else {
+            let indexPathEnd = indexLastWord;
+            const results = children.filter((child) => {
+                return child.name.startsWith(lastWord);
+            }).map((item) => {
+                const isDir = this.isDirectory(item);
+                const isNonEmptyDirectory = isDir && item.childCount > 0;
+                const suffix = isNonEmptyDirectory  ? searchSeparator : "";
+                //const suffix = isDir  ? searchSeparator : "";
+                if (!isDir && item.name == lastWord) {
+                    indexPathEnd += searchSeparator.length + item.name.length + 1;
+                }
+                return item.name + suffix;
+            });
+            const path = filter.substring(0, indexPathEnd);
+            return [results, path];
+        }
+    }
+}
+
+const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-dropdown-key-selected";
+const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-dropdown-mouse-selected";
+
+
+class ModelData {
+    /** @type {string} */
+    searchSeparator = "/"; // TODO: other client or server code may be assuming this to always be "/"
+    
+    /** @type {string} */
+    systemSeparator = null;
+    
+    /** @type {Object} */
+    models = {};
+    
+    /** @type {ModelDirectories} */
+    directories = null;
+    
+    constructor() {
+        this.directories = new ModelDirectories();
+    }
+}
 
 class DirectoryDropdown {
     /** @type {HTMLDivElement} */
@@ -625,9 +879,11 @@ class DirectoryDropdown {
     /** @type {HTMLInputElement} */
     #input = null;
     
-    // TODO: remove this
-    /** @type {() => void} */
-    #updateDropdown = null;
+    /** @type {() => string} */
+    #getModelType = null;
+    
+    /** @type {ModelData} */
+    #modelData = null; // READ ONLY
     
     /** @type {() => void} */
     #updateCallback = null;
@@ -635,15 +891,21 @@ class DirectoryDropdown {
     /** @type {() => Promise<void>} */
     #submitCallback = null;
     
+    /** @type {string} */
+    #deepestPreviousPath = "/";
+    
+    /** @type {Any} */
+    #touchSelectionStart = null;
+    
     /**
+     * @param {ModelData} modelData
      * @param {HTMLInputElement} input
-     * @param {() => void} updateDropdown
+     * @param {Boolean} [showDirectoriesOnly=false]
+     * @param {() => string} [getModelType= () => { return ""; }]
      * @param {() => void} [updateCallback= () => {}]
      * @param {() => Promise<void>} [submitCallback= () => {}]
-     * @param {String} [searchSeparator="/"]
-     * @param {Boolean} [showDirectoriesOnly=false]
      */
-    constructor(input, updateDropdown, updateCallback = () => {}, submitCallback = () => {}, searchSeparator = "/", showDirectoriesOnly = false) {
+    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -651,23 +913,36 @@ class DirectoryDropdown {
             },
         });
         this.element = dropdown;
+        this.#modelData = modelData;
         this.#input = input;
-        this.#updateDropdown = updateDropdown;
+        this.#getModelType = getModelType;
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
         
-        input.addEventListener("input", () => updateDropdown());
-        input.addEventListener("focus", () => updateDropdown());
+        input.addEventListener("input", () => {
+            const path = this.#updateOptions();
+            if (path !== undefined) {
+                this.#restoreSelectedOption(path);
+                this.#updateDeepestPath(path);
+            }
+            updateCallback();
+        });
+        input.addEventListener("focus", () => {
+            const path = this.#updateOptions();
+            if (path !== undefined) {
+                this.#deepestPreviousPath = path;
+                this.#restoreSelectedOption(path);
+            }
+            updateCallback();
+        });
         input.addEventListener("blur", () => { dropdown.style.display = "none"; });
-        input.addEventListener(
-            "keydown",
-            (e) => {
+        input.addEventListener("keydown", async(e) => {
                 const options = dropdown.children;
                 let iSelection;
                 for (iSelection = 0; iSelection < options.length; iSelection++) {
                     const selection = options[iSelection];
-                    if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+                    if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS)) {
                         break;
                     }
                 }
@@ -675,7 +950,7 @@ class DirectoryDropdown {
                     e.stopPropagation();
                     if (iSelection < options.length) {
                         const selection = options[iSelection];
-                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
                     else {
                         e.target.blur();
@@ -687,22 +962,26 @@ class DirectoryDropdown {
                         e.stopPropagation();
                         e.preventDefault(); // prevent cursor move
                         const input = e.target;
-                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
-                        updateDropdown();
-                        //updateCallback();
-                        //submitCallback();
-                        /*
-                        const options = dropdown.children;
-                        if (options.length > 0) {
-                            // arrow key navigation
-                            options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const searchSeparator = modelData.searchSeparator;
+                        DirectoryDropdown.selectionToInput(
+                            input, 
+                            selection, 
+                            searchSeparator, 
+                            DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
+                        );
+                        const path = this.#updateOptions();
+                        if (path !== undefined) {
+                            this.#restoreSelectedOption(path);
+                            this.#updateDeepestPath(path);
                         }
-                        */
+                        updateCallback();
+                        //await submitCallback();
                     }
                 }
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
                     const input = e.target;
                     const oldFilterText = input.value;
+                    const searchSeparator = modelData.searchSeparator;
                     const iSep = oldFilterText.lastIndexOf(searchSeparator, oldFilterText.length - 2);
                     const newFilterText = oldFilterText.substring(0, iSep + 1);
                     if (oldFilterText !== newFilterText) {
@@ -722,41 +1001,36 @@ class DirectoryDropdown {
                             e.stopPropagation();
                             e.preventDefault(); // prevent cursor move
                             input.value = newFilterText;
-                            updateDropdown();
-                            //updateCallback();
-                            //submitCallback();
-                            /*
-                            const options = dropdown.children;
-                            let isSelected = false;
-                            for (let i = 0; i < options.length; i++) {
-                                const option = options[i];
-                                if (option.innerText.startsWith(delta)) {
-                                    option.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-                                    isSelected = true;
-                                    break;
-                                }
+                            const path = this.#updateOptions();
+                            if (path !== undefined) {
+                                this.#restoreSelectedOption(path);
+                                this.#updateDeepestPath(path);
                             }
-                            if (!isSelected) {
-                                const options = dropdown.children;
-                                if (options.length > 0) {
-                                    // arrow key navigation
-                                    options[0].classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
-                                }
-                            }
-                            */
+                            updateCallback();
+                            //await submitCallback();
                         }
                     }
                 }
                 else if (e.key === "Enter") {
                     e.stopPropagation();
-                    const input = e.target
-                    const selection = options[iSelection];
-                    if (selection !== undefined && selection !== null) {
-                        DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
-                        updateDropdown();
-                        updateCallback();
+                    const input = e.target;
+                    if (dropdown.style.display !== "none") {
+                        const selection = options[iSelection];
+                        if (selection !== undefined && selection !== null) {
+                            DirectoryDropdown.selectionToInput(
+                                input, 
+                                selection, 
+                                modelData.searchSeparator, 
+                                DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
+                            );
+                            const path = this.#updateOptions();
+                            if (path !== undefined) {
+                                this.#updateDeepestPath(path);
+                            }
+                            updateCallback();
+                        }
                     }
-                    submitCallback();
+                    await submitCallback();
                     input.blur();
                 }
                 else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && dropdown.style.display !== "none") {
@@ -765,36 +1039,33 @@ class DirectoryDropdown {
                     let iNext = options.length;
                     if (iSelection < options.length) {
                         const selection = options[iSelection];
-                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                         const delta = e.key === "ArrowDown" ? 1 : -1;
                         iNext = iSelection + delta;
-                        if (0 <= iNext && iNext < options.length) {
-                            const selectionNext = options[iNext];
-                            selectionNext.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        if (iNext < 0) {
+                            iNext = options.length - 1;
                         }
+                        else if (iNext >= options.length) {
+                            iNext = 0;
+                        }
+                        const selectionNext = options[iNext];
+                        selectionNext.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
-                    else if (iSelection === options.length) {
+                    else if (iSelection === options.length) { // none
                         iNext = e.key === "ArrowDown" ? 0 : options.length-1;
-                        const selection = options[iNext]
-                        selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                        const selection = options[iNext];
+                        selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                     }
                     if (0 <= iNext && iNext < options.length) {
-                        let dropdownTop = dropdown.scrollTop;
-                        const dropdownHeight = dropdown.offsetHeight;
-                        const selection = options[iNext];
-                        const selectionHeight = selection.offsetHeight;
-                        const selectionTop = selection.offsetTop;
-                        dropdownTop = Math.max(dropdownTop, selectionTop - dropdownHeight + selectionHeight);
-                        dropdownTop = Math.min(dropdownTop, selectionTop);
-                        dropdown.scrollTop = dropdownTop;
+                        DirectoryDropdown.#clampDropdownScrollTop(dropdown, options[iNext]);
                     }
                     else {
                         dropdown.scrollTop = 0;
                         const options = dropdown.children;
                         for (iSelection = 0; iSelection < options.length; iSelection++) {
                             const selection = options[iSelection];
-                            if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
-                                selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                            if (selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS)) {
+                                selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
                             }
                         }
                     }
@@ -802,182 +1073,207 @@ class DirectoryDropdown {
             },
         );
     }
-
+    
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
      * @param {String} searchSeparator
+     * @param {String} className
+     * @returns {boolean} changed
      */
-    static selectionToInput(input, selection, searchSeparator) {
-        selection.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+    static selectionToInput(input, selection, searchSeparator, className) {
+        selection.classList.remove(className);
         const selectedText = selection.innerText;
         const oldFilterText = input.value;
         const iSep = oldFilterText.lastIndexOf(searchSeparator);
         const previousPath = oldFilterText.substring(0, iSep + 1);
-        input.value = previousPath + selectedText;
+        const newFilterText = previousPath + selectedText;
+        input.value = newFilterText;
+        return newFilterText !== oldFilterText;
     }
 
     /**
-     * @param {DirectoryItem[]} directories
-     * @param {string} searchSeparator
-     * @param {string} [modelType = ""]
+     * @param {string} path
      */
-    update(directories, searchSeparator, modelType = "") {
+    #updateDeepestPath = (path) => {
+        const deepestPath = this.#deepestPreviousPath;
+        if (path.length > deepestPath.length || !deepestPath.startsWith(path)) {
+            this.#deepestPreviousPath = path;
+        }
+    };
+
+    /**
+         * @param {HTMLDivElement} dropdown
+         * @param {HTMLParagraphElement} selection
+         */
+    static #clampDropdownScrollTop = (dropdown, selection) => {
+        let dropdownTop = dropdown.scrollTop;
+        const dropdownHeight = dropdown.offsetHeight;
+        const selectionHeight = selection.offsetHeight;
+        const selectionTop = selection.offsetTop;
+        dropdownTop = Math.max(dropdownTop, selectionTop - dropdownHeight + selectionHeight);
+        dropdownTop = Math.min(dropdownTop, selectionTop);
+        dropdown.scrollTop = dropdownTop;
+    };
+
+    /**
+     * @param {string} path
+     */
+    #restoreSelectedOption(path) {
+        const searchSeparator = this.#modelData.searchSeparator;
+        const deepest = this.#deepestPreviousPath;
+        if (deepest.length >= path.length && deepest.startsWith(path)) {
+            let name = deepest.substring(path.length);
+            name = removePrefix(name, searchSeparator);
+            const i1 = name.indexOf(searchSeparator);
+            if (i1 !== -1) {
+                name = name.substring(0, i1);
+            }
+            
+            const dropdown = this.element;
+            const options = dropdown.children;
+            let iSelection;
+            for (iSelection = 0; iSelection < options.length; iSelection++) {
+                const selection = options[iSelection];
+                let text = removeSuffix(selection.innerText, searchSeparator);
+                if (text === name) {
+                    selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS);
+                    dropdown.scrollTop = dropdown.scrollHeight; // snap to top
+                    DirectoryDropdown.#clampDropdownScrollTop(dropdown, selection);
+                    break;
+                }
+            }
+            if (iSelection === options.length) {
+                dropdown.scrollTop = 0;
+            }
+        }
+    }
+
+    /**
+     * Returns path if update was successful.
+     * @returns {string | undefined}
+     */
+    #updateOptions() {
         const dropdown = this.element;
         const input = this.#input;
-        const updateDropdown = this.#updateDropdown;
-        const updateCallback = this.#updateCallback;
-        const submitCallback = this.#submitCallback;
-        const showDirectoriesOnly = this.showDirectoriesOnly;
 
+        const searchSeparator = this.#modelData.searchSeparator;
         const filter = input.value;
         if (filter[0] !== searchSeparator) {
             dropdown.style.display = "none";
-            return;
+            return undefined;
         }
 
-        let cwd = 0;
-        if (modelType !== "") {
-            const root = directories[0];
-            const rootChildIndex = root["childIndex"];
-            const rootChildCount = root["childCount"];
-            cwd = null;
-            for (let i = rootChildIndex; i < rootChildIndex + rootChildCount; i++) {
-                const modelDir = directories[i];
-                if (modelDir["name"] === modelType) {
-                    cwd = i;
-                    break;
-                }
-            }
-        }
-
-        // TODO: directories === undefined?
-        let indexLastWord = 1;
-        while (true) {
-            const indexNextWord = filter.indexOf(searchSeparator, indexLastWord);
-            if (indexNextWord === -1) {
-                // end of filter
-                break;
-            }
-
-            const item = directories[cwd];
-            const childCount = item["childCount"];
-            if (childCount === undefined) {
-                // file
-                break;
-            }
-            if (childCount === 0) {
-                // directory is empty
-                break;
-            }
-            const childIndex = item["childIndex"];
-            const items = directories.slice(childIndex, childIndex + childCount);
-
-            const word = filter.substring(indexLastWord, indexNextWord);
-            cwd = null;
-            for (let itemIndex = 0; itemIndex < items.length; itemIndex++) {
-                const itemName = items[itemIndex]["name"];
-                if (itemName === word) {
-                    // directory exists
-                    cwd = childIndex + itemIndex;
-                    break;
-                }
-            }
-            if (cwd === null) {
-                // directory does not exist
-                break;
-            }
-            indexLastWord = indexNextWord + 1;
-        }
-        if (cwd === null) {
-            dropdown.style.display = "none";
-            return;
-        }
-
-        let options = [];
-        const lastWord = filter.substring(indexLastWord);
-        const item = directories[cwd];
-        if (item["childIndex"] !== undefined) {
-            const childIndex = item["childIndex"];
-            const childCount = item["childCount"];
-            const items = directories.slice(childIndex, childIndex + childCount);
-            for (let i = 0; i < items.length; i++) {
-                const child = items[i];
-                const grandChildCount = child["childCount"];
-                const isDir = grandChildCount !== undefined && grandChildCount !== null;
-                const itemName = child["name"];
-                if (itemName.startsWith(lastWord) && (!showDirectoriesOnly || (showDirectoriesOnly && isDir))) {
-                    options.push(itemName + (isDir ? searchSeparator : ""));
-                }
-            }
-        }
-        else if (!showDirectoriesOnly) {
-            const filename = item["name"];
-            if (filename.startsWith(lastWord)) {
-                options.push(filename);
-            }
-        }
+        const modelType = this.#getModelType();
+        const searchPrefix = modelType !== "" ? searchSeparator + modelType : "";
+        const directories = this.#modelData.directories;
+        const [options, path] = directories.search(
+            searchPrefix + filter,
+            searchSeparator,
+            this.showDirectoriesOnly,
+        );
         if (options.length === 0) {
             dropdown.style.display = "none";
-            return;
+            return undefined;
         }
 
-        const selection_select = (e) => {
+        const mouse_selection_select = (e) => {
             const selection = e.target;
             if (e.movementX === 0 && e.movementY === 0) { return; }
-            if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_CLASS)) {
+            if (!selection.classList.contains(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS)) {
                 // assumes only one will ever selected at a time
                 e.stopPropagation();
                 const children = dropdown.children;
-                let iChild;
-                for (iChild = 0; iChild < children.length; iChild++) {
+                for (let iChild = 0; iChild < children.length; iChild++) {
                     const child = children[iChild];
-                    child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                    child.classList.remove(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
                 }
-                selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+                selection.classList.add(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
             }
         };
-        const selection_deselect = (e) => {
+        const mouse_selection_deselect = (e) => {
             e.stopPropagation();
-            e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_CLASS);
+            e.target.classList.remove(DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS);
         };
-        const selection_submit = (e) => {
+        const selection_submit = async(e) => {
             e.stopPropagation();
+            e.preventDefault();
             const selection = e.target;
-            DirectoryDropdown.selectionToInput(input, selection, searchSeparator);
-            updateDropdown();
-            updateCallback();e.target
-            submitCallback();
+            const changed = DirectoryDropdown.selectionToInput(
+                input, 
+                selection, 
+                searchSeparator, 
+                DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS
+            );
+            if (!changed) {
+                dropdown.style.display = "none";
+                input.blur();
+            }
+            else {
+                const path = this.#updateOptions(); // TODO: is this needed?
+                if (path !== undefined) {
+                    this.#updateDeepestPath(path);
+                }
+            }
+            this.#updateCallback();
         };
-        const innerHtml = options.map((text) => {
+        const touch_selection_select = async(e) => {
+            const [startX, startY] = this.#touchSelectionStart;
+            const [endX, endY] = [
+                e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY
+            ];
+            if (startX === endX && startY === endY) {
+                const touch = e.changedTouches[0];
+                const box = dropdown.getBoundingClientRect();
+                if (touch.clientX >= box.left &&
+                    touch.clientX <= box.right &&
+                    touch.clientY >= box.top &&
+                    touch.clientY <= box.bottom) {
+                    selection_submit(e);
+                }
+            }
+        };
+        const touch_start = (e) => {
+            this.#touchSelectionStart = [
+                e.changedTouches[0].clientX,
+                e.changedTouches[0].clientY
+            ];
+        };
+        dropdown.innerHTML = "";
+        dropdown.append.apply(dropdown, options.map((text) => {
             /** @type {HTMLParagraphElement} */
             const p = $el(
                 "p",
                 {
-                    onmouseenter: (e) => selection_select(e),
-                    onmousemove: (e) => selection_select(e),
-                    onmouseleave: (e) => selection_deselect(e),
+                    onmouseenter: (e) => mouse_selection_select(e),
+                    onmousemove: (e) => mouse_selection_select(e),
+                    onmouseleave: (e) => mouse_selection_deselect(e),
                     onmousedown: (e) => selection_submit(e),
+                    ontouchstart: (e) => touch_start(e),
+                    ontouchmove: (e) => touch_move(e),
+                    ontouchend: (e) => touch_selection_select(e),
                 },
                 [
                     text
                 ]
             );
             return p;
-        });
-        dropdown.innerHTML = "";
-        dropdown.append.apply(dropdown, innerHtml);
+        }));
         // TODO: handle when dropdown is near the bottom of the window
         const inputRect = input.getBoundingClientRect();
         dropdown.style.width = inputRect.width + "px";
         dropdown.style.top = (input.offsetTop + inputRect.height) + "px";
         dropdown.style.left = input.offsetLeft + "px";
         dropdown.style.display = "block";
+
+        return path;
     }
 }
 
 const MODEL_SORT_DATE_CREATED = "dateCreated";
 const MODEL_SORT_DATE_MODIFIED = "dateModified";
+const MODEL_SORT_SIZE_BYTES = "sizeBytes";
 const MODEL_SORT_DATE_NAME = "name";
 
 class ModelGrid {
@@ -986,7 +1282,7 @@ class ModelGrid {
      * @returns {int}
      */
     static modelWidgetIndex(nodeType) {
-        return 0;
+        return nodeType === undefined ? -1 : 0;
     }
     
     /**
@@ -1041,7 +1337,7 @@ class ModelGrid {
     }
     
     /**
-     * In-place sort. Returns an arrat alias.
+     * In-place sort. Returns an array alias.
      * @param {Array} list
      * @param {string} sortBy
      * @param {bool} [reverse=false]
@@ -1058,6 +1354,9 @@ class ModelGrid {
                 break;
             case MODEL_SORT_DATE_CREATED:
                 compareFn = (a, b) => { return b[MODEL_SORT_DATE_CREATED] - a[MODEL_SORT_DATE_CREATED]; };
+                break;
+            case MODEL_SORT_SIZE_BYTES:
+                compareFn = (a, b) => { return b[MODEL_SORT_SIZE_BYTES] - a[MODEL_SORT_SIZE_BYTES]; };
                 break;
             default:
                 console.warn("Invalid filter sort value: '" + sortBy + "'");
@@ -1080,7 +1379,7 @@ class ModelGrid {
             const nodeType = modelNodeType[modelType];
             const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             let node = LiteGraph.createNode(nodeType, null, []);
-            if (node) {
+            if (widgetIndex !== -1 && node) {
                 node.widgets[widgetIndex].value = path;
                 const selectedNodes = app.canvas.selected_nodes;
                 let isSelectedNode = false;
@@ -1109,7 +1408,7 @@ class ModelGrid {
                 const selectedNode = selectedNodes[i];
                 const nodeType = modelNodeType[modelType];
                 const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
-                const target = selectedNode.widgets[widgetIndex].element;
+                const target = selectedNode?.widgets[widgetIndex]?.element;
                 if (target && target.type === "textarea") {
                     target.value = ModelGrid.insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                     success = true;
@@ -1122,41 +1421,72 @@ class ModelGrid {
         }
         buttonAlert(event.target, success, "✔", "✖", "✚");
     }
-    
+
+    static #getWidgetComboIndices(node, value) {
+        const widgetIndices = [];
+        node?.widgets?.forEach((widget, index) => {
+            if (widget.type === "combo" && widget.options.values?.includes(value)) {
+                widgetIndices.push(index);
+            }
+        });
+        return widgetIndices;
+    }
+
     /**
      * @param {Event} event
      * @param {string} modelType
      * @param {string} path
      * @param {boolean} removeEmbeddingExtension
-     * @param {boolean} strictDragToAdd
+     * @param {boolean} strictlyOnWidget
      */
-    static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictDragToAdd) {
+    static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictlyOnWidget) {
         const target = document.elementFromPoint(event.x, event.y);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
-            const nodeType = modelNodeType[modelType];
-            const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
             const pos = app.canvas.convertEventToCanvasOffset(event);
-            const nodeAtPos = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
+            const node = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
-            let draggedOnNode = nodeAtPos && nodeAtPos.type === nodeType;
-            if (strictDragToAdd) {
-                const draggedOnWidget = app.canvas.processNodeWidgets(nodeAtPos, pos, event) === nodeAtPos.widgets[widgetIndex];
-                draggedOnNode = draggedOnNode && draggedOnWidget;
+            let widgetIndex = -1;
+            if (widgetIndex === -1) {
+                const widgetIndices = this.#getWidgetComboIndices(node, path);
+                if (widgetIndices.length === 0) {
+                    widgetIndex = -1;
+                }
+                else if (widgetIndices.length === 1) {
+                    widgetIndex = widgetIndices[0];
+                    if (strictlyOnWidget) {
+                        const draggedWidget = app.canvas.processNodeWidgets(node, pos, event);
+                        const widget =  node.widgets[widgetIndex];
+                        if (draggedWidget != widget) { // != check NOT same object
+                            widgetIndex = -1;
+                        }
+                    }
+                }
+                else {
+                    // ambiguous widget (strictlyOnWidget always true)
+                    const draggedWidget = app.canvas.processNodeWidgets(node, pos, event);
+                    widgetIndex = widgetIndices.findIndex((index) => {
+                        return draggedWidget == node.widgets[index]; // == check same object
+                    });
+                }
             }
 
-            if (draggedOnNode) {
-                let node = nodeAtPos;
+            if (widgetIndex !== -1) {
                 node.widgets[widgetIndex].value = path;
                 app.canvas.selectNode(node);
             }
             else {
-                let node = LiteGraph.createNode(nodeType, null, []);
-                if (node) {
-                    node.pos[0] = pos[0];
-                    node.pos[1] = pos[1];
-                    node.widgets[widgetIndex].value = path;
-                    app.graph.add(node, {doProcessChange: true});
-                    app.canvas.selectNode(node);
+                const expectedNodeType = modelNodeType[modelType];
+                const newNode = LiteGraph.createNode(expectedNodeType, null, []);
+                let newWidgetIndex = ModelGrid.modelWidgetIndex(expectedNodeType);
+                if (newWidgetIndex === -1) {
+                    newWidgetIndex = this.#getWidgetComboIndices(newNode, path)[0] ?? -1;
+                }
+                if (newNode !== undefined && newNode !== null && newWidgetIndex !== -1) {
+                    newNode.pos[0] = pos[0];
+                    newNode.pos[1] = pos[1];
+                    newNode.widgets[newWidgetIndex].value = path;
+                    app.graph.add(newNode, {doProcessChange: true});
+                    app.canvas.selectNode(newNode);
                 }
             }
             event.stopPropagation();
@@ -1196,9 +1526,11 @@ class ModelGrid {
         else if (nodeType) {
             const node = LiteGraph.createNode(nodeType, null, []);
             const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
-            node.widgets[widgetIndex].value = path;
-            app.canvas.copyToClipboard([node]);
-            success = true;
+            if (widgetIndex !== -1) {
+                node.widgets[widgetIndex].value = path;
+                app.canvas.copyToClipboard([node]);
+                success = true;
+            }
         }
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
@@ -1212,11 +1544,11 @@ class ModelGrid {
      * @param {Object.<HTMLInputElement>} settingsElements
      * @param {String} searchSeparator
      * @param {String} systemSeparator
-     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
      * @returns {HTMLElement[]}
      */
-    static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, modelInfoCallback) {
-        // TODO: seperate text and model logic; getting too messy
+    static #generateInnerHtml(models, modelType, settingsElements, searchSeparator, systemSeparator, showModelInfo) {
+        // TODO: separate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
@@ -1231,7 +1563,7 @@ class ModelGrid {
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let buttons = [];
-                if (showAddButton) {
+                if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
                     buttons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
@@ -1271,7 +1603,13 @@ class ModelGrid {
                 );
                 return $el("div.item", {}, [
                     $el("img.model-preview", {
-                        src: imageUri(previewInfo?.path, previewInfo?.dateModified),
+                        loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
+                        src: imageUri(
+                            previewInfo?.path, 
+                            previewInfo?.dateModified, 
+                            PREVIEW_THUMBNAIL_WIDTH, 
+                            PREVIEW_THUMBNAIL_HEIGHT, 
+                        ),
                         draggable: false,
                     }),
                     $el("div.model-preview-overlay", {
@@ -1289,13 +1627,13 @@ class ModelGrid {
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "ⓘ",
-                            onclick: async() => modelInfoCallback(searchPath),
+                            onclick: async() => { await showModelInfo(searchPath) },
                             draggable: false,
                         }),
                     ]),
                     $el("div.model-label", {
                         ondragend: (e) => dragAdd(e),
-                        draggable: true,
+                        draggable: false,
                     }, [
                         $el("p", [showModelExtension ? item.name : SearchPath.splitExtension(item.name)[0]])
                     ]),
@@ -1308,7 +1646,7 @@ class ModelGrid {
     
     /**
      * @param {HTMLDivElement} modelGrid
-     * @param {Object} models
+     * @param {ModelData} modelData
      * @param {HTMLSelectElement} modelSelect
      * @param {Object.<{value: string}>} previousModelType
      * @param {Object} settings
@@ -1316,11 +1654,10 @@ class ModelGrid {
      * @param {boolean} reverseSort
      * @param {Array} previousModelFilters
      * @param {HTMLInputElement} modelFilter
-     * @param {String} searchSeparator
-     * @param {String} systemSeparator
-     * @param {(searchPath: string) => Promise<void>} modelInfoCallback
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
      */
-    static update(modelGrid, models, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, searchSeparator, systemSeparator, modelInfoCallback) {
+    static update(modelGrid, modelData, modelSelect, previousModelType, settings, sortBy, reverseSort, previousModelFilters, modelFilter, showModelInfo) {
+        const models = modelData.models;
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
             modelType = "checkpoints"; // TODO: magic value
@@ -1358,9 +1695,9 @@ class ModelGrid {
             modelList, 
             modelType, 
             settings, 
-            searchSeparator, 
-            systemSeparator,
-            modelInfoCallback,
+            modelData.searchSeparator, 
+            modelData.systemSeparator,
+            showModelInfo,
         );
         modelGrid.append.apply(modelGrid, modelGridModels);
     }
@@ -1372,36 +1709,33 @@ class ModelInfoView {
     
     elements = {
         /** @type {HTMLDivElement} */ info: null,
+        /** @type {HTMLTextAreaElement} */ notes: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
+        /** @type {HTMLInputElement} */  moveDestinationInput: null,
     };
     
     /** @type {ImageSelect} */
     previewSelect = null;
     
+    /** @type {string} */
+    #savedNotesValue = null;
+    
     /**
-     * @param {DirectoryItem[]} modelDirectories - Should be unique for every radio group.
+     * @param {ModelData} modelData
      * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
      */
-    constructor(modelDirectories, updateModels, searchSeparator) {
+    constructor(modelData, updateModels) {
         const moveDestinationInput = $el("input.search-text-area", {
             name: "move directory",
             autocomplete: "off",
-            placeholder: searchSeparator,
+            placeholder: modelData.searchSeparator,
+            value: modelData.searchSeparator,
         });
+        this.elements.moveDestinationInput = moveDestinationInput;
         
-        let searchDropdown = null;
-        searchDropdown = new DirectoryDropdown(
+        const searchDropdown = new DirectoryDropdown(
+            modelData,
             moveDestinationInput,
-            () => {
-                searchDropdown.update(
-                    modelDirectories,
-                    searchSeparator,
-                );
-            },
-            () => {},
-            () => {},
-            searchSeparator,
             true,
         );
         
@@ -1413,14 +1747,14 @@ class ModelInfoView {
             $: (el) => (this.elements.setPreviewButton = el),
             textContent: "Set as Preview",
             onclick: async(e) => {
-                const confirmation = window.confirm("Change preview image PERMANENTLY?");
+                const confirmation = window.confirm("Change preview image(s) PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
                     e.target.disabled = true;
                     const container = this.elements.info;
                     const path = container.dataset.path;
-                    const imageUrl = previewSelect.getImage();
-                    if (imageUrl === imageUri()) {
+                    const imageUrl = await previewSelect.getImage();
+                    if (imageUrl === PREVIEW_NONE_URI) {
                         const encodedPath = encodeURIComponent(path);
                         updatedPreview = await request(
                             `/model-manager/preview/delete?path=${encodedPath}`,
@@ -1430,6 +1764,10 @@ class ModelInfoView {
                             }
                         )
                         .then((result) => {
+                            const message = result["alert"];
+                            if (message !== undefined) {
+                                window.alert(message);
+                            }
                             return result["success"];
                         })
                         .catch((err) => {
@@ -1449,6 +1787,10 @@ class ModelInfoView {
                             }
                         )
                         .then((result) => {
+                            const message = result["alert"];
+                            if (message !== undefined) {
+                                window.alert(message);
+                            }
                             return result["success"];
                         })
                         .catch((err) => {
@@ -1458,7 +1800,7 @@ class ModelInfoView {
                     if (updatedPreview) {
                         updateModels();
                         const previewSelect = this.previewSelect;
-                        previewSelect.elements.defaultUrl.dataset.noimage = imageUri();
+                        previewSelect.elements.defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
                         previewSelect.resetModelInfoPreview();
                         this.element.style.display = "none";
                     }
@@ -1496,7 +1838,11 @@ class ModelInfoView {
                                 )
                                 .then((result) => {
                                     const deleted = result["success"];
-                                    if (deleted) 
+                                    const message = result["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
+                                    }
+                                    if (deleted)
                                     {
                                         container.innerHTML = "";
                                         this.element.style.display = "none";
@@ -1528,7 +1874,7 @@ class ModelInfoView {
                                 const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
                                 const newFile = (
                                     moveDestinationInput.value + 
-                                    searchSeparator + 
+                                    modelData.searchSeparator + 
                                     oldFileName
                                 );
                                 moved = await request(
@@ -1543,6 +1889,10 @@ class ModelInfoView {
                                 )
                                 .then((result) => {
                                     const moved = result["success"];
+                                    const message = result["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
+                                    }
                                     if (moved)
                                     {
                                         moveDestinationInput.value = "";
@@ -1568,19 +1918,64 @@ class ModelInfoView {
         ]);
     }
     
-    /** @returns {boolean} */
-    isVisible() {
-        return this.element.style.display === "none";
-    }
-    
     /** @returns {void} */
     show() {
-        this.element.removeAttribute("style");
+        this.element.style = "";
+        this.element.scrollTop = 0;
     }
     
-    /** @returns {void} */
-    hide() {
+    /**
+     * @param {boolean}
+     * @returns {Promise<boolean>}
+     */
+    async trySave(promptUser) {
+        if (this.element.style.display === "none") {
+            return true;
+        }
+        
+        const noteValue = this.elements.notes.value;
+        const savedNotesValue = this.#savedNotesValue;
+        if (noteValue.trim() === savedNotesValue.trim()) {
+            return true;
+        }
+        const saveChanges = !promptUser || window.confirm("Save notes?");
+        if (saveChanges) {
+            const path = this.elements.info.dataset.path;
+            const saved = await saveNotes(path, noteValue);
+            if (!saved) {
+                window.alert("Failed to save notes!");
+                return false;
+            }
+            this.#savedNotesValue = noteValue;
+        }
+        else {
+            const discardChanges = window.confirm("Discard changes?");
+            if (!discardChanges) {
+                return false;
+            }
+            else {
+                this.elements.notes.value = savedNotesValue;
+            }
+        }
+        return true;
+    }
+    
+    /**
+     * @param {boolean?} promptSave
+     * @returns {Promise<boolean>}
+     */
+    async tryHide(promptSave = true) {
+        const notes = this.elements.notes;
+        if (promptSave && notes !== undefined && notes !== null) {
+            const saved = await this.trySave(promptSave);
+            if (!saved) {
+                return false;
+            }
+            this.#savedNotesValue = "";
+            this.elements.notes.value = "";
+        }
         this.element.style.display = "none";
+        return true;
     }
     
     /**
@@ -1591,11 +1986,22 @@ class ModelInfoView {
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
         const info = await request(`/model-manager/model/info?path=${path}`)
+        .then((result) => {
+            const success = result["success"];
+            const message = result["alert"];
+            if (message !== undefined) {
+                window.alert(message);
+            }
+            if (!success) {
+                return undefined;
+            }
+            return result["info"];
+        })
         .catch((err) => {
             console.log(err);
-            return null;
+            return undefined;
         });
-        if (info === null) {
+        if (info === undefined || info === null) {
             return;
         }
         const infoHtml = this.elements.info;
@@ -1642,6 +2048,10 @@ class ModelInfoView {
                                     )
                                     .then((result) => {
                                         const renamed = result["success"];
+                                        const message = result["alert"];
+                                        if (message !== undefined) {
+                                            window.alert(message);
+                                        }
                                         if (renamed)
                                         {
                                             container.innerHTML = "";
@@ -1663,6 +2073,16 @@ class ModelInfoView {
             );
         }
         
+        const fileDirectory = info["File Directory"];
+        if (fileDirectory !== undefined && fileDirectory !== null && fileDirectory !== "") {
+            this.elements.moveDestinationInput.placeholder = fileDirectory
+            this.elements.moveDestinationInput.value = fileDirectory; // TODO: noise vs convenience
+        }
+        else {
+            this.elements.moveDestinationInput.placeholder = searchSeparator;
+            this.elements.moveDestinationInput.value = searchSeparator;
+        }
+        
         const previewSelect = this.previewSelect;
         const defaultUrl = previewSelect.elements.defaultUrl;
         if (info["Preview"]) {
@@ -1671,7 +2091,7 @@ class ModelInfoView {
             defaultUrl.dataset.noimage = imageUri(imagePath, imageDateModified);
         }
         else {
-            defaultUrl.dataset.noimage = imageUri();
+            defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
         }
         previewSelect.resetModelInfoPreview();
         const setPreviewButton = this.elements.setPreviewButton;
@@ -1719,33 +2139,21 @@ class ModelInfoView {
                         else {
                             if (key === "Notes") {
                                 elements.push($el("h2", [key + ":"]));
-                                const noteArea = $el("textarea.comfy-multiline-input", {
+                                const notes = $el("textarea.comfy-multiline-input", {
                                     name: "model notes",
                                     value: value, 
-                                    rows: 10,
+                                    rows: 12,
                                 });
-                                elements.push(noteArea);
+                                this.elements.notes = notes;
+                                this.#savedNotesValue = value;
                                 elements.push($el("button", {
                                     textContent: "Save Notes",
-                                    onclick: (e) => {
-                                        const saved = request(
-                                            "/model-manager/notes/save",
-                                            {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    "path": this.elements.info.dataset.path,
-                                                    "notes": noteArea.value,
-                                                }),
-                                            }
-                                        ).then((result) => {
-                                            return result["success"];
-                                        })
-                                        .catch((err) => {
-                                            return false;
-                                        });
+                                    onclick: async (e) => {
+                                        const saved = await this.trySave(false);
                                         buttonAlert(e.target, saved);
                                     },
                                 }));
+                                elements.push(notes);
                             }
                             else if (key === "Description") {
                                 if (value !== "") {
@@ -1779,7 +2187,7 @@ class Civitai {
      * @param {string} id - Model ID.
      * @param {string} apiPath - Civitai request subdirectory. "models" for 'model' urls. "model-version" for 'api' urls.
      *
-     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+     * @returns {Promise<Object>} Dictionary containing received model info. Returns an empty if fails.
      */
     static async requestInfo(id, apiPath) {
         const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
@@ -1793,15 +2201,15 @@ class Civitai {
     }
     
     /**
-     * Extract file information from the given model version infomation.
+     * Extract file information from the given model version information.
      *
-     * @param {Object} modelVersionInfo - Model version infomation.
+     * @param {Object} modelVersionInfo - Model version information.
      * @param {(string|null)} [type=null] - Optional select by model type.
      * @param {(string|null)} [fp=null] - Optional select by floating point quantization.
      * @param {(string|null)} [size=null] - Optional select by sizing.
      * @param {(string|null)} [format=null] - Optional select by file format.
      *
-     * @returns {Object} - Extracted list of infomation on each file of the given model version.
+     * @returns {Object} - Extracted list of information on each file of the given model version.
      */
     static getModelFilesInfo(modelVersionInfo, type = null, fp = null, size = null, format = null) {
         const files = [];
@@ -1842,12 +2250,11 @@ class Civitai {
                 return image["url"];
             }),
             "name": modelVersionInfo["name"],
+            "description": modelVersionInfo["description"] ?? "",
         };
     }
     
     /**
-     * 
-     *
      * @param {string} stringUrl - Model url.
      *
      * @returns {Promise<Object>} - Download information for the given url.
@@ -1879,6 +2286,7 @@ class Civitai {
             return {
                 "name": modelVersionInfo["model"]["name"],
                 "type": modelVersionInfo["model"]["type"],
+                "description": modelVersionInfo["description"] ?? "",
                 "versions": [filesInfo]
             }
         }
@@ -1910,11 +2318,79 @@ class Civitai {
             return {
                 "name": modelInfo["name"],
                 "type": modelInfo["type"],
-                "versions": modelVersions
+                "description": modelInfo["description"] ?? "",
+                "versions": modelVersions,
             }
         }
         else {
             return {};
+        }
+    }
+    
+    /**
+     * @returns {string}
+     */
+    static imagePostUrlPrefix() {
+        return "https://civitai.com/images/";
+    }
+    
+    /**
+     * @returns {string}
+     */
+    static imageUrlPrefix() {
+        return "https://image.civitai.com/";
+    }
+    
+    /**
+     * @param {string} stringUrl - https://civitai.com/images/{imageId}.
+     *
+     * @returns {Promise<Object>} - Image information.
+     */
+    static async getImageInfo(stringUrl) {
+        const imagePostUrlPrefix = Civitai.imagePostUrlPrefix();
+        if (!stringUrl.startsWith(imagePostUrlPrefix)) {
+            return {};
+        }
+        const id = stringUrl.substring(imagePostUrlPrefix.length).match(/^\d+/)[0];
+        const url = `https://civitai.com/api/v1/images?imageId=${id}`;
+        try {
+            return await request(url);
+        }
+        catch (error) {
+            console.error("Failed to get image info from Civitai!", error);
+            return {};
+        }
+    }
+    
+    /**
+     * @param {string} stringUrl - https://image.civitai.com/...
+     *
+     * @returns {Promise<string>}
+     */
+    static async getFullSizeImageUrl(stringUrl) {
+        const imageUrlPrefix = Civitai.imageUrlPrefix();
+        if (!stringUrl.startsWith(imageUrlPrefix)) {
+            return "";
+        }
+        const i0 = stringUrl.lastIndexOf("/");
+        const i1 = stringUrl.lastIndexOf(".");
+        if (i0 === -1 || i1 === -1) {
+            return "";
+        }
+        const id = parseInt(stringUrl.substring(i0 + 1, i1)).toString();
+        const url = `https://civitai.com/api/v1/images?imageId=${id}`;
+        try {
+            const imageInfo = await request(url);
+            const items = imageInfo["items"];
+            if (items.length === 0) {
+                console.warn("Civitai /api/v1/images returned 0 items.");
+                return stringUrl;
+            }
+            return items[0]["url"];
+        }
+        catch (error) {
+            console.error("Failed to get image info from Civitai!", error);
+            return stringUrl;
         }
     }
 }
@@ -1926,7 +2402,7 @@ class HuggingFace {
      * @param {string} id - Model ID.
      * @param {string} apiPath - API path.
      *
-     * @returns {Promise<Object>} Dictionary containing recieved model info. Returns an empty if fails.
+     * @returns {Promise<Object>} Dictionary containing received model info. Returns an empty if fails.
      */
     static async requestInfo(id, apiPath = "models") {
         const url = "https://huggingface.co/api/" + apiPath + "/" + id;
@@ -2029,8 +2505,97 @@ class HuggingFace {
             "baseDownloadUrl": baseDownloadUrl,
             "modelFiles": modelFiles,
             "images": images,
+            "name": modelId,
         };
     }
+}
+
+/**
+ * @param {string} urlText 
+ * @returns {Promise<[string, any[]]>} [name, modelInfos]
+ */
+async function getModelInfos(urlText) {
+    // TODO: class for proper return type
+    return await (async () => {
+        if (urlText.startsWith("https://civitai.com")) {
+            const civitaiInfo = await Civitai.getFilteredInfo(urlText);
+            if (Object.keys(civitaiInfo).length === 0) {
+                return ["", []];
+            }
+            const name = civitaiInfo["name"];
+            const infos = [];
+            const type = civitaiInfo["type"];
+            const modelInfo = civitaiInfo["description"]?? "";
+            civitaiInfo["versions"].forEach((version) => {
+                const images = version["images"];
+                const versionDescription = version["description"]??"";
+                const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
+                version["files"].forEach((file) => {
+                    infos.push({
+                        "images": images,
+                        "fileName": file["name"],
+                        "modelType": type,
+                        "downloadUrl": file["downloadUrl"],
+                        "downloadFilePath": "",
+                        "description": description,
+                        "details": {
+                            "fileSizeKB": file["sizeKB"],
+                            "fileType": file["type"],
+                            "fp": file["fp"],
+                            "quant": file["size"],
+                            "fileFormat": file["format"],
+                        },
+                    });
+                });
+            });
+            return [name, infos];
+        }
+        if (urlText.startsWith("https://huggingface.co")) {
+            const hfInfo = await HuggingFace.getFilteredInfo(urlText);
+            if (Object.keys(hfInfo).length === 0) {
+                return ["", []];
+            }
+            const files = hfInfo["modelFiles"];
+            if (files.length === 0) {
+                return ["", []];
+            }
+            const name = hfInfo["name"];
+            const baseDownloadUrl = hfInfo["baseDownloadUrl"];
+            const infos = hfInfo["modelFiles"].map((file) => {
+                const indexSep = file.lastIndexOf("/");
+                const filename = file.substring(indexSep + 1);
+                return {
+                    "images": hfInfo["images"],
+                    "fileName": filename,
+                    "modelType": "",
+                    "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
+                    "downloadFilePath": file.substring(0, indexSep + 1),
+                    "description": "",
+                    "details": {
+                        "fileSizeKB": undefined, // TODO: too hard?
+                    },
+                };
+            });
+            return [name, infos];
+        }
+        if (urlText.endsWith(".json")) {
+            const indexInfo = await request(urlText).catch(() => []);
+            const name = urlText.substring(math.max(urlText.lastIndexOf("/"), 0));
+            const infos = indexInfo.map((file) => {
+                return {
+                    "images": [],
+                    "fileName": file["name"],
+                    "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                    "downloadUrl": file["download"],
+                    "downloadFilePath": "",
+                    "description": file["description"],
+                    "details": {},
+                };
+            });
+            return [name, infos];
+        }
+        return ["", []];
+    })();
 }
 
 class DownloadTab {
@@ -2043,11 +2608,54 @@ class DownloadTab {
         /** @type {HTMLInputElement} */ overwrite: null,
     };
     
+    /** @type {DOMParser} */
+    #domParser = null;
+    
     /** @type {() => Promise<void>} */
     #updateModels = () => {};
     
     /**
-     * Tries to return the related ComfyUI model directory if unambigious.
+     * @param {ModelData} modelData
+     * @param {any} settings
+     * @param {() => Promise<void>} updateModels
+     */
+    constructor(modelData, settings, updateModels) {
+        this.#domParser = new DOMParser();
+        this.#updateModels = updateModels;
+        const update = async() => { await this.#update(modelData, settings); };
+        $el("div.tab-header", {
+            $: (el) => (this.element = el),
+        }, [
+            $el("div.row.tab-header-flex-block", [
+                $el("input.search-text-area", {
+                    $: (el) => (this.elements.url = el),
+                    type: "text",
+                    name: "model download url",
+                    autocomplete: "off",
+                    placeholder: "Search URL...",
+                    onkeydown: async (e) => {
+                        if (e.key === "Enter") {
+                            e.stopPropagation();
+                            await update();
+                            e.target.blur();
+                        }
+                    },
+                }),
+                $el("button.icon-button", {
+                    onclick: async () => { await update(); },
+                    textContent: "🔍︎",
+                }),
+            ]),
+            $el("div.download-model-infos", {
+                $: (el) => (this.elements.infos = el),
+            }, [
+                $el("h1", ["Input a URL to select a model to download."]),
+            ]),
+        ]);
+    }
+    
+    /**
+     * Tries to return the related ComfyUI model directory if unambiguous.
      *
      * @param {string | undefined} modelType - Model type.
      * @param {string | undefined} [fileType] - File type. Relevant for "Diffusers".
@@ -2089,131 +2697,124 @@ class DownloadTab {
     
     /**
      * @param {Object} info
-     * @param {String[]} modelTypes
-     * @param {DirectoryItem[]} modelDirectories
-     * @param {String} searchSeparator
+     * @param {ModelData} modelData
      * @param {int} id
+     * @param {any} settings
      * @returns {HTMLDivElement}
      */
-    #modelInfo(info, modelTypes, modelDirectories, searchSeparator, id) {
+    #modelInfoHtml(info, modelData, id, settings) {
         const downloadPreviewSelect = new ImageSelect(
             "model-download-info-preview-model" + "-" + id,
             info["images"],
         );
         
-        const el_modelTypeSelect = $el("select.model-select-dropdown", {
-            name: "model select dropdown",
-        }, (() => {
-            const options = [$el("option", { value: "" }, ["-- Model Type --"])];
-            modelTypes.forEach((modelType) => {
-                options.push($el("option", { value: modelType }, [modelType]));
-            });
-            return options;
-        })());
+        const comfyUIModelType = (
+            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
+            ""
+        );
+        const searchSeparator = modelData.searchSeparator;
+        const defaultBasePath = searchSeparator + (comfyUIModelType === "" ? "" : comfyUIModelType + searchSeparator + "0");
         
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
             name: "save directory",
             autocomplete: "off",
-            placeholder: searchSeparator + "0",
-            value: searchSeparator + "0",
+            placeholder: defaultBasePath,
+            value: defaultBasePath,
         });
-        let searchDropdown = null;
-        searchDropdown = new DirectoryDropdown(
+        const searchDropdown = new DirectoryDropdown(
+            modelData,
             el_saveDirectoryPath,
-            () => {
-                const modelType = el_modelTypeSelect.value;
-                if (modelType === "") { return; }
-                searchDropdown.update(
-                    modelDirectories,
-                    searchSeparator,
-                    modelType,
-                );
-            },
-            () => {},
-            () => {},
-            searchSeparator,
             true,
         );
         
+        const default_name = (() => {
+            const filename = info["fileName"];
+            // TODO: only remove valid model file extensions
+            const i = filename.lastIndexOf(".");
+            return i === - 1 ? filename : filename.substring(0, i);
+        })();
         const el_filename = $el("input.plain-text-area", {
             type: "text",
             name: "model save file name",
             autocomplete: "off",
-            placeholder: (() => {
-                const filename = info["fileName"];
-                // TODO: only remove valid model file extensions
-                const i = filename.lastIndexOf(".");
-                return i === - 1 ? filename : filename.substring(0, i);
-            })(),
+            placeholder: default_name,
+            value: default_name,
+            onkeydown: (e) => {
+                if (e.key === "Enter") {
+                    e.stopPropagation();
+                    e.target.blur();
+                }
+            },
         });
         
         const filepath = info["downloadFilePath"];
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
-            $el("div", {
-                style: { display: "flex", "flex-wrap": "wrap", gap: "16px" },
-            }, [
+            $el("div", [
                 downloadPreviewSelect.elements.previews,
-                $el("div.download-settings", [
-                    $el("div", {
-                        style: { "margin-top": "8px" }
-                    }, [
-                        $el("div.row.tab-header-flex-block", [
-                            el_modelTypeSelect,
-                        ]),
+                $el("div.download-settings-wrapper", [
+                    $el("div.download-settings", [
+                        $el("button.icon-button", {
+                            textContent: "📥︎",
+                            onclick: async (e) => {
+                                const pathDirectory = el_saveDirectoryPath.value;
+                                const modelName = (() => {
+                                    const filename = info["fileName"];
+                                    const name = el_filename.value;
+                                    if (name === "") {
+                                        return filename;
+                                    }
+                                    const ext = MODEL_EXTENSIONS.find((ext) => {
+                                        return filename.endsWith(ext);
+                                    }) ?? "";
+                                    return name + ext;
+                                })();
+                                const formData = new FormData();
+                                formData.append("download", info["downloadUrl"]);
+                                formData.append("path", pathDirectory);
+                                formData.append("name", modelName);
+                                const image = await downloadPreviewSelect.getImage();
+                                formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
+                                formData.append("overwrite", this.elements.overwrite.checked);
+                                e.target.disabled = true;
+                                const [success, resultText] = await request(
+                                    "/model-manager/model/download",
+                                    {
+                                        method: "POST",
+                                        body: formData,
+                                    }
+                                ).then((data) => {
+                                    const success = data["success"];
+                                    const message = data["alert"];
+                                    if (message !== undefined) {
+                                        window.alert(message);
+                                    }
+                                    return [success, success ? "✔" : "📥︎"];
+                                }).catch((err) => {
+                                    return [false, "📥︎"];
+                                });
+                                if (success) {
+                                    const description = info["description"];
+                                    if (settings["download-save-description-as-text-file"].checked && description !== "") {
+                                        const modelPath = pathDirectory + searchSeparator + modelName;
+                                        const saved = await saveNotes(modelPath, description);
+                                        if (!saved) {
+                                            console.warn("Description was note saved as notes!");
+                                        }
+                                    }
+                                    this.#updateModels();
+                                }
+                                buttonAlert(e.target, success, "✔", "✖", resultText);
+                                e.target.disabled = success;
+                            },
+                        }),
                         $el("div.row.tab-header-flex-block", [
                             el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
                         $el("div.row.tab-header-flex-block", [
-                            $el("button.icon-button", {
-                                textContent: "📥︎",
-                                onclick: async (e) => {
-                                    const formData = new FormData();
-                                    formData.append("download", info["downloadUrl"]);
-                                    formData.append("path",
-                                        el_modelTypeSelect.value + 
-                                        searchSeparator + // NOTE: this may add multiple separators (server should handle carefully)
-                                        el_saveDirectoryPath.value
-                                    );
-                                    formData.append("name", (() => {
-                                        const filename = info["fileName"];
-                                        const name = el_filename.value;
-                                        if (name === "") {
-                                            return filename;
-                                        }
-                                        const ext = MODEL_EXTENSIONS.find((ext) => {
-                                            return filename.endsWith(ext);
-                                        }) ?? "";
-                                        return name + ext;
-                                    })());
-                                    const image = downloadPreviewSelect.getImage();
-                                    formData.append("image", image === imageUri() ? "" : image);
-                                    formData.append("overwrite", this.elements.overwrite.checked);
-                                    e.target.disabled = true;
-                                    const [success, resultText] = await request(
-                                        "/model-manager/model/download",
-                                        {
-                                            method: "POST",
-                                            body: formData,
-                                        }
-                                    ).then((data) => {
-                                        const success = data["success"];
-                                        if (!success) {
-                                            console.warn(data["invalid"]);
-                                        }
-                                        return [success, success ? "✔" : "📥︎"];
-                                    }).catch((err) => {
-                                        return [false, "📥︎"];
-                                    });
-                                    if (success) {
-                                        this.#updateModels();
-                                    }
-                                    buttonAlert(e.target, success, "✔", "✖", resultText);
-                                    e.target.disabled = success;
-                                },
-                            }),
                             el_filename,
                         ]),
                         downloadPreviewSelect.elements.radioGroup,
@@ -2222,175 +2823,50 @@ class DownloadTab {
             ]),
         ]);
         
-        el_modelTypeSelect.selectedIndex = 0; // reset
-        const comfyUIModelType = (
-            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
-            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
-            null
-        );
-        if (comfyUIModelType !== undefined && comfyUIModelType !== null) {
-            const modelTypeOptions = el_modelTypeSelect.children;
-            for (let i = 0; i < modelTypeOptions.length; i++) {
-                const option = modelTypeOptions[i];
-                if (option.value === comfyUIModelType) {
-                    el_modelTypeSelect.selectedIndex = i;
-                    break;
-                }
-            }
-        }
-        
         return modelInfo;
     }
-    
-    /**
-     * @param {Object} models
-     * @param {DirectoryItem[]} modelDirectories
-     * @param {string} searchSeparator
-     */
-    async search(models, modelDirectories, searchSeparator) {
-        const infosHtml = this.elements.infos;
-        infosHtml.innerHTML = "";
 
-        const urlText = this.elements.url.value;
-        const modelInfos = await (async () => {
-            if (urlText.startsWith("https://civitai.com")) {
-                const civitaiInfo = await Civitai.getFilteredInfo(urlText);
-                if (Object.keys(civitaiInfo).length === 0) {
-                    return [];
-                }
-                const infos = [];
-                const type = civitaiInfo["type"];
-                civitaiInfo["versions"].forEach((version) => {
-                    const images = version["images"];
-                    version["files"].forEach((file) => {
-                        infos.push({
-                            "images": images,
-                            "fileName": file["name"],
-                            "modelType": type,
-                            "downloadUrl": file["downloadUrl"],
-                            "downloadFilePath": "",
-                            "details": {
-                                "fileSizeKB": file["sizeKB"],
-                                "fileType": file["type"],
-                                "fp": file["fp"],
-                                "quant": file["size"],
-                                "fileFormat": file["format"],
-                            },
-                        });
-                    });
-                });
-                return infos;
-            }
-            if (urlText.startsWith("https://huggingface.co")) {
-                const hfInfo = await HuggingFace.getFilteredInfo(urlText);
-                if (Object.keys(hfInfo).length === 0) {
-                    return [];
-                }
-                const files = hfInfo["modelFiles"];
-                if (files.length === 0) {
-                    return [];
-                }
-                
-                const baseDownloadUrl = hfInfo["baseDownloadUrl"];
-                return hfInfo["modelFiles"].map((file) => {
-                    const indexSep = file.lastIndexOf("/");
-                    const filename = file.substring(indexSep + 1);
-                    return {
-                        "images": hfInfo["images"],
-                        "fileName": filename,
-                        "modelType": "",
-                        "downloadUrl": baseDownloadUrl + "/" + file + "?download=true",
-                        "downloadFilePath": file.substring(0, indexSep + 1),
-                        "details": {
-                            "fileSizeKB": undefined, // TODO: too hard?
-                        },
-                    };
-                });
-            }
-            if (urlText.endsWith(".json")) {
-                const indexInfo = await request(urlText).catch(() => []);
-                return indexInfo.map((file) => {
-                    return {
-                        "images": [],
-                        "fileName": file["name"],
-                        "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
-                        "downloadUrl": file["download"],
-                        "downloadFilePath": "",
-                        "details": {},
-                    };
-                });
-            }
-            return [];
-        })();
-        
-        const modelTypes = Object.keys(models);
+    /**
+     * @param {ModelData} modelData
+     * @param {any} settings
+     */
+    async #update(modelData, settings) {
+        const [name, modelInfos] = await getModelInfos(this.elements.url.value);
         const modelInfosHtml = modelInfos.filter((modelInfo) => {
             const filename = modelInfo["fileName"];
             return MODEL_EXTENSIONS.find((ext) => {
                 return filename.endsWith(ext);
             }) ?? false;
         }).map((modelInfo, id) => {
-            return this.#modelInfo(
+            return this.#modelInfoHtml(
                 modelInfo,
-                modelTypes,
-                modelDirectories,
-                searchSeparator,
+                modelData,
                 id,
+                settings,
             );
         });
-        if (modelInfos.length === 0) {
-            modelInfosHtml.push($el("div", ["No results found."]));
+        if (modelInfosHtml.length === 0) {
+            modelInfosHtml.push($el("h1", ["No models found."]));
         }
         else {
-            if (modelInfos.length === 1) {
+            if (modelInfosHtml.length === 1) {
                 modelInfosHtml[0].open = true;
             }
-            const label = $checkbox({
-                $: (el) => { this.elements.overwrite = el; },
-                textContent: "Overwrite Existing Files",
-            });
-            modelInfosHtml.unshift(label);
+            
+            const header = $el("div", [
+                $el("h1", [name]),
+                $checkbox({
+                    $: (el) => { this.elements.overwrite = el; },
+                    textContent: "Overwrite Existing Files.",
+                    checked: false,
+                }),
+            ]);
+            modelInfosHtml.unshift(header);
         }
+
+        const infosHtml = this.elements.infos;
+        infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
-    }
-    
-    /**
-     * @param {Object} models
-     * @param {DirectoryItem[]} modelDirectories
-     * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
-     */
-    constructor(models, modelDirectories, updateModels, searchSeparator) {
-        this.#updateModels = updateModels;
-        const search = async() => this.search(models, modelDirectories, searchSeparator);
-        $el("div.tab-header", {
-            $: (el) => (this.element = el),
-        }, [
-            $el("div.row.tab-header-flex-block", [
-                $el("input.search-text-area", {
-                    $: (el) => (this.elements.url = el),
-                    type: "text",
-                    name: "model download url",
-                    autocomplete: "off",
-                    placeholder: "example: https://civitai.com/models/207992/stable-video-diffusion-svd",
-                    onkeydown: (e) => {
-                        if (e.key === "Enter") {
-                            e.stopPropagation();
-                            search();
-                        }
-                    },
-                }),
-                $el("button.icon-button", {
-                    onclick: () => search(),
-                    textContent: "🔍︎",
-                }),
-            ]),
-            $el("div.download-model-infos", {
-                $: (el) => (this.elements.infos = el),
-            }, [
-                $el("div", ["Input a URL to select a model to download."]),
-            ]),
-        ]);
     }
 }
 
@@ -2405,36 +2881,83 @@ class ModelTab {
         /** @type {HTMLInputElement} */ modelContentFilter: null,
     };
     
+    /** @type {Array} */
+    previousModelFilters = [];
+    
+    /** @type {Object.<{value: string}>} */
+    previousModelType = { value: null };
+    
     /** @type {DirectoryDropdown} */
     directoryDropdown = null;
     
+    /** @type {ModelData} */
+    #modelData = null;
+    
+    /** @type {@param {() => Promise<void>}} */
+    #updateModels = null;
+    
+    /**  */
+    #settingsElements = null;
+    
+    /** @type {() => void} */
+    updateModelGrid = () => {};
+    
     /**
-     * @param {() => void} updateDirectoryDropdown
-     * @param {() => void} updatePreviousModelFilter
-     * @param {() => Promise<void>} updateModelGrid
      * @param {() => Promise<void>} updateModels
-     * @param {string} searchSeparator
+     * @param {ModelData} modelData
+     * @param {(searchPath: string) => Promise<void>} showModelInfo
+     * @param {any} settingsElements
      */
-    constructor(updateDirectoryDropdown, updatePreviousModelFilter, updateModelGrid, updateModels, searchSeparator) {
+    constructor(updateModels, modelData, showModelInfo, settingsElements) {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
+        
+        this.#updateModels = updateModels;
+        this.#modelData = modelData;
+        this.#settingsElements = settingsElements;
         
         const searchInput = $el("input.search-text-area", {
             $: (el) => (this.elements.modelContentFilter = el),
             type: "text",
             name: "model search",
             autocomplete: "off",
-            placeholder: "example: /0/1.5/styles/clothing -.pt",
+            placeholder: "/Search...",
         });
         
+        const updatePreviousModelFilter = () => {
+            const modelType = this.elements.modelTypeSelect.value;
+            const value = this.elements.modelContentFilter.value;
+            this.previousModelFilters[modelType] = value;
+        };
+        
+        const updateModelGrid = () => {
+            const sortValue = this.elements.modelSortSelect.value;
+            const reverseSort = sortValue[0] === "-";
+            const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
+            ModelGrid.update(
+                this.elements.modelGrid,
+                this.#modelData,
+                this.elements.modelTypeSelect,
+                this.previousModelType,
+                this.#settingsElements,
+                sortBy,
+                reverseSort,
+                this.previousModelFilters,
+                this.elements.modelContentFilter,
+                showModelInfo,
+            );
+            this.element.parentElement.scrollTop = 0;
+        }
+        this.updateModelGrid = updateModelGrid;
+        
         const searchDropdown = new DirectoryDropdown(
+            modelData,
             searchInput,
-            updateDirectoryDropdown,
+            false,
+            () => { return this.elements.modelTypeSelect.value; },
             updatePreviousModelFilter,
             updateModelGrid,
-            searchSeparator,
-            false,
         );
         this.directoryDropdown = searchDropdown;
         
@@ -2458,12 +2981,14 @@ class ModelTab {
                             onchange: () => updateModelGrid(),
                         },
                         [
-                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest to newest)"]),
-                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest to oldest)"]),
-                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest to newest)"]),
+                            $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_CREATED }, ["Created (oldest first)"]),
+                            $el("option", { value: MODEL_SORT_DATE_MODIFIED }, ["Modified (newest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_DATE_MODIFIED }, ["Modified (oldest first)"]),
                             $el("option", { value: MODEL_SORT_DATE_NAME }, ["Name (A-Z)"]),
                             $el("option", { value: "-" + MODEL_SORT_DATE_NAME }, ["Name (Z-A)"]),
+                            $el("option", { value: MODEL_SORT_SIZE_BYTES }, ["Size (largest first)"]),
+                            $el("option", { value: "-" + MODEL_SORT_SIZE_BYTES }, ["Size (smallest first)"]),
                         ],
                     ),
                 ]),
@@ -2505,6 +3030,8 @@ class SettingsTab {
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
+            
+            /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
         },
     };
     
@@ -2543,7 +3070,8 @@ class SettingsTab {
      */
     async reload(updateModels) {
         const data = await request("/model-manager/settings/load");
-        this.#setSettings(data["settings"], updateModels);
+        const settingsData = data["settings"];
+        this.#setSettings(settingsData, updateModels);
         buttonAlert(this.elements.reloadButton, true);
     }
     
@@ -2563,7 +3091,7 @@ class SettingsTab {
             }
             settingsData[setting] = value;
         }
-
+        
         const data = await request(
             "/model-manager/settings/save",
             {
@@ -2575,7 +3103,8 @@ class SettingsTab {
         });
         const success = data["success"];
         if (success) {
-            this.#setSettings(data["settings"], true);
+            const settingsData = data["settings"];
+            this.#setSettings(settingsData, true);
         }
         buttonAlert(this.elements.saveButton, success);
     }
@@ -2590,18 +3119,24 @@ class SettingsTab {
             $: (el) => (this.element = el),
         }, [
             $el("h1", ["Settings"]),
+            $el("a", {
+                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
+                }, [
+                    "File bugs and issues here."
+                ]
+            ),
             $el("div", [
                 $el("button", {
                     $: (el) => (this.elements.reloadButton = el),
                     type: "button",
                     textContent: "Reload", // ⟳
-                    onclick: () => this.reload(true),
+                    onclick: async () => { await this.reload(true); },
                 }),
                 $el("button", {
                     $: (el) => (this.elements.saveButton = el),
                     type: "button",
                     textContent: "Save", // 💾︎
-                    onclick: () => this.save(),
+                    onclick: async () => { await this.save(); },
                 }),
             ]),
             /*
@@ -2639,7 +3174,8 @@ class SettingsTab {
                     $el("textarea.comfy-multiline-input", {
                         $: (el) => (settings["model-search-always-append"] = el),
                         name: "always include in model search",
-                        placeholder: "example: -nsfw",
+                        placeholder: "example: /0/sd1.5/styles \"pastel style\" -3d",
+                        rows: "6",
                     }),
                 ]),
             ]),
@@ -2681,6 +3217,11 @@ class SettingsTab {
                 }),
                 $el("p", ["Add model offset"]),
             ]),
+            $el("h2", ["Download"]),
+            $checkbox({
+                $: (el) => (settings["download-save-description-as-text-file"] = el),
+                textContent: "Save descriptions as notes (in .txt file).",
+            }),
         ]);
     }
 }
@@ -2703,14 +3244,20 @@ class SidebarButtons {
         const modelManager = this.#modelManager.element;
         const sidebarButtons = this.element.children;
 
+        const buttonActiveState = "sidebar-button-active";
+        for (let i = 0; i < sidebarButtons.length; i++) {
+            sidebarButtons[i].classList.remove(buttonActiveState);
+        }
+
         let buttonIndex;
         for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            if (sidebarButtons[buttonIndex] === button) {
+            const sidebarButton = sidebarButtons[buttonIndex];
+            if (sidebarButton === button) {
                 break;
             }
         }
 
-        const sidebarStates = ["sidebar-left", "sidebar-bottom", "sidebar-top", "sidebar-right"];
+        const sidebarStates = ["sidebar-right", "sidebar-top", "sidebar-bottom", "sidebar-left"]; // TODO: magic numbers
         let stateIndex;
         for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
             const state = sidebarStates[stateIndex];
@@ -2723,6 +3270,8 @@ class SidebarButtons {
         if (stateIndex != buttonIndex) {
             const newSidebarState = sidebarStates[buttonIndex];
             modelManager.classList.add(newSidebarState);
+            const sidebarButton = sidebarButtons[buttonIndex];
+            sidebarButton.classList.add(buttonActiveState);
         }
     }
     
@@ -2736,12 +3285,9 @@ class SidebarButtons {
             $: (el) => (this.element = el),
         },
         [
+            
             $el("button.icon-button", {
-                textContent: "◧",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬓",
+                textContent: "◨",
                 onclick: (event) => this.#setSidebar(event),
             }),
             $el("button.icon-button", {
@@ -2749,7 +3295,11 @@ class SidebarButtons {
                 onclick: (event) => this.#setSidebar(event),
             }),
             $el("button.icon-button", {
-                textContent: "◨",
+                textContent: "⬓",
+                onclick: (event) => this.#setSidebar(event),
+            }),
+            $el("button.icon-button", {
+                textContent: "◧",
                 onclick: (event) => this.#setSidebar(event),
             }),
         ]);
@@ -2757,18 +3307,11 @@ class SidebarButtons {
 }
 
 class ModelManager extends ComfyDialog {
-    #data = {
-        /** @type {Object} */ models: {},
-        /** @type {DirectoryItem[]} */ modelDirectories: [],
-        /** @type {Array} */ previousModelFilters: [],
-        /** @type {Object.<{value: string}>} */ previousModelType: { value: null },
-    };
+    /** @type {HTMLDivElement} */
+    element = null;
     
-    /** @type {string} */
-    #searchSeparator = "/";
-    
-    /** @type {string} */
-    #systemSeparator = null;
+    /** @type {ModelData} */
+    #modelData = null;
     
     /** @type {ModelInfoView} */
     #modelInfoView = null;
@@ -2782,146 +3325,204 @@ class ModelManager extends ComfyDialog {
     /** @type {SettingsTab} */
     #settingsTab = null;
     
-    /** @type {SidebarButtons} */
-    #sidebarButtons = null;
+    /** @type {HTMLDivElement} */
+    #tabs = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabContents = null;
+    
+    /** @type {HTMLButtonElement} */
+    #closeModelInfoButton = null;
     
     constructor() {
         super();
+        
+        this.#modelData = new ModelData();
+        
         const modelInfoView = new ModelInfoView(
-            this.#data.modelDirectories, 
-            this.#modelTab_updateModels, 
-            this.#searchSeparator, 
+            this.#modelData,
+            this.#refreshModels,
         );
         this.#modelInfoView = modelInfoView;
         
-        const downloadTab = new DownloadTab(
-            this.#data.models,
-            this.#data.modelDirectories,
-            this.#modelTab_updateModels,
-            this.#searchSeparator,
-        );
-        this.#downloadTab = DownloadTab;
-        
-        const modelTab = new ModelTab(
-            this.#modelTab_updateDirectoryDropdown,
-            this.#modelTab_updatePreviousModelFilter,
-            this.#modelTab_updateModelGrid,
-            this.#modelTab_updateModels,
-            this.#searchSeparator,
-        );
-        this.#modelTab = modelTab;
-        
         const settingsTab = new SettingsTab(
-            this.#modelTab_updateModels, 
+            this.#refreshModels,
         );
         this.#settingsTab = settingsTab;
         
-        const sidebarButtons = new SidebarButtons(this);
-        this.#sidebarButtons = sidebarButtons;
+        const ACTIVE_TAB_CLASS = "active";
         
-        this.element = $el(
+        /**
+         * @param {searchPath: string}
+         * @return {Promise<void>}
+         */
+        const showModelInfo = async(searchPath) => {
+            await this.#modelInfoView.update(
+                searchPath, 
+                this.#refreshModels, 
+                this.#modelData.searchSeparator
+            ).then(() => {
+                this.#tabs.style.display = "none";
+                this.#tabContents.style.display = "none";
+                this.#closeModelInfoButton.style.display = "";
+                this.#modelInfoView.show();
+            });
+        }
+        
+        const modelTab = new ModelTab(
+            this.#refreshModels,
+            this.#modelData,
+            showModelInfo,
+            this.#settingsTab.elements.settings, // TODO: decouple settingsData from elements?
+        );
+        this.#modelTab = modelTab;
+        
+        const downloadTab = new DownloadTab(
+            this.#modelData,
+            this.#settingsTab.elements.settings,
+            this.#refreshModels,
+        );
+        this.#downloadTab = downloadTab;
+        
+        const sidebarButtons = new SidebarButtons(this);
+        
+        /** @type {Record<string, HTMLDivElement>} */
+        const head = {};
+        
+        /** @type {Record<string, HTMLDivElement>} */
+        const body = {};
+        
+        /** @type {HTMLDivElement[]} */
+        const contents = [
+            $el("div", { dataset: { name: "Download" } }, [downloadTab.element]),
+            $el("div", { dataset: { name: "Models" } }, [modelTab.element]),
+            $el("div", { dataset: { name: "Settings" } }, [settingsTab.element]),
+        ];
+        
+        const tabs = contents.map((content) => {
+            const name = content.getAttribute("data-name");
+            /** @type {HTMLDivElement} */
+            const tab = $el("div.head-item", {
+                    onclick: () => {
+                        Object.keys(head).forEach((key) => {
+                            if (name === key) {
+                                head[key].classList.add(ACTIVE_TAB_CLASS);
+                                body[key].style.display = "";
+                            } else {
+                                head[key].classList.remove(ACTIVE_TAB_CLASS);
+                                body[key].style.display = "none";
+                            }
+                        });
+                    },
+                },
+                [name],
+            );
+            head[name] = tab;
+            body[name] = content;
+            return tab;
+        });
+        tabs[0]?.click();
+        
+        const closeManagerButton = $el("button.icon-button", {
+            textContent: "✖",
+            onclick: async() => {
+                const saved = await modelInfoView.trySave(true);
+                if (saved) {
+                    this.close();
+                }
+            }
+        });
+        
+        const closeModelInfoButton = $el("button.icon-button", {
+            $: (el) => (this.#closeModelInfoButton = el),
+            style: { display: "none" },
+            textContent: "⬅",
+            onclick: async() => { await this.#tryHideModelInfo(true); },
+        });
+        
+        const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
+                $: (el) => (this.element = el),
                 parent: document.body,
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
-                    modelInfoView.element,
-                    $el("div.topbar-buttons",
-                        [
-                            sidebarButtons.element,
-                            $el("button.icon-button", {
-                                textContent: "✖",
-                                onclick: () => {
-                                    if (modelInfoView.isVisible()) { // TODO: decouple
-                                        this.close();
-                                    }
-                                    else {
-                                        modelInfoView.hide();
-                                    }
-                                },
-                            }),
-                        ]
-                    ),
-                    $tabs([
-                        $tab("Download", [downloadTab.element]),
-                        $tab("Models", [modelTab.element]),
-                        $tab("Settings", [settingsTab.element]),
+                    $el("div.model-manager-panel", [
+                        $el("div.model-manager-head", [
+                            $el("div.topbar-right", [
+                                closeManagerButton,
+                                closeModelInfoButton,
+                                sidebarButtons.element,
+                            ]),
+                            $el("div.topbar-left", [
+                                $el("div.model-manager-tabs", {
+                                    $: (el) => (this.#tabs = el),
+                                }, tabs),
+                            ]),
+                        ]),
+                        $el("div.model-manager-body", [
+                            $el("div.model-manager-tab-contents", {
+                                $: (el) => (this.#tabContents = el),
+                            }, contents),
+                            modelInfoView.element,
+                        ]),
                     ]),
                 ]),
             ]
         );
+        
+        new ResizeObserver(() => {
+            if (modelManager.style.display === "none") {
+                return;
+            }
+            const minWidth = 768; // magic value (could easily break)
+            const managerRect = modelManager.getBoundingClientRect();
+            const isNarrow = managerRect.width < minWidth;
+            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"]; // magic values
+            texts.forEach((text, i) => {
+                tabs[i].innerText = text;
+            });
+        }).observe(modelManager);
         
         this.#init();
     }
     
     #init() {
         this.#settingsTab.reload(false);
-        this.#modelTab_updateModels();
+        this.#refreshModels();
     }
     
-    #modelTab_updateModelGrid = () => {
-        const modelTab = this.#modelTab;
-        const sortValue = modelTab.elements.modelSortSelect.value;
-        const reverseSort = sortValue[0] === "-";
-        const sortBy = reverseSort ? sortValue.substring(1) : sortValue;
-        ModelGrid.update(
-            modelTab.elements.modelGrid,
-            this.#data.models,
-            modelTab.elements.modelTypeSelect,
-            this.#data.previousModelType,
-            this.#settingsTab.elements.settings,
-            sortBy,
-            reverseSort,
-            this.#data.previousModelFilters,
-            modelTab.elements.modelContentFilter,
-            this.#searchSeparator,
-            this.#systemSeparator,
-            this.#modelTab_showModelInfo,
-        );
-    }
-    
-    #modelTab_updateModels = async() => {
-        this.#systemSeparator = await request("/model-manager/system-separator");
-        
+    #refreshModels = async() => {
+        const modelData = this.#modelData;
+        modelData.systemSeparator = await request("/model-manager/system-separator");
         const newModels = await request("/model-manager/models/list");
-        Object.assign(this.#data.models, newModels); // NOTE: do NOT create a new object
-        
+        Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
         const newModelDirectories = await request("/model-manager/models/directory-list");
-        this.#data.modelDirectories.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
+        modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
-        this.#modelTab_updateModelGrid();
-    }
-    
-    #modelTab_updatePreviousModelFilter = () => {
-        const modelType = this.#modelTab.elements.modelTypeSelect.value;
-        const value = this.#modelTab.elements.modelContentFilter.value;
-        this.#data.previousModelFilters[modelType] = value;
-    };
-    
-    #modelTab_updateDirectoryDropdown = () => {
-        this.#modelTab.directoryDropdown.update(
-            this.#data.modelDirectories,
-            this.#searchSeparator,
-            this.#modelTab.elements.modelTypeSelect.value,
-        );
-        this.#modelTab_updatePreviousModelFilter();
+        this.#modelTab.updateModelGrid();
+        await this.#tryHideModelInfo(false);
     }
     
     /**
-     * @param {string} searchPath
+     * @param {boolean} promptSave 
+     * @returns {Promise<boolean>}
      */
-    #modelTab_showModelInfo = async(searchPath) => {
-        this.#modelInfoView.update(
-            searchPath, 
-            this.#modelTab_updateModels, 
-            this.#searchSeparator
-        ).then(() => {
-            this.#modelInfoView.show();
-        });
+    #tryHideModelInfo = async(promptSave) => {
+        if (this.#tabContents.style.display === "none") {
+            if (!await this.#modelInfoView.tryHide(promptSave)) {
+                return false;
+            }
+            this.#closeModelInfoButton.style.display = "none";
+            this.#tabs.style.display = "";
+            this.#tabContents.style.display = "";
+        }
+        return true;
     }
 }
 
+/** @type {ModelManager | undefined} */
 let instance;
 
 /**
@@ -2950,7 +3551,16 @@ app.registerExtension({
                 id: "comfyui-model-manager-button",
                 parent: document.querySelector(".comfy-menu"),
                 textContent: "Models",
-                onclick: () => { getInstance().show(); },
+                onclick: () => {
+                    const modelManager = getInstance();
+                    const style = modelManager.element.style;
+                    if (style.display === "" || style.display === "none") {
+                        modelManager.show();
+                    }
+                    else {
+                        modelManager.close();
+                    }
+                },
             })
         );
     },

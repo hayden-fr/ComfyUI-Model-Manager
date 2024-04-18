@@ -20,20 +20,50 @@ requests.packages.urllib3.disable_warnings()
 
 import folder_paths
 
-config_loader_path = os.path.join(os.path.dirname(__file__), 'config_loader.py')
+comfyui_model_uri = folder_paths.models_dir
+
+extension_uri = os.path.dirname(__file__)
+
+config_loader_path = os.path.join(extension_uri, 'config_loader.py')
 config_loader_spec = importlib.util.spec_from_file_location('config_loader', config_loader_path)
 config_loader = importlib.util.module_from_spec(config_loader_spec)
 config_loader_spec.loader.exec_module(config_loader)
 
-comfyui_model_uri = os.path.join(os.getcwd(), "models")
-extension_uri = os.path.join(os.getcwd(), "custom_nodes" + os.path.sep + "ComfyUI-Model-Manager")
 no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 
 fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
-image_extensions = (".apng", ".gif", ".jpeg", ".jpg", ".png", ".webp")  # TODO: JavaScript does not know about this (x2 states)
+image_extensions = (
+    ".png", # order matters
+    ".webp", 
+    ".jpeg", 
+    ".jpg", 
+    ".gif", 
+    ".apng", 
+)
+stable_diffusion_webui_civitai_helper_image_extensions = (
+    ".preview.png", # order matters
+    ".preview.webp", 
+    ".preview.jpeg", 
+    ".preview.jpg", 
+    ".preview.gif", 
+    ".preview.apng", 
+)
+preview_extensions = ( # TODO: JavaScript does not know about this (x2 states)
+    image_extensions + # order matters
+    stable_diffusion_webui_civitai_helper_image_extensions
+)
+model_info_extension = ".txt"
 #video_extensions = (".avi", ".mp4", ".webm") # TODO: Requires ffmpeg or cv2. Cache preview frame?
+
+def split_valid_ext(s, *arg_exts):
+    sl = s.lower()
+    for exts in arg_exts:
+        for ext in exts:
+            if sl.endswith(ext.lower()):
+                return (s[:-len(ext)], ext)
+    return (s, "")
 
 _folder_names_and_paths = None # dict[str, tuple[list[str], list[str]]]
 def folder_paths_folder_names_and_paths(refresh = False):
@@ -75,10 +105,9 @@ def folder_paths_get_supported_pt_extensions(folder_name, refresh = False): # Mi
 def search_path_to_system_path(model_path):
     sep = os.path.sep
     model_path = os.path.normpath(model_path.replace("/", sep))
+    model_path = model_path.lstrip(sep)
 
-    isep0 = 0 if model_path[0] == sep else -1
-
-    isep1 = model_path.find(sep, isep0 + 1)
+    isep1 = model_path.find(sep, 0)
     if isep1 == -1 or isep1 == len(model_path):
         return (None, None)
 
@@ -86,7 +115,7 @@ def search_path_to_system_path(model_path):
     if isep2 == -1 or isep2 - isep1 == 1:
         isep2 = len(model_path)
 
-    model_path_type = model_path[isep0 + 1:isep1]
+    model_path_type = model_path[0:isep1]
     paths = folder_paths_get_folder_paths(model_path_type)
     if len(paths) == 0:
         return (None, None)
@@ -156,6 +185,7 @@ def ui_rules():
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
+        Rule("download-save-description-as-text-file", False, bool),
     ]
 
 
@@ -168,6 +198,26 @@ def server_rules():
     ]
 server_settings = config_loader.yaml_load(server_settings_uri, server_rules())
 config_loader.yaml_save(server_settings_uri, server_rules(), server_settings)
+
+
+def get_def_headers(url=""):
+    def_headers = {
+        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
+    }
+
+    if url.startswith("https://civitai.com/"):
+        api_key = server_settings["civitai_api_key"]
+        if (api_key != ""):
+            def_headers["Authorization"] = f"Bearer {api_key}"
+            url += "&" if "?" in url else "?" # not the most robust solution
+            url += f"token={api_key}" # TODO: Authorization didn't work in the header
+    elif url.startswith("https://huggingface.co/"):
+        api_key = server_settings["huggingface_api_key"]
+        if api_key != "":
+            def_headers["Authorization"] = f"Bearer {api_key}"
+    
+    return def_headers
+
 
 @server.PromptServer.instance.routes.get("/model-manager/settings/load")
 async def load_ui_settings(request):
@@ -183,58 +233,171 @@ async def save_ui_settings(request):
     rules = ui_rules()
     validated_settings = config_loader.validated(rules, settings)
     success = config_loader.yaml_save(ui_settings_uri, rules, validated_settings)
+    print("Saved file: " + ui_settings_uri)
     return web.json_response({
         "success": success,
         "settings": validated_settings if success else "",
     })
 
 
+from PIL import Image, TiffImagePlugin
+from PIL.PngImagePlugin import PngInfo
+def PIL_cast_serializable(v):
+    # source: https://github.com/python-pillow/Pillow/issues/6199#issuecomment-1214854558
+    if isinstance(v, TiffImagePlugin.IFDRational):
+        return float(v)
+    elif isinstance(v, tuple):
+        return tuple(PIL_cast_serializable(t) for t in v)
+    elif isinstance(v, bytes):
+        return v.decode(errors="replace")
+    elif isinstance(v, dict):
+        for kk, vv in v.items():
+            v[kk] = PIL_cast_serializable(vv)
+        return v
+    else:
+        return v
+
+
+def get_safetensors_image_bytes(path):
+    if not os.path.isfile(path):
+        raise RuntimeError("Path was invalid!")
+    header = get_safetensor_header(path)
+    metadata = header.get("__metadata__", None)
+    if metadata is None:
+        return None
+    thumbnail = metadata.get("modelspec.thumbnail", None)
+    if thumbnail is None:
+        return None
+    image_data = thumbnail.split(',')[1]
+    return base64.b64decode(image_data)
+
+
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri")
-
     image_path = no_preview_image
-    image_extension = "png"
-    image_data = None
+    image_type = "png"
+    file_name = os.path.split(no_preview_image)[1]
     if uri != "no-preview":
         sep = os.path.sep
         uri = uri.replace("/" if sep == "\\" else "/", sep)
         path, _ = search_path_to_system_path(uri)
-        head, extension = os.path.splitext(path)
+        head, extension = split_valid_ext(path, preview_extensions)
         if os.path.exists(path):
-            image_extension = extension[1:]
             image_path = path
-        elif os.path.exists(head) and os.path.splitext(head)[1] == ".safetensors":
-            image_extension = extension[1:]
-            header = get_safetensor_header(head)
-            metadata = header.get("__metadata__", None)
-            if metadata is not None:
-                thumbnail = metadata.get("modelspec.thumbnail", None)
-                if thumbnail is not None:
-                    image_data = thumbnail.split(',')[1]
-                    image_data = base64.b64decode(image_data)
+            image_type = extension.rsplit(".", 1)[1]
+            file_name = os.path.split(head)[1] + "." + image_type
+        elif os.path.exists(head) and head.endswith(".safetensors"):
+            image_path = head
+            image_type = extension.rsplit(".", 1)[1]
+            file_name = os.path.splitext(os.path.split(head)[1])[0] + "." + image_type
 
-    if image_data == None:
-        with open(image_path, "rb") as file:
-            image_data = file.read()
+    w = request.query.get("width")
+    h = request.query.get("height")
+    try:
+        w = int(w)
+        if w < 1:
+            w = None
+    except:
+        w = None
+    try:
+        h = int(h)
+        if w < 1:
+            h = None
+    except:
+        h = None
 
-    return web.Response(body=image_data, content_type="image/" + image_extension)
+    image_data = None
+    if w is None and h is None: # full size
+        if image_path.endswith(".safetensors"):
+            image_data = get_safetensors_image_bytes(image_path)
+        else:
+            with open(image_path, "rb") as image:
+                image_data = image.read()
+    else:
+        if image_path.endswith(".safetensors"):
+            image_data = get_safetensors_image_bytes(image_path)
+            fp = io.BytesIO(image_data)
+        else:
+            fp = image_path
+
+        with Image.open(fp) as image:
+            w0, h0 = image.size
+            if w is None:
+                w = (h * w0) // h0
+            elif h is None:
+                h = (w * h0) // w0
+
+            exif = image.getexif()
+
+            metadata = None
+            if len(image.info) > 0:
+                metadata = PngInfo()
+                for (key, value) in image.info.items():
+                    value_str = str(PIL_cast_serializable(value)) # not sure if this is correct (sometimes includes exif)
+                    metadata.add_text(key, value_str)
+
+            image.thumbnail((w, h))
+
+            image_bytes = io.BytesIO()
+            image.save(image_bytes, format=image.format, exif=exif, pnginfo=metadata)
+            image_data = image_bytes.getvalue()
+
+    return web.Response(
+        headers={
+            "Content-Disposition": f"inline; filename={file_name}",
+        },
+        body=image_data,
+        content_type="image/" + image_type,
+    )
+
+
+@server.PromptServer.instance.routes.get("/model-manager/image/extensions")
+async def get_image_extensions(request):
+    return web.json_response(image_extensions)
 
 
 def download_model_preview(formdata):
     path = formdata.get("path", None)
     if type(path) is not str:
         raise ("Invalid path!")
-    path, _ = search_path_to_system_path(path)
-    path_without_extension, _ = os.path.splitext(path)
+    path, model_type = search_path_to_system_path(path)
+    model_type_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    path_without_extension, _ = split_valid_ext(path, model_type_extensions)
 
     overwrite = formdata.get("overwrite", "true").lower()
     overwrite = True if overwrite == "true" else False
 
     image = formdata.get("image", None)
     if type(image) is str:
-        image_path = download_image(image, path, overwrite)
-        _, image_extension = os.path.splitext(image_path)
+        civitai_image_url = "https://civitai.com/images/"
+        if image.startswith(civitai_image_url):
+            image_id = re.search(r"^\d+", image[len(civitai_image_url):]).group(0)
+            image_id = str(int(image_id))
+            image_info_url = f"https://civitai.com/api/v1/images?imageId={image_id}"
+            def_headers = get_def_headers(image_info_url)
+            response = requests.get(
+                url=image_info_url, 
+                stream=False, 
+                verify=False, 
+                headers=def_headers, 
+                proxies=None, 
+                allow_redirects=False, 
+            )
+            if response.ok:
+                content_type = response.headers.get("Content-Type")
+                info = response.json()
+                items = info["items"]
+                if len(items) == 0:
+                    raise RuntimeError("Civitai /api/v1/images returned 0 items!")
+                image = items[0]["url"]
+            else:
+                raise RuntimeError("Bad response from api/v1/images!")
+        _, image_extension = split_valid_ext(image, image_extensions)
+        if image_extension == "":
+            raise ValueError("Invalid image type!")
+        image_path = path_without_extension + image_extension
+        download_file(image, image_path, overwrite)
     else:
         content_type = image.content_type
         if not content_type.startswith("image/"):
@@ -251,7 +414,7 @@ def download_model_preview(formdata):
         with open(image_path, "wb") as f:
             f.write(image_data)
 
-    delete_same_name_files(path_without_extension, image_extensions, image_extension)
+    delete_same_name_files(path_without_extension, preview_extensions, image_extension)
 
 
 @server.PromptServer.instance.routes.post("/model-manager/preview/set")
@@ -262,21 +425,29 @@ async def set_model_preview(request):
         return web.json_response({ "success": True })
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
-        return web.json_response({ "success": False })
+        return web.json_response({
+            "success": False,
+            "alert": "Failed to set preview!\n\n" + str(e),
+        })
 
 
 @server.PromptServer.instance.routes.post("/model-manager/preview/delete")
 async def delete_model_preview(request):
+    result = { "success": False }
+    
     model_path = request.query.get("path", None)
     if model_path is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
-    file, _ = search_path_to_system_path(model_path)
-    path_and_name, _ = os.path.splitext(file)
-    delete_same_name_files(path_and_name, image_extensions)
-    
-    return web.json_response({ "success": True })
+    model_path, model_type = search_path_to_system_path(model_path)
+    model_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    path_and_name, _ = split_valid_ext(model_path, model_extensions)
+    delete_same_name_files(path_and_name, preview_extensions)
+
+    result["success"] = True
+    return web.json_response(result)
 
 
 @server.PromptServer.instance.routes.get("/model-manager/models/list")
@@ -297,29 +468,36 @@ async def get_model_list(request):
         for base_path_index, model_base_path in enumerate(folder_paths_get_folder_paths(model_type)):
             if not os.path.exists(model_base_path): # TODO: Bug in main code? ("ComfyUI\output\checkpoints", "ComfyUI\output\clip", "ComfyUI\models\t2i_adapter", "ComfyUI\output\vae")
                 continue
-            for cwd, _subdirs, files in os.walk(model_base_path):
+            for cwd, subdirs, files in os.walk(model_base_path):
                 dir_models = []
                 dir_images = []
 
                 for file in files:
                     if file.lower().endswith(model_extensions):
                         dir_models.append(file)
-                    elif file.lower().endswith(image_extensions):
+                    elif file.lower().endswith(preview_extensions):
                         dir_images.append(file)
 
                 for model in dir_models:
-                    model_name, model_ext = os.path.splitext(model)
+                    model_name, model_ext = split_valid_ext(model, model_extensions)
                     image = None
                     image_modified = None
-                    for iImage in range(len(dir_images)-1, -1, -1):
-                        image_name, _ = os.path.splitext(dir_images[iImage])
-                        if model_name == image_name:
-                            image = end_swap_and_pop(dir_images, iImage)
-                            img_abs_path = os.path.join(cwd, image)
-                            image_modified = pathlib.Path(img_abs_path).stat().st_mtime_ns
+                    for ext in preview_extensions: # order matters
+                        for iImage in range(len(dir_images)-1, -1, -1):
+                            image_name = dir_images[iImage]
+                            if not image_name.lower().endswith(ext.lower()):
+                                continue
+                            image_name = image_name[:-len(ext)]
+                            if model_name == image_name:
+                                image = end_swap_and_pop(dir_images, iImage)
+                                img_abs_path = os.path.join(cwd, image)
+                                image_modified = pathlib.Path(img_abs_path).stat().st_mtime_ns
+                                break
+                        if image is not None:
                             break
                     abs_path = os.path.join(cwd, model)
                     stats = pathlib.Path(abs_path).stat()
+                    sizeBytes = stats.st_size
                     model_modified = stats.st_mtime_ns
                     model_created = stats.st_ctime_ns
                     if use_safetensor_thumbnail and image is None and model_ext == ".safetensors":
@@ -336,12 +514,21 @@ async def get_model_list(request):
                                     image = model + image_ext
                                     image_modified = model_modified
                     rel_path = "" if cwd == model_base_path else os.path.relpath(cwd, model_base_path)
-                    info = (model, image, base_path_index, rel_path, model_modified, model_created, image_modified)
+                    info = (
+                        model, 
+                        image, 
+                        base_path_index, 
+                        rel_path, 
+                        model_modified,
+                        model_created, 
+                        image_modified, 
+                        sizeBytes, 
+                    )
                     file_infos.append(info)
-        file_infos.sort(key=lambda tup: tup[4], reverse=True) # TODO: remove sort; sorted on client
+        #file_infos.sort(key=lambda tup: tup[4], reverse=True) # TODO: remove sort; sorted on client
 
         model_items = []
-        for model, image, base_path_index, rel_path, model_modified, model_created, image_modified in file_infos:
+        for model, image, base_path_index, rel_path, model_modified, model_created, image_modified, sizeBytes in file_infos:
             item = {
                 "name": model,
                 "path": "/" + os.path.join(model_type, str(base_path_index), rel_path, model).replace(os.path.sep, "/"), # relative logical path
@@ -350,6 +537,7 @@ async def get_model_list(request):
                 "dateCreated": model_created,
                 #"dateLastUsed": "", # TODO: track server-side, send increment client-side
                 #"countUsed": 0, # TODO: track server-side, send increment client-side
+                "sizeBytes": sizeBytes,
             }
             if image is not None:
                 raw_post = os.path.join(model_type, str(base_path_index), rel_path, image)
@@ -378,7 +566,7 @@ def linear_directory_hierarchy(refresh = False):
         for dir_path_index, dir_path in enumerate(model_dirs):
             if not os.path.exists(dir_path) or os.path.isfile(dir_path):
                 continue
-
+            
             #dir_list.append({ "name": str(dir_path_index), "childIndex": None, "childCount": 0 })
             dir_stack = [(dir_path, model_dir_child_index + dir_path_index)]
             while len(dir_stack) > 0: # DEPTH-FIRST
@@ -403,8 +591,7 @@ def linear_directory_hierarchy(refresh = False):
                         dir_child_count += 1
                     else:
                         # file
-                        _, file_extension = os.path.splitext(item_name)
-                        if extension_whitelist is None or file_extension in extension_whitelist:
+                        if extension_whitelist is None or split_valid_ext(item_name, extension_whitelist)[1] != "":
                             dir_list.append({ "name": item_name })
                             dir_child_count += 1
                 if dir_child_count > 0:
@@ -430,21 +617,15 @@ def download_file(url, filename, overwrite):
 
     filename_temp = filename + ".download"
 
-    def_headers = {
-        "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
-    }
-
-    if url.startswith("https://civitai.com/"):
-        api_key = server_settings["civitai_api_key"]
-        if (api_key != ""):
-            def_headers["Authorization"] = f"Bearer {api_key}"
-            url += "&" if "?" in url else "?" # not the most robust solution
-            url += f"token={api_key}" # TODO: Authorization didn't work in the header
-    elif url.startswith("https://huggingface.co/"):
-        api_key = server_settings["huggingface_api_key"]
-        if api_key != "":
-            def_headers["Authorization"] = f"Bearer {api_key}"
-    rh = requests.get(url=url, stream=True, verify=False, headers=def_headers, proxies=None, allow_redirects=False)
+    def_headers = get_def_headers(url)
+    rh = requests.get(
+        url=url, 
+        stream=True, 
+        verify=False, 
+        headers=def_headers, 
+        proxies=None, 
+        allow_redirects=False, 
+    )
     if not rh.ok:
         raise ValueError(
             "Unable to download! Request header status code: " + 
@@ -457,8 +638,16 @@ def download_file(url, filename, overwrite):
 
     headers = {"Range": "bytes=%d-" % downloaded_size}
     headers["User-Agent"] = def_headers["User-Agent"]
-    
-    r = requests.get(url=url, stream=True, verify=False, headers=headers, proxies=None, allow_redirects=False)
+    headers["Authorization"] = def_headers.get("Authorization", None)
+
+    r = requests.get(
+        url=url, 
+        stream=True, 
+        verify=False, 
+        headers=headers, 
+        proxies=None, 
+        allow_redirects=False, 
+    )
     if rh.status_code == 307 and r.status_code == 307:
         # Civitai redirect
         redirect_url = r.content.decode("utf-8")
@@ -482,7 +671,7 @@ def download_file(url, filename, overwrite):
 
     total_size = int(rh.headers.get("Content-Length", 0)) # TODO: pass in total size earlier
 
-    print("Download file: " + filename)
+    print("Downloading file: " + url)
     if total_size != 0:
         print("Download file size: " + str(total_size))
 
@@ -512,54 +701,63 @@ def download_file(url, filename, overwrite):
     if overwrite and os.path.isfile(filename):
         os.remove(filename)
     os.rename(filename_temp, filename)
+    print("Saved file: " + filename)
 
 
-def download_image(image_uri, model_path, overwrite):
-    _, extension = os.path.splitext(image_uri) # TODO: doesn't work for https://civitai.com/images/...
-    if not extension in image_extensions:
-        raise ValueError("Invalid image type!")
-    path_without_extension, _ = os.path.splitext(model_path)
-    file = path_without_extension + extension
-    download_file(image_uri, file, overwrite)
-    return file
+def bytes_to_size(total_bytes):
+    units = ["B", "KiB", "MiB", "GiB", "TiB", "PiB"]
+    b = total_bytes
+    i = 0
+    while True:
+        b = b >> 10
+        if (b == 0): break
+        i = i + 1
+    if i >= len(units) or i == 0:
+        return str(total_bytes) + " " + units[0]
+    return "{:.2f}".format(total_bytes / (1 << (i * 10))) + " " + units[i]
 
 
 @server.PromptServer.instance.routes.get("/model-manager/model/info")
 async def get_model_info(request):
+    result = { "success": False }
+
     model_path = request.query.get("path", None)
     if model_path is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
-    file, _ = search_path_to_system_path(model_path)
-    if file is None:
-        return web.json_response({})
+    abs_path, model_type = search_path_to_system_path(model_path)
+    if abs_path is None:
+        result["alert"] = "Invalid model path!"
+        return web.json_response(result)
 
     info = {}
-    path, name = os.path.split(model_path)
+    comfyui_directory, name = os.path.split(model_path)
     info["File Name"] = name
-    info["File Directory"] = path
-    info["File Size"] = str(os.path.getsize(file)) + " bytes"
-    stats = pathlib.Path(file).stat()
+    info["File Directory"] = comfyui_directory
+    info["File Size"] = bytes_to_size(os.path.getsize(abs_path))
+    stats = pathlib.Path(abs_path).stat()
     date_format = "%Y-%m-%d %H:%M:%S"
     date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
     info["Date Modified"] = date_modified
     info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
 
-    file_name, _ = os.path.splitext(file)
+    model_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    abs_name , _ = split_valid_ext(abs_path, model_extensions)
 
-    for extension in image_extensions:
-        maybe_image = file_name + extension
-        if os.path.isfile(maybe_image):
-            image_path, _ = os.path.splitext(model_path)
-            image_modified = pathlib.Path(maybe_image).stat().st_mtime_ns
+    for extension in preview_extensions:
+        maybe_preview = abs_name + extension
+        if os.path.isfile(maybe_preview):
+            preview_path, _ = split_valid_ext(model_path, model_extensions)
+            preview_modified = pathlib.Path(maybe_preview).stat().st_mtime_ns
             info["Preview"] = {
-                "path": urllib.parse.quote_plus(image_path + extension),
-                "dateModified": urllib.parse.quote_plus(str(image_modified)),
+                "path": urllib.parse.quote_plus(preview_path + extension),
+                "dateModified": urllib.parse.quote_plus(str(preview_modified)),
             }
             break
 
-    header = get_safetensor_header(file)
+    header = get_safetensor_header(abs_path)
     metadata = header.get("__metadata__", None)
     #json.dump(metadata, sys.stdout, indent=4)
     #print()
@@ -593,13 +791,14 @@ async def get_model_info(request):
 
         info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
         info["Base Model"] = metadata.get("ss_base_model_version", "")
-        info["Architecture"] = metadata.get("modelspec.architecture", "") # "stable-diffusion-xl-v1-base"
-
+        info["Architecture"] = metadata.get("modelspec.architecture", "")
+        info["Network Dimension"] = metadata.get("ss_network_dim", "") # features trained
+        info["Network Alpha"] = metadata.get("ss_network_alpha", "") # trained features applied
+        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
         clip_skip = metadata.get("ss_clip_skip", "")
-        if clip_skip == "None":
+        if clip_skip == "None" or clip_skip == "1": # assume 1 means no clip skip
             clip_skip = ""
-        info["Clip Skip"] = clip_skip # default 1 (disable clip skip)
-        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "") # "epsilon"
+        info["Clip Skip"] = clip_skip
 
         # it is unclear what these are
         #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
@@ -622,10 +821,10 @@ async def get_model_info(request):
             training_comment if training_comment != "None" else ""
         ).strip()
 
-    txt_file = file_name + ".txt"
+    info_text_file = abs_name + model_info_extension
     notes = ""
-    if os.path.isfile(txt_file):
-        with open(txt_file, 'r', encoding="utf-8") as f:
+    if os.path.isfile(info_text_file):
+        with open(info_text_file, 'r', encoding="utf-8") as f:
             notes = f.read()
     info["Notes"] = notes
 
@@ -656,7 +855,9 @@ async def get_model_info(request):
         tags.sort(key=lambda x: x[1], reverse=True)
         info["Tags"] = tags
 
-    return web.json_response(info)
+    result["success"] = True
+    result["info"] = info
+    return web.json_response(result)
 
 
 @server.PromptServer.instance.routes.get("/model-manager/system-separator")
@@ -667,10 +868,7 @@ async def get_system_separator(request):
 @server.PromptServer.instance.routes.post("/model-manager/model/download")
 async def download_model(request):
     formdata = await request.post()
-    result = {
-        "success": False,
-        "invalid": None,
-    }
+    result = { "success": False }
 
     overwrite = formdata.get("overwrite", "false").lower()
     overwrite = True if overwrite == "true" else False
@@ -678,25 +876,30 @@ async def download_model(request):
     model_path = formdata.get("path", "/0")
     directory, model_type = search_path_to_system_path(model_path)
     if directory is None:
-        result["invalid"] = "path"
+        result["alert"] = "Invalid save path!"
         return web.json_response(result)
 
     download_uri = formdata.get("download")
     if download_uri is None:
-        result["invalid"] = "download"
+        result["alert"] = "Invalid download url!"
         return web.json_response(result)
 
     name = formdata.get("name")
-    _, model_extension = os.path.splitext(name)
-    if not model_extension in folder_paths_get_supported_pt_extensions(model_type):
-        result["invalid"] = "name"
+    model_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    name_head, model_extension = split_valid_ext(name, model_extensions)
+    name_without_extension = os.path.split(name_head)[1]
+    if name_without_extension == "":
+        result["alert"] = "Cannot have empty model name!"
+        return web.json_response(result)
+    if model_extension == "":
+        result["alert"] = "Unrecognized model extension!"
         return web.json_response(result)
     file_name = os.path.join(directory, name)
     try:
         download_file(download_uri, file_name, overwrite)
     except Exception as e:
         print(e, file=sys.stderr, flush=True)
-        result["invalid"] = "model"
+        result["alert"] = "Failed to download model!\n\n" + str(e)
         return web.json_response(result)
 
     image = formdata.get("image")
@@ -709,7 +912,7 @@ async def download_model(request):
             })
         except Exception as e:
             print(e, file=sys.stderr, flush=True)
-            result["invalid"] = "preview"
+            result["alert"] = "Failed to download preview!\n\n" + str(e)
 
     result["success"] = True
     return web.json_response(result)
@@ -718,63 +921,86 @@ async def download_model(request):
 @server.PromptServer.instance.routes.post("/model-manager/model/move")
 async def move_model(request):
     body = await request.json()
+    result = { "success": False }
 
     old_file = body.get("oldFile", None)
     if old_file is None:
-        return web.json_response({ "success": False })
+        result["alert"] = "No model was given!"
+        return web.json_response(result)
     old_file, old_model_type = search_path_to_system_path(old_file)
     if not os.path.isfile(old_file):
-        return web.json_response({ "success": False })
-    _, model_extension = os.path.splitext(old_file)
-    if not model_extension in folder_paths_get_supported_pt_extensions(old_model_type):
-        # cannot move arbitrary files
-        return web.json_response({ "success": False })
+        result["alert"] = "Model does not exist!"
+        return web.json_response(result)
+    old_model_extensions = folder_paths_get_supported_pt_extensions(old_model_type)
+    old_file_without_extension, model_extension = split_valid_ext(old_file, old_model_extensions)
+    if model_extension == "":
+        result["alert"] = "Invalid model extension!"
+        return web.json_response(result)
 
     new_file = body.get("newFile", None)
     if new_file is None or new_file == "":
-        # cannot have empty name
-        return web.json_response({ "success": False })
+        result["alert"] = "New model name was invalid!"
+        return web.json_response(result)
     new_file, new_model_type = search_path_to_system_path(new_file)
     if not new_file.endswith(model_extension):
-        return web.json_response({ "success": False })
+        result["alert"] = "Cannot change model extension!"
+        return web.json_response(result)
     if os.path.isfile(new_file):
-        # cannot overwrite existing file
-        return web.json_response({ "success": False })
-    if not model_extension in folder_paths_get_supported_pt_extensions(new_model_type):
-        return web.json_response({ "success": False })
-    new_file_dir, _ = os.path.split(new_file)
+        result["alert"] = "Cannot overwrite existing model!"
+        return web.json_response(result)
+    new_model_extensions = folder_paths_get_supported_pt_extensions(new_model_type)
+    new_file_without_extension, new_model_extension = split_valid_ext(new_file, new_model_extensions)
+    if model_extension != new_model_extension:
+        result["alert"] = "Cannot change model extension!"
+        return web.json_response(result)
+    new_file_dir, new_file_name = os.path.split(new_file)
     if not os.path.isdir(new_file_dir):
-        return web.json_response({ "success": False })
+        result["alert"] = "Destination directory does not exist!"
+        return web.json_response(result)
+    new_name_without_extension = os.path.splitext(new_file_name)[0]
+    if new_file_name == new_name_without_extension or new_name_without_extension == "":
+        result["alert"] = "New model name was empty!"
+        return web.json_response(result)
 
     if old_file == new_file:
-        return web.json_response({ "success": False })
+        # no-op
+        result["success"] = True
+        return web.json_response(result)
     try:
         shutil.move(old_file, new_file)
+        print("Moved file: " + new_file)
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
-        return web.json_response({ "success": False })
+        result["alert"] = "Failed to move model!\n\n" + str(e)
+        return web.json_response(result)
 
-    old_file_without_extension, _ = os.path.splitext(old_file)
-    new_file_without_extension, _ = os.path.splitext(new_file)
-
-    # TODO: this could overwrite existing files...
-    for extension in image_extensions + (".txt",):
+    # TODO: this could overwrite existing files in destination; do a check beforehand?
+    for extension in preview_extensions + (model_info_extension,):
         old_file = old_file_without_extension + extension
         if os.path.isfile(old_file):
+            new_file = new_file_without_extension + extension
             try:
-                shutil.move(old_file, new_file_without_extension + extension)
+                shutil.move(old_file, new_file)
+                print("Moved file: " + new_file)
             except ValueError as e:
                 print(e, file=sys.stderr, flush=True)
+                msg = result.get("alert","")
+                if msg == "":
+                    result["alert"] = "Failed to move model resource file!\n\n" + str(e)
+                else:
+                    result["alert"] = msg + "\n" + str(e)
 
-    return web.json_response({ "success": True })
+    result["success"] = True
+    return web.json_response(result)
 
 
 def delete_same_name_files(path_without_extension, extensions, keep_extension=None):
     for extension in extensions:
         if extension == keep_extension: continue
-        image_file = path_without_extension + extension
-        if os.path.isfile(image_file):
-            os.remove(image_file)
+        file = path_without_extension + extension
+        if os.path.isfile(file):
+            os.remove(file)
+            print("Deleted file: " + file)
 
 
 @server.PromptServer.instance.routes.post("/model-manager/model/delete")
@@ -783,29 +1009,27 @@ async def delete_model(request):
 
     model_path = request.query.get("path", None)
     if model_path is None:
+        result["alert"] = "Missing model path!"
         return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
-
-    file, model_type = search_path_to_system_path(model_path)
-    if file is None:
+    model_path, model_type = search_path_to_system_path(model_path)
+    if model_path is None:
+        result["alert"] = "Invalid model path!"
         return web.json_response(result)
 
-    _, extension = os.path.splitext(file)
-    if not extension in folder_paths_get_supported_pt_extensions(model_type):
-        # cannot delete arbitrary files
+    model_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    path_and_name, model_extension = split_valid_ext(model_path, model_extensions)
+    if model_extension == "":
+        result["alert"] = "Cannot delete file!"
         return web.json_response(result)
 
-    if os.path.isfile(file):
-        os.remove(file)
+    if os.path.isfile(model_path):
+        os.remove(model_path)
         result["success"] = True
+        print("Deleted file: " + model_path)
 
-        path_and_name, _ = os.path.splitext(file)
-
-        delete_same_name_files(path_and_name, image_extensions)
-
-        txt_file = path_and_name + ".txt"
-        if os.path.isfile(txt_file):
-            os.remove(txt_file)
+        delete_same_name_files(path_and_name, preview_extensions)
+        delete_same_name_files(path_and_name, (model_info_extension,))
 
     return web.json_response(result)
 
@@ -813,29 +1037,37 @@ async def delete_model(request):
 @server.PromptServer.instance.routes.post("/model-manager/notes/save")
 async def set_notes(request):
     body = await request.json()
+    result = { "success": False }
 
     text = body.get("notes", None)
     if type(text) is not str:
-        return web.json_response({ "success": False })
+        result["alert"] = "Invalid note!"
+        return web.json_response(result)
 
     model_path = body.get("path", None)
     if type(model_path) is not str:
-        return web.json_response({ "success": False })
-    model_path, _ = search_path_to_system_path(model_path)
-    file_path_without_extension, _ = os.path.splitext(model_path)
-    filename = os.path.normpath(file_path_without_extension + ".txt")
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
+    model_path, model_type = search_path_to_system_path(model_path)
+    model_extensions = folder_paths_get_supported_pt_extensions(model_type)
+    file_path_without_extension, _ = split_valid_ext(model_path, model_extensions)
+    filename = os.path.normpath(file_path_without_extension + model_info_extension)
     if text.isspace() or text == "":
         if os.path.exists(filename):
             os.remove(filename)
+            print("Deleted file: " + filename)
     else:
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(text)
+            print("Saved file: " + filename)
         except ValueError as e:
             print(e, file=sys.stderr, flush=True)
-            web.json_response({ "success": False })
+            result["alert"] = "Failed to save notes!\n\n" + str(e)
+            web.json_response(result)
 
-    return web.json_response({ "success": True })
+    result["success"] = True
+    return web.json_response(result)
 
 
 WEB_DIRECTORY = "web"
