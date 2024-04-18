@@ -6,10 +6,17 @@ class Rule:
     key: any
     value_default: any
     value_type: type
-    value_min: int | float | None
-    value_max: int | float | None
+    value_min: any # int | float | None
+    value_max: any # int | float | None
 
-    def __init__(self, key, value_default, value_type: type, value_min: int | float | None = None, value_max: int | float | None = None):
+    def __init__(
+            self, 
+            key, 
+            value_default, 
+            value_type: type, 
+            value_min: any = None, # int | float | None
+            value_max: any = None, # int | float | None
+    ):
         self.key = key
         self.value_default = value_default
         self.value_type = value_type
