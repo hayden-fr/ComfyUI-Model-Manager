@@ -491,7 +491,7 @@ class ImageSelect {
                 if (file) {
                     el_uploadPreview.src = URL.createObjectURL(file);
                 }
-                if (el_uploadPreview.src === "") {
+                else {
                     el_uploadPreview.src = el_defaultUri.dataset.noimage;
                 }
             },
