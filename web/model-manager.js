@@ -3503,6 +3503,8 @@ class ModelManager extends ComfyDialog {
         
         this.#modelTab.updateModelGrid();
         await this.#tryHideModelInfo(false);
+        
+        document.getElementById("comfy-refresh-button")?.click();
     }
     
     /**
