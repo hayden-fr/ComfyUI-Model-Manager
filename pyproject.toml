@@ -1,0 +1,14 @@
+[project]
+name = "comfyui-model-manager"
+description = "Manage models: browsing, download and delete."
+version = "1.0.0"
+license = "LICENSE"
+
+[project.urls]
+Repository = "https://github.com/hayden-fr/ComfyUI-Model-Manager"
+#  Used by Comfy Registry https://comfyregistry.org
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-Model-Manager"
+Icon = ""
