@@ -322,6 +322,7 @@ async def get_model_preview(request):
             fp = image_path
 
         with Image.open(fp) as image:
+            format = image.format
             w0, h0 = image.size
             if w is None:
                 w = (h * w0) // h0
@@ -337,10 +338,24 @@ async def get_model_preview(request):
                     value_str = str(PIL_cast_serializable(value)) # not sure if this is correct (sometimes includes exif)
                     metadata.add_text(key, value_str)
 
+            ratio_original = w0 / h0
+            ratio_thumbnail = w / h
+            if abs(ratio_original - ratio_thumbnail) < 0.01:
+                crop_box = (0, 0, w0, h0)
+            elif ratio_original > ratio_thumbnail:
+                crop_width_fp = h0 * w / h
+                x0 = int((w0 - crop_width_fp) / 2)
+                crop_box = (x0, 0, x0 + int(crop_width_fp), h0)
+            else:
+                crop_height_fp = w0 * h / w
+                y0 = int((h0 - crop_height_fp) / 2)
+                crop_box = (0, y0, w0, y0 + int(crop_height_fp))
+            image = image.crop(crop_box)
+
             image.thumbnail((w, h))
 
             image_bytes = io.BytesIO()
-            image.save(image_bytes, format=image.format, exif=exif, pnginfo=metadata)
+            image.save(image_bytes, format=format, exif=exif, pnginfo=metadata)
             image_data = image_bytes.getvalue()
 
     return web.Response(
