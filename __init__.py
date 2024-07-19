@@ -810,9 +810,16 @@ async def get_model_info(request):
             notes = f.read()
 
     if metadata is not None:
-        img_buckets = metadata.get("ss_bucket_info", "{}")
+        img_buckets = metadata.get("ss_bucket_info", None)
+        datasets = metadata.get("ss_datasets", None)
+
         if type(img_buckets) is str:
             img_buckets = json.loads(img_buckets)
+        elif type(datasets) is str:
+                datasets = json.loads(datasets)
+                if isinstance(datasets, list):
+                    datasets = datasets[0]
+                    img_buckets = datasets.get("bucket_info", None)
         resolutions = {}
         if img_buckets is not None:
             buckets = img_buckets.get("buckets", {})
