@@ -2012,7 +2012,7 @@ class ModelInfo {
         ]);
         
         [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
-            { name: "Overview", icon: "ⓘ", tabContent: this.element },
+            { name: "Overview", icon: "ℹ️", tabContent: this.element },
             { name: "Metadata", icon: "📄", tabContent: $el("div", ["Metadata"]) },
             { name: "Tags", icon: "🏷️", tabContent: $el("div", ["Tags"]) },
             { name: "Notes", icon: "✏️", tabContent: $el("div", ["Notes"]) },
