@@ -755,8 +755,8 @@ async def get_model_info(request):
     stats = pathlib.Path(abs_path).stat()
     date_format = "%Y-%m-%d %H:%M:%S"
     date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
-    info["Date Modified"] = date_modified
-    info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
+    #info["Date Modified"] = date_modified
+    #info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
 
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     abs_name , _ = split_valid_ext(abs_path, model_extensions)
@@ -774,8 +774,6 @@ async def get_model_info(request):
 
     header = get_safetensor_header(abs_path)
     metadata = header.get("__metadata__", None)
-    #json.dump(metadata, sys.stdout, indent=4)
-    #print()
 
     if metadata is not None and info.get("Preview", None) is None:
         thumbnail = metadata.get("modelspec.thumbnail")
@@ -790,41 +788,10 @@ async def get_model_info(request):
                 }
 
     if metadata is not None:
-        train_end = metadata.get("modelspec.date", "").replace("T", " ")
-        train_start = metadata.get("ss_training_started_at", "")
-        if train_start != "":
-            try:
-                train_start = float(train_start)
-                train_start = datetime.fromtimestamp(train_start).strftime(date_format)
-            except:
-                train_start = ""
-        info["Date Trained"] = (
-            train_start + 
-            (" ... " if train_start != "" and train_end != "" else "") + 
-            train_end
-        )
-
         info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
-        info["Base Model"] = metadata.get("ss_base_model_version", "")
-        info["Architecture"] = metadata.get("modelspec.architecture", "")
-        info["Network Dimension"] = metadata.get("ss_network_dim", "") # features trained
-        info["Network Alpha"] = metadata.get("ss_network_alpha", "") # trained features applied
-        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
-        clip_skip = metadata.get("ss_clip_skip", "")
-        if clip_skip == "None" or clip_skip == "1": # assume 1 means no clip skip
-            clip_skip = ""
-        info["Clip Skip"] = clip_skip
-
-        # it is unclear what these are
-        #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
-        #info["SSHS Model Hash"] = metadata.get("sshs_model_hash", "")
-        #info["SSHS Legacy Hash"] = metadata.get("sshs_legacy_hash", "")
-        #info["New SD Model Hash"] = metadata.get("ss_new_sd_model_hash", "")
-
-        #info["Output Name"] = metadata.get("ss_output_name", "")
-        #info["Title"] = metadata.get("modelspec.title", "")
-        info["Author"] = metadata.get("modelspec.author", "")
-        info["License"] = metadata.get("modelspec.license", "")
+        info["Base Model Version"] = metadata.get("ss_base_model_version", "")
+        info["Network Dimension"] = metadata.get("ss_network_dim", "")
+        info["Network Alpha"] = metadata.get("ss_network_alpha", "")
 
     if metadata is not None:
         training_comment = metadata.get("ss_training_comment", "")
@@ -841,7 +808,6 @@ async def get_model_info(request):
     if os.path.isfile(info_text_file):
         with open(info_text_file, 'r', encoding="utf-8") as f:
             notes = f.read()
-    info["Notes"] = notes
 
     if metadata is not None:
         img_buckets = metadata.get("ss_bucket_info", "{}")
@@ -859,6 +825,8 @@ async def get_model_info(request):
         resolutions.sort(key=lambda x: x[1], reverse=True)
         info["Bucket Resolutions"] = resolutions
 
+    tags = None
+    if metadata is not None:
         dir_tags = metadata.get("ss_tag_frequency", "{}")
         if type(dir_tags) is str:
             dir_tags = json.loads(dir_tags)
@@ -868,10 +836,14 @@ async def get_model_info(request):
                 tags[tag] = tags.get(tag, 0) + count
         tags = list(tags.items())
         tags.sort(key=lambda x: x[1], reverse=True)
-        info["Tags"] = tags
 
     result["success"] = True
     result["info"] = info
+    if metadata is not None:
+        result["metadata"] = metadata
+    if tags is not None:
+        result["tags"] = tags
+    result["notes"] = notes
     return web.json_response(result)
 
 

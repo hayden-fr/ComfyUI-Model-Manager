@@ -269,6 +269,98 @@ function $radioGroup(attr) {
     return $el("div.comfy-radio-group", radioGroup);
 }
 
+/**
+ * @param {{name: string, icon: string, tabContent: HTMLDivElement}[]} tabData
+ * @returns {[Record<string, HTMLDivElement>[], Record<string, HTMLDivElement>[]]}
+ */
+function GenerateTabGroup(tabData) {
+    /** @type {HTMLDivElement[]} */
+    const tabContents = tabData.map((data) => {
+        return $el("div", {
+            dataset: {
+                name: data.name,
+                icon: data.icon, // TODO: remove this; not needed
+            }
+        }, [
+            data.tabContent
+        ]);
+    });
+    
+    /** @type {Record<string, HTMLDivElement>} */
+    const tabButton = {};
+    
+    /** @type {Record<string, HTMLDivElement>} */
+    const tabContent = {};
+    
+    const ACTIVE_TAB_CLASS = "active";
+    
+    /** @type {HTMLDivElement[]} */
+    const tabButtons = tabContents.map((content) => {
+        const name = content.getAttribute("data-name");
+        const icon = content.getAttribute("data-icon");
+        /** @type {HTMLDivElement} */
+        const tab = $el("div.tab-button", {
+                dataset: { name: name, icon: icon },
+                onclick: () => {
+                    Object.keys(tabButton).forEach((key) => {
+                        if (name === key) {
+                            tabButton[key].classList.add(ACTIVE_TAB_CLASS);
+                            tabContent[key].style.display = "";
+                        } else {
+                            tabButton[key].classList.remove(ACTIVE_TAB_CLASS);
+                            tabContent[key].style.display = "none";
+                        }
+                    });
+                },
+            },
+            [name],
+        );
+        tabButton[name] = tab;
+        tabContent[name] = content;
+        return tab;
+    });
+    
+    return [tabButtons, tabContents];
+}
+
+/**
+ * @param {HTMLDivElement} element
+ * @param {Record<string, HTMLDivElement>[]} tabButtons
+ */
+function GenerateDynamicTabTextCallback(element, tabButtons, minWidth) {
+    return () => {
+        if (element.style.display === "none") {
+            return;
+        }
+        const managerRect = element.getBoundingClientRect();
+        const isNarrow = managerRect.width < minWidth; // TODO: `minWidth` is a magic value
+        tabButtons.forEach((tabButton) => {
+            const attribute = isNarrow ? "data-icon" : "data-name";
+            tabButton.innerText = tabButton.getAttribute(attribute);
+        });
+    };
+}
+
+/**
+ * 
+ * @param {[String, int][]} map
+ * @returns {String}
+ */
+function TagCountMapToParagraph(map) {
+    let text = "<p>";
+    for (let i = 0; i < map.length; i++) {
+        const v = map[i];
+        const tag = v[0];
+        const count = v[1];
+        text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
+        if (i !== map.length - 1) {
+            text += ", ";
+        }
+    }
+    text += "</p>";
+    return text;
+}
+
 class ImageSelect {
     /** @constant {string} */ #PREVIEW_DEFAULT = "Default";
     /** @constant {string} */ #PREVIEW_UPLOAD = "Upload";
@@ -1703,11 +1795,13 @@ class ModelGrid {
     }
 }
 
-class ModelInfoView {
+class ModelInfo {
     /** @type {HTMLDivElement} */
     element = null;
     
     elements = {
+        /** @type {Record<string, HTMLDivElement>[]} */ tabButtons: null,
+        /** @type {Record<string, HTMLDivElement>[]} */ tabContents: null,
         /** @type {HTMLDivElement} */ info: null,
         /** @type {HTMLTextAreaElement} */ notes: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
@@ -1916,6 +2010,13 @@ class ModelInfoView {
                 "data-path": "",
             }),
         ]);
+        
+        [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
+            { name: "Overview", icon: "ⓘ", tabContent: this.element },
+            { name: "Metadata", icon: "📄", tabContent: $el("div", ["Metadata"]) },
+            { name: "Tags", icon: "🏷️", tabContent: $el("div", ["Tags"]) },
+            { name: "Notes", icon: "✏️", tabContent: $el("div", ["Notes"]) },
+        ]);
     }
     
     /** @returns {void} */
@@ -1985,22 +2086,28 @@ class ModelInfoView {
      */
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
-        const info = await request(`/model-manager/model/info?path=${path}`)
-        .then((result) => {
-            const success = result["success"];
-            const message = result["alert"];
-            if (message !== undefined) {
-                window.alert(message);
-            }
-            if (!success) {
+        const [info, metadata, tags, noteText] = await request(`/model-manager/model/info?path=${path}`)
+            .then((result) => {
+                const success = result["success"];
+                const message = result["alert"];
+                if (message !== undefined) {
+                    window.alert(message);
+                }
+                if (!success) {
+                    return undefined;
+                }
+                return [
+                    result["info"], 
+                    result["metadata"], 
+                    result["tags"], 
+                    result["notes"]
+                ];
+            })
+            .catch((err) => {
+                console.log(err);
                 return undefined;
             }
-            return result["info"];
-        })
-        .catch((err) => {
-            console.log(err);
-            return undefined;
-        });
+        );
         if (info === undefined || info === null) {
             return;
         }
@@ -2107,7 +2214,7 @@ class ModelInfoView {
                     setPreviewButton,
                 ]),
             ]),
-            $el("h2", ["Details:"]),
+            $el("h2", ["File Info:"]),
             $el("div", 
                 (() => {
                     const elements = [];
@@ -2117,45 +2224,17 @@ class ModelInfoView {
                         }
                         
                         if (Array.isArray(value)) {
+                            // currently only used for "Bucket Resolutions"
                             if (value.length > 0) {
                                 elements.push($el("h2", [key + ":"]));
-                                
-                                let text = "<p>";
-                                for (let i = 0; i < value.length; i++) {
-                                    const v = value[i];
-                                    const tag = v[0];
-                                    const count = v[1];
-                                    text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
-                                    if (i !== value.length - 1) {
-                                        text += ", ";
-                                    }
-                                }
-                                text += "</p>";
+                                const text = TagCountMapToParagraph(value);
                                 const div = $el("div");
                                 div.innerHTML = text;
                                 elements.push(div);
                             }
                         }
                         else {
-                            if (key === "Notes") {
-                                elements.push($el("h2", [key + ":"]));
-                                const notes = $el("textarea.comfy-multiline-input", {
-                                    name: "model notes",
-                                    value: value, 
-                                    rows: 12,
-                                });
-                                this.elements.notes = notes;
-                                this.#savedNotesValue = value;
-                                elements.push($el("button", {
-                                    textContent: "Save Notes",
-                                    onclick: async (e) => {
-                                        const saved = await this.trySave(false);
-                                        buttonAlert(e.target, saved);
-                                    },
-                                }));
-                                elements.push(notes);
-                            }
-                            else if (key === "Description") {
+                            if (key === "Description") {
                                 if (value !== "") {
                                     elements.push($el("h2", [key + ":"]));
                                     elements.push($el("p", [value]));
@@ -2177,6 +2256,86 @@ class ModelInfoView {
         ]));
         infoHtml.append.apply(infoHtml, innerHtml);
         // TODO: set default value of dropdown and value to model type?
+        
+        /** @type {HTMLDivElement} */
+        const metadataElement = this.elements.tabContents[1]; // TODO: remove magic value
+        const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
+        metadataElement.innerHTML = "";
+        metadataElement.append.apply(metadataElement, [
+            $el("h1", ["Metadata"]),
+            $el("div", (() => {
+                    const tableRows = [];
+                    if (isMetadata) {
+                        for (const [key, value] of Object.entries(metadata)) {
+                            if (value === undefined || value === null) {
+                                continue;
+                            }
+                            if (value !== "") {
+                                tableRows.push($el("tr", [
+                                    $el("th.model-metadata-key", [key]),
+                                    $el("th.model-metadata-value", [value]),
+                                ]));
+                            }
+                        }
+                    }
+                    return $el("table.model-metadata", tableRows);
+                })(),
+            ),
+        ]);
+        const metadataButton = this.elements.tabButtons[1]; // TODO: remove magic value
+        metadataButton.style.display = isMetadata ? "" : "none";
+        
+        /** @type {HTMLDivElement} */
+        const tagsElement = this.elements.tabContents[2]; // TODO: remove magic value
+        const isTags = Array.isArray(tags) && tags.length > 0;
+        tagsElement.innerHTML = "";
+        tagsElement.append.apply(tagsElement, [
+            $el("h1", ["Tags"]),
+            $el("div", (() => {
+                    const elements = [];
+                    if (isTags) {
+                        let text = TagCountMapToParagraph(tags);
+                        const div = $el("div");
+                        div.innerHTML = text;
+                        elements.push(div);
+                    }
+                    return elements;
+                })(),
+            ),
+        ]);
+        const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
+        tagButton.style.display = isTags ? "" : "none";
+        
+        /** @type {HTMLDivElement} */
+        const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
+        notesElement.innerHTML = "";
+        notesElement.append.apply(notesElement, [
+            $el("div", (() => {
+                    const notes = $el("textarea.comfy-multiline-input", {
+                        name: "model notes",
+                        value: noteText, 
+                        rows: 14,
+                    });
+                    this.elements.notes = notes;
+                    this.#savedNotesValue = noteText;
+                    return [
+                        $el("div.row", {
+                            style: { margin: "8px 0px 16px" },
+                        }, [
+                            $el("h1", { style: { margin: "0px" } }, ["Notes"]),
+                            $el("button.icon-button", {
+                                textContent: "💾",
+                                onclick: async (e) => {
+                                    const saved = await this.trySave(false);
+                                    buttonAlert(e.target, saved);
+                                },
+                            }),
+                        ]),
+                        notes,
+                    ];
+                })(),
+            ),
+        ]);
     }
 }
 
@@ -2585,7 +2744,7 @@ async function getModelInfos(urlText) {
                 return {
                     "images": [],
                     "fileName": file["name"],
-                    "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                    "modelType": DownloadView.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
                     "downloadUrl": file["download"],
                     "downloadFilePath": "",
                     "description": file["description"],
@@ -2598,7 +2757,7 @@ async function getModelInfos(urlText) {
     })();
 }
 
-class DownloadTab {
+class DownloadView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -2709,8 +2868,8 @@ class DownloadTab {
         );
         
         const comfyUIModelType = (
-            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
-            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
+            DownloadView.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            DownloadView.modelTypeToComfyUiDirectory(info["modelType"]) ??
             ""
         );
         const searchSeparator = modelData.searchSeparator;
@@ -2870,7 +3029,7 @@ class DownloadTab {
     }
 }
 
-class ModelTab {
+class BrowseView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -2906,9 +3065,10 @@ class ModelTab {
      * @param {() => Promise<void>} updateModels
      * @param {ModelData} modelData
      * @param {(searchPath: string) => Promise<void>} showModelInfo
+     * @param {() => void} updateModelGridCallback
      * @param {any} settingsElements
      */
-    constructor(updateModels, modelData, showModelInfo, settingsElements) {
+    constructor(updateModels, modelData, showModelInfo, updateModelGridCallback, settingsElements) {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
@@ -2947,7 +3107,7 @@ class ModelTab {
                 this.elements.modelContentFilter,
                 showModelInfo,
             );
-            this.element.parentElement.scrollTop = 0;
+            updateModelGridCallback();
         }
         this.updateModelGrid = updateModelGrid;
         
@@ -3009,7 +3169,7 @@ class ModelTab {
     }
 }
 
-class SettingsTab {
+class SettingsView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -3285,7 +3445,6 @@ class SidebarButtons {
             $: (el) => (this.element = el),
         },
         [
-            
             $el("button.icon-button", {
                 textContent: "◨",
                 onclick: (event) => this.#setSidebar(event),
@@ -3313,23 +3472,29 @@ class ModelManager extends ComfyDialog {
     /** @type {ModelData} */
     #modelData = null;
     
-    /** @type {ModelInfoView} */
-    #modelInfoView = null;
+    /** @type {ModelInfo} */
+    #modelInfo = null;
     
-    /** @type {DownloadTab} */
-    #downloadTab = null;
+    /** @type {DownloadView} */
+    #downloadView = null;
     
-    /** @type {ModelTab} */
-    #modelTab = null;
+    /** @type {BrowseView} */
+    #browseView = null;
     
-    /** @type {SettingsTab} */
-    #settingsTab = null;
-    
-    /** @type {HTMLDivElement} */
-    #tabs = null;
+    /** @type {SettingsView} */
+    #settingsView = null;
     
     /** @type {HTMLDivElement} */
-    #tabContents = null;
+    #tabManagerButtons = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabManagerContents = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabInfoButtons = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabInfoContents = null;
     
     /** @type {HTMLButtonElement} */
     #closeModelInfoButton = null;
@@ -3339,106 +3504,38 @@ class ModelManager extends ComfyDialog {
         
         this.#modelData = new ModelData();
         
-        const modelInfoView = new ModelInfoView(
+        this.#settingsView = new SettingsView(
+            this.#refreshModels,
+        );
+        
+        this.#modelInfo = new ModelInfo(
             this.#modelData,
             this.#refreshModels,
         );
-        this.#modelInfoView = modelInfoView;
         
-        const settingsTab = new SettingsTab(
-            this.#refreshModels,
-        );
-        this.#settingsTab = settingsTab;
-        
-        const ACTIVE_TAB_CLASS = "active";
-        
-        /**
-         * @param {searchPath: string}
-         * @return {Promise<void>}
-         */
-        const showModelInfo = async(searchPath) => {
-            await this.#modelInfoView.update(
-                searchPath, 
-                this.#refreshModels, 
-                this.#modelData.searchSeparator
-            ).then(() => {
-                this.#tabs.style.display = "none";
-                this.#tabContents.style.display = "none";
-                this.#closeModelInfoButton.style.display = "";
-                this.#modelInfoView.show();
-            });
-        }
-        
-        const modelTab = new ModelTab(
+        this.#browseView = new BrowseView(
             this.#refreshModels,
             this.#modelData,
-            showModelInfo,
-            this.#settingsTab.elements.settings, // TODO: decouple settingsData from elements?
+            this.#showModelInfo,
+            this.#resetManagerContentsScroll,
+            this.#settingsView.elements.settings, // TODO: decouple settingsData from elements?
         );
-        this.#modelTab = modelTab;
         
-        const downloadTab = new DownloadTab(
+        this.#downloadView = new DownloadView(
             this.#modelData,
-            this.#settingsTab.elements.settings,
+            this.#settingsView.elements.settings,
             this.#refreshModels,
         );
-        this.#downloadTab = downloadTab;
         
-        const sidebarButtons = new SidebarButtons(this);
+        const [tabManagerButtons, tabManagerContents] = GenerateTabGroup([
+            { name: "Download", icon: "⬇️", tabContent: this.#downloadView.element },
+            { name: "Models", icon: "📁", tabContent: this.#browseView.element },
+            { name: "Settings", icon: "⚙️", tabContent: this.#settingsView.element },
+        ]);
+        tabManagerButtons[0]?.click();
         
-        /** @type {Record<string, HTMLDivElement>} */
-        const head = {};
-        
-        /** @type {Record<string, HTMLDivElement>} */
-        const body = {};
-        
-        /** @type {HTMLDivElement[]} */
-        const contents = [
-            $el("div", { dataset: { name: "Download" } }, [downloadTab.element]),
-            $el("div", { dataset: { name: "Models" } }, [modelTab.element]),
-            $el("div", { dataset: { name: "Settings" } }, [settingsTab.element]),
-        ];
-        
-        const tabs = contents.map((content) => {
-            const name = content.getAttribute("data-name");
-            /** @type {HTMLDivElement} */
-            const tab = $el("div.head-item", {
-                    onclick: () => {
-                        Object.keys(head).forEach((key) => {
-                            if (name === key) {
-                                head[key].classList.add(ACTIVE_TAB_CLASS);
-                                body[key].style.display = "";
-                            } else {
-                                head[key].classList.remove(ACTIVE_TAB_CLASS);
-                                body[key].style.display = "none";
-                            }
-                        });
-                    },
-                },
-                [name],
-            );
-            head[name] = tab;
-            body[name] = content;
-            return tab;
-        });
-        tabs[0]?.click();
-        
-        const closeManagerButton = $el("button.icon-button", {
-            textContent: "✖",
-            onclick: async() => {
-                const saved = await modelInfoView.trySave(true);
-                if (saved) {
-                    this.close();
-                }
-            }
-        });
-        
-        const closeModelInfoButton = $el("button.icon-button", {
-            $: (el) => (this.#closeModelInfoButton = el),
-            style: { display: "none" },
-            textContent: "⬅",
-            onclick: async() => { await this.#tryHideModelInfo(true); },
-        });
+        const tabInfoButtons = this.#modelInfo.elements.tabButtons;
+        const tabInfoContents = this.#modelInfo.elements.tabContents;
         
         const modelManager = $el(
             "div.comfy-modal.model-manager",
@@ -3451,46 +3548,62 @@ class ModelManager extends ComfyDialog {
                     $el("div.model-manager-panel", [
                         $el("div.model-manager-head", [
                             $el("div.topbar-right", [
-                                closeManagerButton,
-                                closeModelInfoButton,
-                                sidebarButtons.element,
+                                $el("button.icon-button", {
+                                    textContent: "✖",
+                                    onclick: async() => {
+                                        const saved = await this.#modelInfo.trySave(true);
+                                        if (saved) {
+                                            this.close();
+                                        }
+                                    }
+                                }),
+                                $el("button.icon-button", {
+                                    $: (el) => (this.#closeModelInfoButton = el),
+                                    style: { display: "none" },
+                                    textContent: "⬅",
+                                    onclick: async() => { await this.#tryHideModelInfo(true); },
+                                }),
+                                (new SidebarButtons(this)).element,
                             ]),
                             $el("div.topbar-left", [
-                                $el("div.model-manager-tabs", {
-                                    $: (el) => (this.#tabs = el),
-                                }, tabs),
+                                $el("div", [
+                                    $el("div.model-tab-group", {
+                                        $: (el) => (this.#tabManagerButtons = el),
+                                    }, tabManagerButtons),
+                                    $el("div.model-tab-group", {
+                                        $: (el) => (this.#tabInfoButtons = el),
+                                        style: { display: "none"},
+                                    }, tabInfoButtons),
+                                ]),
                             ]),
                         ]),
                         $el("div.model-manager-body", [
-                            $el("div.model-manager-tab-contents", {
-                                $: (el) => (this.#tabContents = el),
-                            }, contents),
-                            modelInfoView.element,
+                            $el("div", {
+                                $: (el) => (this.#tabManagerContents = el)
+                            }, tabManagerContents),
+                            $el("div", {
+                                $: (el) => (this.#tabInfoContents = el),
+                                style: { display: "none"},
+                            }, tabInfoContents),
                         ]),
                     ]),
                 ]),
             ]
         );
         
-        new ResizeObserver(() => {
-            if (modelManager.style.display === "none") {
-                return;
-            }
-            const minWidth = 768; // magic value (could easily break)
-            const managerRect = modelManager.getBoundingClientRect();
-            const isNarrow = managerRect.width < minWidth;
-            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"]; // magic values
-            texts.forEach((text, i) => {
-                tabs[i].innerText = text;
-            });
-        }).observe(modelManager);
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 768)).observe(modelManager);
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 768)).observe(modelManager);
         
         this.#init();
     }
     
     #init() {
-        this.#settingsTab.reload(false);
+        this.#settingsView.reload(false);
         this.#refreshModels();
+    }
+    
+    #resetManagerContentsScroll = () => {
+        this.#tabManagerContents.scrollTop = 0;
     }
     
     #refreshModels = async() => {
@@ -3501,10 +3614,33 @@ class ModelManager extends ComfyDialog {
         const newModelDirectories = await request("/model-manager/models/directory-list");
         modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
-        this.#modelTab.updateModelGrid();
+        this.#browseView.updateModelGrid();
         await this.#tryHideModelInfo(false);
         
         document.getElementById("comfy-refresh-button")?.click();
+    }
+    
+    /**
+     * @param {searchPath: string}
+     * @return {Promise<void>}
+     */
+    #showModelInfo = async(searchPath) => {
+        await this.#modelInfo.update(
+            searchPath, 
+            this.#refreshModels, 
+            this.#modelData.searchSeparator, 
+        ).then(() => {
+            this.#tabManagerButtons.style.display = "none";
+            this.#tabManagerContents.style.display = "none";
+            
+            this.#closeModelInfoButton.style.display = "";
+            this.#tabInfoButtons.style.display = "";
+            this.#tabInfoContents.style.display = "";
+            
+            this.#tabInfoButtons.children[0]?.click();
+            this.#modelInfo.show();
+            this.#tabInfoContents.scrollTop = 0;
+        });
     }
     
     /**
@@ -3512,13 +3648,17 @@ class ModelManager extends ComfyDialog {
      * @returns {Promise<boolean>}
      */
     #tryHideModelInfo = async(promptSave) => {
-        if (this.#tabContents.style.display === "none") {
-            if (!await this.#modelInfoView.tryHide(promptSave)) {
+        if (this.#tabInfoContents.style.display !== "none") {
+            if (!await this.#modelInfo.tryHide(promptSave)) {
                 return false;
             }
+            
             this.#closeModelInfoButton.style.display = "none";
-            this.#tabs.style.display = "";
-            this.#tabContents.style.display = "";
+            this.#tabInfoButtons.style.display = "none";
+            this.#tabInfoContents.style.display = "none";
+            
+            this.#tabManagerButtons.style.display = "";
+            this.#tabManagerContents.style.display = "";
         }
         return true;
     }
