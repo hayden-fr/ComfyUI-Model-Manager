@@ -82,7 +82,6 @@
 .model-manager input {
     padding: 4px 8px;
     margin: 0;
-	border: 2px solid var(--border-color);
 }
 
 .model-manager button:disabled,

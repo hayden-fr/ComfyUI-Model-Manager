@@ -143,7 +143,7 @@ const PREVIEW_NONE_URI = imageUri();
 const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 const PREVIEW_THUMBNAIL_FORMAT = "JPEG";
-const PREVIEW_THUMBNAIL_QUALITY = undefined;
+const PREVIEW_THUMBNAIL_QUALITY = 75;
 
 /**
  * @param {(...args) => void} callback
