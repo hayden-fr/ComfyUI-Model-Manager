@@ -341,6 +341,7 @@
     height: auto;
 }
 .model-manager .model-info-container .item img {
+    height: auto;
     width: auto;
     max-width: 100%;
     max-height: 50vh;
