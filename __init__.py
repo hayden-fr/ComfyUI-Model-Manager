@@ -393,9 +393,10 @@ async def get_model_preview(request):
             image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
             image_data = image_bytes.getvalue()
 
+    response_file_name = os.path.splitext(file_name)[0] + '.' + response_image_format.lower()
     return web.Response(
         headers={
-            "Content-Disposition": f"inline; filename={file_name}",
+            "Content-Disposition": f"inline; filename={response_file_name}",
         },
         body=image_data,
         content_type="image/" + response_image_format.lower(),
