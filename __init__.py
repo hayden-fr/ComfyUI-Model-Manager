@@ -385,7 +385,11 @@ async def get_model_preview(request):
                 crop_box = (0, y0, w0, y0 + int(crop_height_fp))
             image = image.crop(crop_box)
 
-            image.thumbnail((w, h))
+            if w < w0 and h < h0:
+                resampling_method = Image.Resampling.BOX
+            else:
+                resampling_method = Image.Resampling.BICUBIC
+            image.thumbnail((w, h), resample=resampling_method)
 
             if not image_format_is_equal(image_format, response_image_format) and (response_image_format == 'JPEG' or response_image_format == 'JPG'):
                 image = image.convert('RGB')
