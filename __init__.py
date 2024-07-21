@@ -183,7 +183,7 @@ def ui_rules():
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
         Rule("model-info-button-on-left", False, bool),
-        Rule("model-preview-thumbnail-type", "JPEG/WEBP", str),
+        Rule("model-preview-thumbnail-type", "AUTO", str),
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
@@ -292,10 +292,6 @@ def image_format_is_equal(f1, f2):
     return f1 == f2 or (f1 == "JPG" and f2 == "JPEG") or (f1 == "JPEG" and f2 == "JPG")
 
 
-def is_auto_thumbnail_format(format):
-    return format in ["JPEG/WEBP", "WEBP/JPEG", "JPG/WEBP", "WEBP/JPG"]
-
-
 def get_auto_thumbnail_format(original_format):
     if original_format in ["JPEG", "WEBP", "JPG"]:
         return original_format
@@ -351,7 +347,7 @@ async def get_model_preview(request):
             image_format = image.format
             if response_image_format is None:
                 response_image_format = image_format
-            elif is_auto_thumbnail_format(response_image_format):
+            elif response_image_format == "AUTO":
                 response_image_format = get_auto_thumbnail_format(image_format)
 
             if not image_format_is_equal(response_image_format, image_format):
@@ -373,7 +369,7 @@ async def get_model_preview(request):
             image_format = image.format
             if response_image_format is None:
                 response_image_format = image_format
-            elif is_auto_thumbnail_format(response_image_format):
+            elif response_image_format == "AUTO":
                 response_image_format = get_auto_thumbnail_format(image_format)
 
             w0, h0 = image.size
