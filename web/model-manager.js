@@ -1674,6 +1674,7 @@ class ModelGrid {
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
+        const modelInfoButtonOnLeft = !settingsElements["model-info-button-on-left"].checked;
         const removeEmbeddingExtension = !settingsElements["model-add-embedding-extension"].checked;
         const previewThumbnailFormat = settingsElements["model-preview-thumbnail-type"].value;
         if (models.length > 0) {
@@ -1681,9 +1682,9 @@ class ModelGrid {
                 const previewInfo = item.preview;
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
-                let buttons = [];
+                let actionButtons = [];
                 if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
-                    buttons.push(
+                    actionButtons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "⧉︎",
@@ -1698,7 +1699,7 @@ class ModelGrid {
                     );
                 }
                 if (showCopyButton) {
-                    buttons.push(
+                    actionButtons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
                             textContent: "✚",
@@ -1713,6 +1714,14 @@ class ModelGrid {
                         })
                     );
                 }
+                const infoButtons = [
+                    $el("button.icon-button.model-button", {
+                        type: "button",
+                        textContent: "ⓘ",
+                        onclick: async() => { await showModelInfo(searchPath) },
+                        draggable: false,
+                    }),
+                ];
                 const dragAdd = (e) => ModelGrid.#dragAddModel(
                     e, 
                     modelType, 
@@ -1739,18 +1748,13 @@ class ModelGrid {
                     $el("div.model-preview-top-right", {
                         draggable: false,
                     },
-                        buttons
+                        modelInfoButtonOnLeft ? infoButtons : actionButtons,
                     ),
                     $el("div.model-preview-top-left", {
                         draggable: false,
-                    }, [
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "ⓘ",
-                            onclick: async() => { await showModelInfo(searchPath) },
-                            draggable: false,
-                        }),
-                    ]),
+                    },
+                    modelInfoButtonOnLeft ? actionButtons : infoButtons,
+                    ),
                     $el("div.model-label", {
                         ondragend: (e) => dragAdd(e),
                         draggable: false,
@@ -3389,6 +3393,10 @@ class SettingsView {
             $checkbox({
                 $: (el) => (settings["model-show-copy-button"] = el),
                 textContent: "Show copy button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-info-button-on-left"] = el),
+                textContent: "Model info button on the left",
             }),
             $select({
                 $: (el) => (settings["model-preview-thumbnail-type"] = el),

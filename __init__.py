@@ -182,6 +182,7 @@ def ui_rules():
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
+        Rule("model-info-button-on-left", False, bool),
         Rule("model-preview-thumbnail-type", "JPEG/WEBP", str),
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
