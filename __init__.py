@@ -182,6 +182,7 @@ def ui_rules():
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
+        Rule("model-preview-thumbnail-type", "JPEG/WEBP", str),
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
@@ -290,6 +291,16 @@ def image_format_is_equal(f1, f2):
     return f1 == f2 or (f1 == "JPG" and f2 == "JPEG") or (f1 == "JPEG" and f2 == "JPG")
 
 
+def is_auto_thumbnail_format(format):
+    return format in ["JPEG/WEBP", "WEBP/JPEG", "JPG/WEBP", "WEBP/JPG"]
+
+
+def get_auto_thumbnail_format(original_format):
+    if original_format in ["JPEG", "WEBP", "JPG"]:
+        return original_format
+    return "JPEG" # default fallback
+
+
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri")
@@ -339,10 +350,13 @@ async def get_model_preview(request):
             image_format = image.format
             if response_image_format is None:
                 response_image_format = image_format
-            elif not image_format_is_equal(response_image_format, image_format):
+            elif is_auto_thumbnail_format(response_image_format):
+                response_image_format = get_auto_thumbnail_format(image_format)
+
+            if not image_format_is_equal(response_image_format, image_format):
                 exif = image.getexif()
                 metadata = get_image_info(image)
-                if response_image_format == 'JPEG' or response_image_format == 'JPG':
+                if response_image_format in ['JPEG', 'JPG']:
                     image = image.convert('RGB')
                 image_bytes = io.BytesIO()
                 image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
@@ -358,6 +372,9 @@ async def get_model_preview(request):
             image_format = image.format
             if response_image_format is None:
                 response_image_format = image_format
+            elif is_auto_thumbnail_format(response_image_format):
+                response_image_format = get_auto_thumbnail_format(image_format)
+
             w0, h0 = image.size
             if w is None:
                 w = (h * w0) // h0
@@ -387,13 +404,14 @@ async def get_model_preview(request):
                 resampling_method = Image.Resampling.BICUBIC
             image.thumbnail((w, h), resample=resampling_method)
 
-            if not image_format_is_equal(image_format, response_image_format) and (response_image_format == 'JPEG' or response_image_format == 'JPG'):
+            if not image_format_is_equal(image_format, response_image_format) and response_image_format in ['JPEG', 'JPG']:
                 image = image.convert('RGB')
             image_bytes = io.BytesIO()
             image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
             image_data = image_bytes.getvalue()
 
     response_file_name = os.path.splitext(file_name)[0] + '.' + response_image_format.lower()
+    print(f"response_file_name: {response_file_name}")
     return web.Response(
         headers={
             "Content-Disposition": f"inline; filename={response_file_name}",

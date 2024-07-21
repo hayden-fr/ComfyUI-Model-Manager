@@ -138,7 +138,6 @@ function imageUri(imageSearchPath = undefined, dateImageModified = undefined, wi
 const PREVIEW_NONE_URI = imageUri();
 const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
-const PREVIEW_THUMBNAIL_FORMAT = "JPEG";
 
 /**
  * @param {(...args) => void} callback
@@ -226,6 +225,28 @@ function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
     ]);
     if (x.$ !== undefined){
         x.$(input);
+    }
+    return label;
+}
+
+/**
+ * @returns {HTMLLabelElement}
+ */
+function $select(x = { $: (el) => {}, textContent: "", options: [""] }) {
+    const text = x.textContent;
+    const select = $el("select", {
+        name: text ?? "select",
+    }, x.options.map((option) => {
+        return $el("option", {
+            value: option,
+        }, option);
+    }));
+    const label = $el("label", [
+        select, 
+        text === "" || text === undefined || text === null ? "" : " " + text,
+    ]);
+    if (x.$ !== undefined){
+        x.$(select);
     }
     return label;
 }
@@ -1654,6 +1675,7 @@ class ModelGrid {
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
         const removeEmbeddingExtension = !settingsElements["model-add-embedding-extension"].checked;
+        const previewThumbnailFormat = settingsElements["model-preview-thumbnail-type"].value;
         if (models.length > 0) {
             return models.map((item) => {
                 const previewInfo = item.preview;
@@ -1706,7 +1728,7 @@ class ModelGrid {
                             previewInfo?.dateModified, 
                             PREVIEW_THUMBNAIL_WIDTH, 
                             PREVIEW_THUMBNAIL_HEIGHT, 
-                            PREVIEW_THUMBNAIL_FORMAT, 
+                            previewThumbnailFormat, 
                         ),
                         draggable: false,
                     }),
@@ -3221,7 +3243,8 @@ class SettingsView {
                 case "range": setting.value = parseFloat(value); break;
                 case "textarea": setting.value = value; break;
                 case "number": setting.value = parseInt(value); break;
-                default: console.warn("Unknown settings input type!");
+                case "select-one": setting.value = value; break;
+                default: console.warn(`Unknown settings input type '${type}'!`);
             }
         }
 
@@ -3253,6 +3276,7 @@ class SettingsView {
                 case "range": value = el.value; break;
                 case "textarea": value = el.value; break;
                 case "number": value = el.value; break;
+                case "select-one": value = el.value; break;
                 default: console.warn("Unknown settings input type!");
             }
             settingsData[setting] = value;
@@ -3364,6 +3388,11 @@ class SettingsView {
             $checkbox({
                 $: (el) => (settings["model-show-copy-button"] = el),
                 textContent: "Show copy button",
+            }),
+            $select({
+                $: (el) => (settings["model-preview-thumbnail-type"] = el),
+                textContent: "Preview thumbnail type",
+                options: ["JPEG/WEBP", "JPEG", "WEBP"],
             }),
             $el("h2", ["Model Add"]),
             $checkbox({
