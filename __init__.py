@@ -411,7 +411,6 @@ async def get_model_preview(request):
             image_data = image_bytes.getvalue()
 
     response_file_name = os.path.splitext(file_name)[0] + '.' + response_image_format.lower()
-    print(f"response_file_name: {response_file_name}")
     return web.Response(
         headers={
             "Content-Disposition": f"inline; filename={response_file_name}",
