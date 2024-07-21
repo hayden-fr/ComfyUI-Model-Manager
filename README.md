@@ -28,15 +28,16 @@ Download, browse and delete models in ComfyUI.
 
 ### Model Info View
 
-- View model metadata, including training tags and bucket resolutions.
+- View model metadata and file info.
 - Read, edit and save notes in a `.txt` file beside the model.
 - Change or remove a model's preview image (add a different one using a url or local upload).
-- Rename, move or **permanently** remove models.
+- Rename, move or **permanently** remove model files.
 
 ### ComfyUI Node Graph
 
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
+- Button to load workflows embedded in previews. (Can alternatively drag full-sized image in model info onto node graph.)
 - Right, left, top and bottom toggleable sidebar modes.
 - Drag a model onto the graph to add a new node.
 - Drag a model onto an existing node to set the model field. (Must be exact on input if multiple inputs use model name text.)
@@ -47,7 +48,7 @@ Download, browse and delete models in ComfyUI.
 
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
-  - Text to always search.
+  - Text to always included in search.
   - Show/Hide add embedding extension.
 - Colors follow ComfyUI's current theme.
 

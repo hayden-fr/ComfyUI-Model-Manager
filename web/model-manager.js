@@ -16,6 +16,17 @@ function request(url, options = undefined) {
     });
 }
 
+/**
+ * @param {string} url
+ */
+async function load_workflow(url) {
+    const response = await fetch(url);
+    const data = await response.blob();
+    const type = data.type;
+    const file = new File([data], "model-manager-workflow-file", { type });
+    app.handleFile(file);
+}
+
 const modelNodeType = {
     "checkpoints": "CheckpointLoaderSimple",
     "clip": "CLIPLoader",
@@ -1671,6 +1682,7 @@ class ModelGrid {
         const canShowButtons = modelNodeType[modelType] !== undefined;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
         const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
+        const showLoadWorkflowButton = canShowButtons && settingsElements["model-show-load-workflow-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
@@ -1680,6 +1692,17 @@ class ModelGrid {
         if (models.length > 0) {
             return models.map((item) => {
                 const previewInfo = item.preview;
+                const previewThumbnail = $el("img.model-preview", {
+                    loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
+                    src: imageUri(
+                        previewInfo?.path, 
+                        previewInfo?.dateModified, 
+                        PREVIEW_THUMBNAIL_WIDTH, 
+                        PREVIEW_THUMBNAIL_HEIGHT, 
+                        previewThumbnailFormat, 
+                    ),
+                    draggable: false,
+                });
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let actionButtons = [];
@@ -1714,6 +1737,23 @@ class ModelGrid {
                         })
                     );
                 }
+                if (showLoadWorkflowButton) {
+                    actionButtons.push(
+                        $el("button.icon-button.model-button", {
+                            type: "button",
+                            textContent: "🡯",
+                            onclick: async (e) => {
+                                const urlString = previewThumbnail.src;
+                                const url = new URL(urlString);
+                                const urlSearchParams = url.searchParams;
+                                const uri = urlSearchParams.get("uri");
+                                const v = urlSearchParams.get("v");
+                                const urlFull = urlString.substring(0, urlString.indexOf("?")) + "?uri=" + uri + "&v=" + v;
+                                load_workflow(urlFull);
+                            },
+                        }),
+                    );
+                }
                 const infoButtons = [
                     $el("button.icon-button.model-button", {
                         type: "button",
@@ -1730,17 +1770,7 @@ class ModelGrid {
                     strictDragToAdd
                 );
                 return $el("div.item", {}, [
-                    $el("img.model-preview", {
-                        loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
-                        src: imageUri(
-                            previewInfo?.path, 
-                            previewInfo?.dateModified, 
-                            PREVIEW_THUMBNAIL_WIDTH, 
-                            PREVIEW_THUMBNAIL_HEIGHT, 
-                            previewThumbnailFormat, 
-                        ),
-                        draggable: false,
-                    }),
+                    previewThumbnail,
                     $el("div.model-preview-overlay", {
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
@@ -2240,15 +2270,11 @@ class ModelInfo {
             $el("div.row.tab-header", [
                 $el("div", [
                     $el("button", {
+                        textContent: "Load Workflow",
                         onclick: async (e) => {
-                            const url = previewSelect.elements.defaultPreviews.children[0].src;
-                            const response = await fetch(url);
-                            const data = await response.blob();
-                            const type = data.type;
-                            const file = new File([data], "model-manager-workflow-file", { type });
-                            app.handleFile(file);
+                            load_workflow(previewSelect.elements.defaultPreviews.children[0].src);
                         },
-                    }, ["Load Workflow"]),
+                    }),
                 ]),
                 $el("div.row.tab-header-flex-block", [
                     previewSelect.elements.radioGroup,
@@ -3238,6 +3264,7 @@ class SettingsView {
             
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
+            /** @type {HTMLInputElement} */ "model-show-load-workflow-button": null,
             /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
             /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
@@ -3414,6 +3441,10 @@ class SettingsView {
             $checkbox({
                 $: (el) => (settings["model-show-copy-button"] = el),
                 textContent: "Show copy button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-load-workflow-button"] = el),
+                textContent: "Show load workflow button",
             }),
             $checkbox({
                 $: (el) => (settings["model-info-button-on-left"] = el),
