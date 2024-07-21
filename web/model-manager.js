@@ -297,53 +297,53 @@ function $radioGroup(attr) {
 
 /**
  * @param {{name: string, icon: string, tabContent: HTMLDivElement}[]} tabData
- * @returns {[Record<string, HTMLDivElement>[], Record<string, HTMLDivElement>[]]}
+ * @returns {[HTMLDivElement[], HTMLDivElement[]]}
  */
 function GenerateTabGroup(tabData) {
-    /** @type {HTMLDivElement[]} */
-    const tabContents = tabData.map((data) => {
-        return $el("div.tab-content", {
-            dataset: {
-                name: data.name,
-                icon: data.icon, // TODO: remove this; not needed
-            }
-        }, [
-            data.tabContent
-        ]);
-    });
-    
-    /** @type {Record<string, HTMLDivElement>} */
-    const tabButton = {};
-    
-    /** @type {Record<string, HTMLDivElement>} */
-    const tabContent = {};
-    
     const ACTIVE_TAB_CLASS = "active";
-    
+
     /** @type {HTMLDivElement[]} */
-    const tabButtons = tabContents.map((content) => {
-        const name = content.getAttribute("data-name");
-        const icon = content.getAttribute("data-icon");
+    const tabButtons = [];
+
+    /** @type {HTMLDivElement[]} */
+    const tabContents = [];
+
+    tabData.forEach((data) => {
+        const name = data.name;
+        const icon = data.icon;
         /** @type {HTMLDivElement} */
         const tab = $el("div.tab-button", {
                 dataset: { name: name, icon: icon },
                 onclick: () => {
-                    Object.keys(tabButton).forEach((key) => {
-                        if (name === key) {
-                            tabButton[key].classList.add(ACTIVE_TAB_CLASS);
-                            tabContent[key].style.display = "";
-                        } else {
-                            tabButton[key].classList.remove(ACTIVE_TAB_CLASS);
-                            tabContent[key].style.display = "none";
+                    tabButtons.forEach((tabButton) => {
+                        if (name === tabButton.getAttribute("data-name")) {
+                            tabButton.classList.add(ACTIVE_TAB_CLASS);
+                        }
+                        else {
+                            tabButton.classList.remove(ACTIVE_TAB_CLASS);
+                        }
+                    });
+                    tabContents.forEach((tabContent) => {
+                        if (name === tabContent.getAttribute("data-name")) {
+                            tabContent.style.display = "";
+                        }
+                        else {
+                            tabContent.style.display = "none";
                         }
                     });
                 },
             },
             [name],
         );
-        tabButton[name] = tab;
-        tabContent[name] = content;
-        return tab;
+        const content = $el("div.tab-content", {
+            dataset: {
+                name: data.name,
+            }
+        }, [
+            data.tabContent
+        ]);
+        tabButtons.push(tab);
+        tabContents.push(content);
     });
     
     return [tabButtons, tabContents];
@@ -1828,8 +1828,8 @@ class ModelInfo {
     element = null;
     
     elements = {
-        /** @type {Record<string, HTMLDivElement>[]} */ tabButtons: null,
-        /** @type {Record<string, HTMLDivElement>[]} */ tabContents: null,
+        /** @type {HTMLDivElement[]} */ tabButtons: null,
+        /** @type {HTMLDivElement[]} */ tabContents: null,
         /** @type {HTMLDivElement} */ info: null,
         /** @type {HTMLTextAreaElement} */ notes: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
