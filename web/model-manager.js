@@ -1756,7 +1756,6 @@ class ModelGrid {
                     modelInfoButtonOnLeft ? actionButtons : infoButtons,
                     ),
                     $el("div.model-label", {
-                        ondragend: (e) => dragAdd(e),
                         draggable: false,
                     }, [
                         $el("p", [showModelExtension ? item.name : SearchPath.splitExtension(item.name)[0]])
@@ -2239,6 +2238,18 @@ class ModelInfo {
         innerHtml.push($el("div", [
             previewSelect.elements.previews,
             $el("div.row.tab-header", [
+                $el("div", [
+                    $el("button", {
+                        onclick: async (e) => {
+                            const url = previewSelect.elements.defaultPreviews.children[0].src;
+                            const response = await fetch(url);
+                            const data = await response.blob();
+                            const type = data.type;
+                            const file = new File([data], "model-manager-workflow-file", { type });
+                            app.handleFile(file);
+                        },
+                    }, ["Load Workflow"]),
+                ]),
                 $el("div.row.tab-header-flex-block", [
                     previewSelect.elements.radioGroup,
                 ]),
