@@ -3401,7 +3401,7 @@ class SettingsView {
             $select({
                 $: (el) => (settings["model-preview-thumbnail-type"] = el),
                 textContent: "Preview thumbnail type",
-                options: ["JPEG/WEBP", "JPEG", "WEBP"],
+                options: ["JPEG/WEBP", "JPEG"], // should use JPEG/WEBP to avoid artifacts from changing between formats; use JPEG for backward compatibility
             }),
             $el("h2", ["Model Add"]),
             $checkbox({
