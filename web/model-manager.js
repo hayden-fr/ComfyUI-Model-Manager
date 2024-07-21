@@ -115,10 +115,9 @@ class SearchPath {
  * @param {string | undefined} [width=undefined]
  * @param {string | undefined} [height=undefined]
  * @param {string | undefined} [imageFormat=undefined]
- * @param {string | undefined} [quality=undefined]
  * @returns {string}
  */
-function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined, imageFormat = undefined, quality = undefined) {
+function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined, imageFormat = undefined) {
     const path = imageSearchPath ?? "no-preview";
     const date = dateImageModified;
     let uri = `/model-manager/preview/get?uri=${path}`;
@@ -134,16 +133,12 @@ function imageUri(imageSearchPath = undefined, dateImageModified = undefined, wi
     if (imageFormat !== undefined && imageFormat !== null) {
         uri += `&image-format=${imageFormat}`;
     }
-    if (quality !== undefined && quality !== null) {
-        uri += `&quality=${quality}`;
-    }
     return uri;
 }
 const PREVIEW_NONE_URI = imageUri();
 const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 const PREVIEW_THUMBNAIL_FORMAT = "JPEG";
-const PREVIEW_THUMBNAIL_QUALITY = 75;
 
 /**
  * @param {(...args) => void} callback
@@ -1712,7 +1707,6 @@ class ModelGrid {
                             PREVIEW_THUMBNAIL_WIDTH, 
                             PREVIEW_THUMBNAIL_HEIGHT, 
                             PREVIEW_THUMBNAIL_FORMAT, 
-                            PREVIEW_THUMBNAIL_QUALITY, 
                         ),
                         draggable: false,
                     }),

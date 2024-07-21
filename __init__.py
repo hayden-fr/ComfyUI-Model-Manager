@@ -293,11 +293,7 @@ def image_format_is_equal(f1, f2):
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri")
-    quality = request.query.get("quality", "75")
-    try:
-        quality = int(quality)
-    except:
-        quality = 75
+    quality = 75
     response_image_format = request.query.get("image-format", None)
     if isinstance(response_image_format, str):
         response_image_format = response_image_format.upper()
