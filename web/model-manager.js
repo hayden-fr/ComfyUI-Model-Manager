@@ -302,7 +302,7 @@ function $radioGroup(attr) {
 function GenerateTabGroup(tabData) {
     /** @type {HTMLDivElement[]} */
     const tabContents = tabData.map((data) => {
-        return $el("div", {
+        return $el("div.tab-content", {
             dataset: {
                 name: data.name,
                 icon: data.icon, // TODO: remove this; not needed
@@ -2290,7 +2290,7 @@ class ModelInfo {
         const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
         metadataElement.innerHTML = "";
         metadataElement.append.apply(metadataElement, [
-            $el("h1", ["Metadata"]),
+            $el("h1", { style: { "margin-top": "0px" } }, ["Metadata"]),
             $el("div", (() => {
                     const tableRows = [];
                     if (isMetadata) {
@@ -2318,7 +2318,7 @@ class ModelInfo {
         const isTags = Array.isArray(tags) && tags.length > 0;
         tagsElement.innerHTML = "";
         tagsElement.append.apply(tagsElement, [
-            $el("h1", ["Tags"]),
+            $el("h1", { style: { "margin-top": "0px", "margin-bottom": "0px" } }, ["Tags"]),
             $el("div", (() => {
                     const elements = [];
                     if (isTags) {
@@ -2337,33 +2337,33 @@ class ModelInfo {
         /** @type {HTMLDivElement} */
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
         notesElement.innerHTML = "";
-        notesElement.append.apply(notesElement, [
-            $el("div", (() => {
-                    const notes = $el("textarea.comfy-multiline-input", {
-                        name: "model notes",
-                        value: noteText, 
-                        rows: 14,
-                    });
-                    this.elements.notes = notes;
-                    this.#savedNotesValue = noteText;
-                    return [
-                        $el("div.row", {
-                            style: { margin: "8px 0px 16px" },
-                        }, [
-                            $el("h1", { style: { margin: "0px" } }, ["Notes"]),
-                            $el("button.icon-button", {
-                                textContent: "💾",
-                                onclick: async (e) => {
-                                    const saved = await this.trySave(false);
-                                    buttonAlert(e.target, saved);
-                                },
-                            }),
-                        ]),
-                        notes,
-                    ];
-                })(),
-            ),
-        ]);
+        notesElement.append.apply(notesElement,
+            (() => {
+                const notes = $el("textarea.comfy-multiline-input", {
+                    name: "model notes",
+                    value: noteText, 
+                });
+                this.elements.notes = notes;
+                this.#savedNotesValue = noteText;
+                return [
+                    $el("div.row", {
+                        style: { margin: "0px 0px 16px" },
+                    }, [
+                        $el("h1", { style: { "margin-top": "0px", "margin-bottom": "0px" } }, ["Notes"]),
+                        $el("button.icon-button", {
+                            textContent: "💾",
+                            onclick: async (e) => {
+                                const saved = await this.trySave(false);
+                                buttonAlert(e.target, saved);
+                            },
+                        }),
+                    ]),
+                    $el("div", {
+                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
+                    }, notes),
+                ];
+            })()
+        );
     }
 }
 
@@ -3615,9 +3615,9 @@ class ModelManager extends ComfyDialog {
                         ]),
                         $el("div.model-manager-body", [
                             $el("div", {
-                                $: (el) => (this.#tabManagerContents = el)
+                                $: (el) => (this.#tabManagerContents = el),
                             }, tabManagerContents),
-                            $el("div", {
+                            $el("div.tab-contents", {
                                 $: (el) => (this.#tabInfoContents = el),
                                 style: { display: "none"},
                             }, tabInfoContents),

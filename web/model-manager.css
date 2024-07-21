@@ -230,6 +230,18 @@
     overflow-x: auto;
 }
 
+.model-manager .model-manager-body .tab-contents {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.model-manager .model-manager-body .tab-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
 /* model info view */
 .model-manager .model-info-view {
     background-color: var(--bg-color);
