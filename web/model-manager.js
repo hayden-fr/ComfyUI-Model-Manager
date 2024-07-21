@@ -242,8 +242,8 @@ function $select(x = { $: (el) => {}, textContent: "", options: [""] }) {
         }, option);
     }));
     const label = $el("label", [
-        select, 
         text === "" || text === undefined || text === null ? "" : " " + text,
+        select, 
     ]);
     if (x.$ !== undefined){
         x.$(select);
@@ -3309,12 +3309,6 @@ class SettingsView {
             $: (el) => (this.element = el),
         }, [
             $el("h1", ["Settings"]),
-            $el("a", {
-                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
-                }, [
-                    "File bugs and issues here."
-                ]
-            ),
             $el("div", [
                 $el("button", {
                     $: (el) => (this.elements.reloadButton = el),
@@ -3329,6 +3323,13 @@ class SettingsView {
                     onclick: async () => { await this.save(); },
                 }),
             ]),
+            $el("a", {
+                    style: { color: "var(--fg-color)" },
+                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
+                }, [
+                    "File bugs and issues here."
+                ]
+            ),
             /*
             $el("h2", ["Window"]),
             $el("div", [
@@ -3404,13 +3405,13 @@ class SettingsView {
                 textContent: "Strict dragging model onto a node's model field to add",
             }),
             $el("div", [
+                $el("p", ["Add model offset"]),
                 $el("input", {
                     $: (el) => (settings["model-add-offset"] = el),
                     type: "number",
                     name: "model add offset",
                     step: 5,
                 }),
-                $el("p", ["Add model offset"]),
             ]),
             $el("h2", ["Download"]),
             $checkbox({
