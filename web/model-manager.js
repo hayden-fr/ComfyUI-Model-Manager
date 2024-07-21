@@ -1741,7 +1741,7 @@ class ModelGrid {
                     actionButtons.push(
                         $el("button.icon-button.model-button", {
                             type: "button",
-                            textContent: "🡯",
+                            textContent: "↙︎",
                             onclick: async (e) => {
                                 const urlString = previewThumbnail.src;
                                 const url = new URL(urlString);
