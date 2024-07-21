@@ -187,7 +187,7 @@ def ui_rules():
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
-        Rule("download-save-description-as-text-file", False, bool),
+        Rule("download-save-description-as-text-file", True, bool),
     ]
 
 

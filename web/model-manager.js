@@ -2797,6 +2797,7 @@ class DownloadView {
         /** @type {HTMLInputElement} */ url: null,
         /** @type {HTMLDivElement} */ infos: null,
         /** @type {HTMLInputElement} */ overwrite: null,
+        /** @type {HTMLInputElement} */ downloadNotes: null,
     };
     
     /** @type {DOMParser} */
@@ -2988,7 +2989,7 @@ class DownloadView {
                                 });
                                 if (success) {
                                     const description = info["description"];
-                                    if (settings["download-save-description-as-text-file"].checked && description !== "") {
+                                    if (this.elements.downloadNotes.checked && description !== "") {
                                         const modelPath = pathDirectory + searchSeparator + modelName;
                                         const saved = await saveNotes(modelPath, description);
                                         if (!saved) {
@@ -3046,11 +3047,18 @@ class DownloadView {
             
             const header = $el("div", [
                 $el("h1", [name]),
-                $checkbox({
-                    $: (el) => { this.elements.overwrite = el; },
-                    textContent: "Overwrite Existing Files.",
-                    checked: false,
-                }),
+                $el("div.model-manager-settings", [
+                    $checkbox({
+                        $: (el) => { this.elements.overwrite = el; },
+                        textContent: "Overwrite Existing Files.",
+                        checked: false,
+                    }),
+                    $checkbox({
+                        $: (el) => { this.elements.downloadNotes = el; },
+                        textContent: "Save Model Descriptions in Text Files.",
+                        checked: settings["download-save-description-as-text-file"].checked,
+                    }),
+                ])
             ]);
             modelInfosHtml.unshift(header);
         }
@@ -3219,6 +3227,8 @@ class SettingsView {
             
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
+            /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
+            /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
@@ -3424,7 +3434,7 @@ class SettingsView {
             $el("h2", ["Download"]),
             $checkbox({
                 $: (el) => (settings["download-save-description-as-text-file"] = el),
-                textContent: "Save descriptions as notes (in .txt file).",
+                textContent: "Save model descriptions in .txt files by default.",
             }),
         ]);
     }

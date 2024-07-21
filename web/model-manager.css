@@ -601,11 +601,11 @@
     margin: 16px 0;
 }
 
-.model-manager .model-manager-settings > label {
+.model-manager label {
     pointer-events: none;
 }
 
-.model-manager .model-manager-settings > label > * {
+.model-manager label > * {
     pointer-events: auto;
 }
 
