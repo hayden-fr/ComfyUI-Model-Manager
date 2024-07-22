@@ -3257,6 +3257,8 @@ class SettingsView {
         settings: {
             //"sidebar-default-height": null,
             //"sidebar-default-width": null,
+            /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
+            
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
@@ -3382,34 +3384,6 @@ class SettingsView {
                     "File bugs and issues here."
                 ]
             ),
-            /*
-            $el("h2", ["Window"]),
-            $el("div", [
-                $el("p", ["Default sidebar width"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-width"] = el),
-                    type: "number",
-                    name: "default sidebar width",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            $el("div", [
-                $el("p", ["Default sidebar height"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-height"] = el),
-                    type: "number",
-                    name: "default sidebar height",
-                    textContent: "Default sidebar height",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            */
             $el("h2", ["Model Search"]),
             $el("div", [
                 $el("div.search-settings-text", [
@@ -3478,6 +3452,38 @@ class SettingsView {
                 $: (el) => (settings["download-save-description-as-text-file"] = el),
                 textContent: "Save model descriptions in .txt files by default.",
             }),
+            $el("h2", ["Window"]),
+            $checkbox({
+                $: (el) => (settings["sidebar-control-always-compact"] = el),
+                textContent: "Sidebar controls always compact (requires window resize or page refresh to recalculate)",
+            }),
+            /*
+            $el("div", [
+                $el("p", ["Default sidebar width"]),
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-width"] = el),
+                    type: "number",
+                    name: "default sidebar width",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            $el("div", [
+                $el("p", ["Default sidebar height"]),
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-height"] = el),
+                    type: "number",
+                    name: "default sidebar height",
+                    textContent: "Default sidebar height",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            */
         ]);
     }
 }
@@ -3796,7 +3802,8 @@ class ModelManager extends ComfyDialog {
         new ResizeObserver(() => {
             const managerRect = document.body.getBoundingClientRect();
             const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
-            if (isNarrow) {
+            const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
+            if (isNarrow || alwaysShowCompactSidebarControls) {
                 sidebarButtonGroup.style.display = "none";
                 sidebarSelect.style.display = "";
             }
