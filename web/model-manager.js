@@ -1033,8 +1033,9 @@ class DirectoryDropdown {
      * @param {() => string} [getModelType= () => { return ""; }]
      * @param {() => void} [updateCallback= () => {}]
      * @param {() => Promise<void>} [submitCallback= () => {}]
+     * @param {() => Boolean} [isDynamicSearch= () => { return false; }]
      */
-    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}) {
+    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}, isDynamicSearch = () => { return false; }) {
         /** @type {HTMLDivElement} */
         const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
             style: {
@@ -1049,13 +1050,16 @@ class DirectoryDropdown {
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
         
-        input.addEventListener("input", () => {
+        input.addEventListener("input", async(e) => {
             const path = this.#updateOptions();
             if (path !== undefined) {
                 this.#restoreSelectedOption(path);
                 this.#updateDeepestPath(path);
             }
             updateCallback();
+            if (isDynamicSearch()) {
+                await submitCallback();
+            }
         });
         input.addEventListener("focus", () => {
             const path = this.#updateOptions();
@@ -1104,7 +1108,9 @@ class DirectoryDropdown {
                             this.#updateDeepestPath(path);
                         }
                         updateCallback();
-                        //await submitCallback();
+                        if (isDynamicSearch()) {
+                            await submitCallback();
+                        }
                     }
                 }
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
@@ -1136,7 +1142,9 @@ class DirectoryDropdown {
                                 this.#updateDeepestPath(path);
                             }
                             updateCallback();
-                            //await submitCallback();
+                            if (isDynamicSearch()) {
+                                await submitCallback();
+                            }
                         }
                     }
                 }
@@ -3195,6 +3203,7 @@ class BrowseView {
             () => { return this.elements.modelTypeSelect.value; },
             updatePreviousModelFilter,
             updateModelGrid,
+            () => { return this.#settingsElements["model-real-time-search"].checked; },
         );
         this.directoryDropdown = searchDropdown;
         
@@ -3260,6 +3269,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
             
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
+            /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
             /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
@@ -3396,6 +3406,10 @@ class SettingsView {
                     }),
                 ]),
             ]),
+            $checkbox({
+                $: (el) => (settings["model-real-time-search"] = el),
+                textContent: "Real-time search",
+            }),
             $checkbox({
                 $: (el) => (settings["model-persistent-search"] = el),
                 textContent: "Persistent search text across model types",
