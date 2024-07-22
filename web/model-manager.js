@@ -976,8 +976,8 @@ class ModelDirectories {
     }
 }
 
-const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-dropdown-key-selected";
-const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-dropdown-mouse-selected";
+const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-directory-dropdown-key-selected";
+const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-directory-dropdown-mouse-selected";
 
 
 class ModelData {
@@ -1037,7 +1037,7 @@ class DirectoryDropdown {
      */
     constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}, isDynamicSearch = () => { return false; }) {
         /** @type {HTMLDivElement} */
-        const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
+        const dropdown = $el("div.search-directory-dropdown", {
             style: {
                 display: "none",
             },
