@@ -3482,83 +3482,164 @@ class SettingsView {
     }
 }
 
-class SidebarButtons {
-    /** @type {HTMLDivElement} */
-    element = null;
-    
-    /** @type {ModelManager} */
-    #modelManager = null;
-    
-    /**
-     * @param {Event} e
-     */
-    #setSidebar(e) {
-        // TODO: settings["sidebar-default-width"]
-        // TODO: settings["sidebar-default-height"]
-        // TODO: draggable resize?
-        const button = e.target;
-        const modelManager = this.#modelManager.element;
-        const sidebarButtons = this.element.children;
-
-        const buttonActiveState = "sidebar-button-active";
-        for (let i = 0; i < sidebarButtons.length; i++) {
-            sidebarButtons[i].classList.remove(buttonActiveState);
-        }
-
-        let buttonIndex;
-        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            const sidebarButton = sidebarButtons[buttonIndex];
-            if (sidebarButton === button) {
-                break;
-            }
-        }
-
-        const sidebarStates = ["sidebar-right", "sidebar-top", "sidebar-bottom", "sidebar-left"]; // TODO: magic numbers
-        let stateIndex;
-        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
-            const state = sidebarStates[stateIndex];
-            if (modelManager.classList.contains(state)) {
-                modelManager.classList.remove(state);
-                break;
-            }
-        }
-
-        if (stateIndex != buttonIndex) {
-            const newSidebarState = sidebarStates[buttonIndex];
-            modelManager.classList.add(newSidebarState);
-            const sidebarButton = sidebarButtons[buttonIndex];
-            sidebarButton.classList.add(buttonActiveState);
-        }
+/**
+ * @param {String[]} labels
+ * @param {[(event: Event) => Promise<void>]} callbacks
+ * @returns {HTMLDivElement}
+ */
+function GenerateRadioButtonGroup(labels, callbacks = []) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const callback = callbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const targetIsActive = event.target.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    if (targetIsActive) {
+                        return;
+                    }
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    event.target.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                    callback(event);
+                },
+            })
+        );
     }
-    
-    /**
-     * @param {ModelManager} modelManager
-     */
-    constructor(modelManager) {
-        this.#modelManager = modelManager;
-        $el("div.sidebar-buttons",
-        {
-            $: (el) => (this.element = el),
-        },
-        [
-            $el("button.icon-button", {
-                textContent: "◨",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬒",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬓",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "◧",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-        ]);
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    buttons[0]?.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+    return radioButtonGroup;
+}
+
+/**
+ * @param {String[]} labels
+ * @param {[(event: Event) => Promise<void>]} activationCallbacks
+ * @param {(event: Event) => Promise<void>} deactivationCallback
+ * @returns {HTMLDivElement}
+ */
+function GenerateToggleRadioButtonGroup(labels, activationCallbacks = [], deactivationCallback = () => {}) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const activationCallback = activationCallbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const targetIsActive = event.target.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    if (targetIsActive) {
+                        deactivationCallback(event);
+                    }
+                    else {
+                        event.target.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallback(event);
+                    }
+                },
+            })
+        );
     }
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    return radioButtonGroup;
+}
+
+/**
+ * Coupled-state select and radio buttons (hidden first radio button)
+ * @param {String[]} labels
+ * @param {[(button: HTMLButtonElement) => Promise<void>]} activationCallbacks
+ * @returns {[HTMLDivElement, HTMLSelectElement]}
+ */
+function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    
+    const select = $el("select", {
+            name: "sidebar-select",
+            onchange: (event) => {
+                const select = event.target;
+                const children = select.children;
+                let value = undefined;
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (child.selected) {
+                        value = child.value;
+                    }
+                }
+                for (let i = 0; i < buttons.length; i++) {
+                    const button = buttons[i];
+                    if (button.textContent === value) {
+                        for (let i = 0; i < buttons.length; i++) {
+                            buttons[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                        }
+                        button.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallbacks[i](button);
+                        break;
+                    }
+                }
+            },
+        }, labels.map((option) => {
+            return $el("option", {
+                value: option,
+            }, option);
+        })
+    );
+    
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const activationCallback = activationCallbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const button = event.target;
+                    let textContent = button.textContent;
+                    const targetIsActive = button.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    if (button === buttons[0] && buttons[0].classList.contains(RADIO_BUTTON_GROUP_ACTIVE)) {
+                        // do not deactivate 0
+                        return;
+                    }
+                    // update button
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    if (targetIsActive) {
+                        // return to 0
+                        textContent = labels[0];
+                        buttons[0].classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallbacks[0](buttons[0]);
+                    }
+                    else {
+                        // move to >0
+                        button.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallback(button);
+                    }
+                    // update selection
+                    for (let i = 0; i < select.children.length; i++) {
+                        const option = select.children[i];
+                        option.selected = option.value === textContent;
+                    }
+                },
+            })
+        );
+    }
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    buttons[0].click();
+    buttons[0].style.display = "none";
+    
+    return [radioButtonGroup, select];
 }
 
 class ModelManager extends ComfyDialog {
@@ -3579,6 +3660,9 @@ class ModelManager extends ComfyDialog {
     
     /** @type {SettingsView} */
     #settingsView = null;
+    
+    /** @type {HTMLDivElement} */
+    #topbarRight = null;
     
     /** @type {HTMLDivElement} */
     #tabManagerButtons = null;
@@ -3633,17 +3717,36 @@ class ModelManager extends ComfyDialog {
         const tabInfoButtons = this.#modelInfo.elements.tabButtons;
         const tabInfoContents = this.#modelInfo.elements.tabContents;
         
+        const [sidebarButtonGroup, sidebarSelect] = GenerateSidebarToggleRadioAndSelect(
+            ["◼", "◨", "⬒", "⬓", "◧"],
+            [
+                () => { this.element.dataset["sidebarState"] = "none"; },
+                () => { this.element.dataset["sidebarState"] = "right"; },
+                () => { this.element.dataset["sidebarState"] = "top"; },
+                () => { this.element.dataset["sidebarState"] = "bottom"; },
+                () => { this.element.dataset["sidebarState"] = "left"; },
+            ],
+        );
+        sidebarButtonGroup.classList.add("sidebar-buttons");
+        const sidebarButtonGroupChildren = sidebarButtonGroup.children;
+        for (let i = 0; i < sidebarButtonGroupChildren.length; i++) {
+            sidebarButtonGroupChildren[i].classList.add("icon-button");
+        }
+        
         const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
                 $: (el) => (this.element = el),
                 parent: document.body,
+                dataset: { "sidebarState": "none" },
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
                     $el("div.model-manager-panel", [
                         $el("div.model-manager-head", [
-                            $el("div.topbar-right", [
+                            $el("div.topbar-right", {
+                                $: (el) => (this.#topbarRight = el),
+                            }, [
                                 $el("button.icon-button", {
                                     textContent: "✖",
                                     onclick: async() => {
@@ -3659,7 +3762,8 @@ class ModelManager extends ComfyDialog {
                                     textContent: "⬅",
                                     onclick: async() => { await this.#tryHideModelInfo(true); },
                                 }),
-                                (new SidebarButtons(this)).element,
+                                sidebarSelect,
+                                sidebarButtonGroup,
                             ]),
                             $el("div.topbar-left", [
                                 $el("div", [
@@ -3689,6 +3793,18 @@ class ModelManager extends ComfyDialog {
         
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 768)).observe(modelManager);
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 768)).observe(modelManager);
+        new ResizeObserver(() => {
+            const managerRect = document.body.getBoundingClientRect();
+            const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
+            if (isNarrow) {
+                sidebarButtonGroup.style.display = "none";
+                sidebarSelect.style.display = "";
+            }
+            else {
+                sidebarButtonGroup.style.display = "";
+                sidebarSelect.style.display = "none";
+            }
+        }).observe(modelManager);
         
         this.#init();
     }
