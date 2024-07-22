@@ -3726,7 +3726,12 @@ class ModelManager extends ComfyDialog {
         const [sidebarButtonGroup, sidebarSelect] = GenerateSidebarToggleRadioAndSelect(
             ["◼", "◨", "⬒", "⬓", "◧"],
             [
-                () => { this.element.dataset["sidebarState"] = "none"; },
+                () => { 
+                    const element = this.element;
+                    if (element) { // callback on initialization as default state
+                        element.dataset["sidebarState"] = "none";
+                    }
+                },
                 () => { this.element.dataset["sidebarState"] = "right"; },
                 () => { this.element.dataset["sidebarState"] = "top"; },
                 () => { this.element.dataset["sidebarState"] = "bottom"; },
