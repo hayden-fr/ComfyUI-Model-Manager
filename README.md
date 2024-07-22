@@ -2,14 +2,13 @@
 
 Download, browse and delete models in ComfyUI.
 
-<div>
-  <img src="demo-tab-download.png" alt="Model Manager Demo Screenshot" width="45%"/>
-  <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="45%"/>
-</div>
+<img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 ## Features
 
 ### Download Tab
+
+<img src="demo-tab-download.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View multiple models associated with a url.
 - Select a download directory.
@@ -19,6 +18,8 @@ Download, browse and delete models in ComfyUI.
 
 ### Models Tab
 
+<img src="demo-tab-models-dropdown.png" alt="Model Manager Demo Screenshot" width="65%"/>
+
 - Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
 - Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
@@ -27,6 +28,8 @@ Download, browse and delete models in ComfyUI.
 - Sort for models (Date Created, Date Modified, Name).
 
 ### Model Info View
+
+<img src="demo-tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View model metadata and file info.
 - Read, edit and save notes in a `.txt` file beside the model.
