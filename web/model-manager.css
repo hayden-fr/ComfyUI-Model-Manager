@@ -529,8 +529,15 @@
 }
 
 .model-manager .model-manager-head .topbar-right select {
-    padding: 0;
+    position: relative;
+    top: 0;
+    bottom: 0;
     font-size: 24px;
+    -o-appearance: none;
+    -ms-appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
 }
 
 /* search dropdown */
