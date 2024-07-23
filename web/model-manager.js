@@ -1,6 +1,7 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
+import { ComfyButton } from "../../scripts/ui/components/button.js";
 
 /**
  * @param {string} url
@@ -4095,6 +4096,17 @@ function getInstance() {
     return instance;
 }
 
+const toggleModelManager = () => {
+    const modelManager = getInstance();
+    const style = modelManager.element.style;
+    if (style.display === "" || style.display === "none") {
+        modelManager.show();
+    }
+    else {
+        modelManager.close();
+    }
+};
+
 app.registerExtension({
     name: "Comfy.ModelManager",
     init() {
@@ -4106,22 +4118,22 @@ app.registerExtension({
             href: "./extensions/ComfyUI-Model-Manager/model-manager.css",
         });
         
-        app.ui.menuContainer.appendChild(
+        app.ui?.menuContainer?.appendChild(
             $el("button", {
                 id: "comfyui-model-manager-button",
                 parent: document.querySelector(".comfy-menu"),
                 textContent: "Models",
-                onclick: () => {
-                    const modelManager = getInstance();
-                    const style = modelManager.element.style;
-                    if (style.display === "" || style.display === "none") {
-                        modelManager.show();
-                    }
-                    else {
-                        modelManager.close();
-                    }
-                },
+                onclick: () => toggleModelManager(),
             })
         );
+        
+        // [Beta] mobile menu
+        app?.menu?.actionsGroup.element.appendChild(new ComfyButton({
+            icon: "folder-search-outline",
+            tooltip: "Opens model manager",
+            action: () => toggleModelManager(),
+            content: "Model Manager",
+            popup: getInstance(),
+        }).element);
     },
 });
