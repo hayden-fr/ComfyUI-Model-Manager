@@ -3500,10 +3500,20 @@ class SettingsView {
     
     /**
      * @param {() => Promise<void>} updateModels
+     * @param {() => void} updateSidebarButtons
      */
-    constructor(updateModels) {
+    constructor(updateModels, updateSidebarButtons) {
         this.#updateModels = updateModels;
         const settings = this.elements.settings;
+        
+        const sidebarControl = $checkbox({
+            $: (el) => (settings["sidebar-control-always-compact"] = el),
+            textContent: "Sidebar controls always compact",
+        });
+        sidebarControl.getElementsByTagName('input')[0].addEventListener("change", () => {
+            updateSidebarButtons();
+        });
+        
         $el("div.model-manager-settings", {
             $: (el) => (this.element = el),
         }, [
@@ -3602,10 +3612,7 @@ class SettingsView {
                 textContent: "Save model descriptions in .txt files by default.",
             }),
             $el("h2", ["Window"]),
-            $checkbox({
-                $: (el) => (settings["sidebar-control-always-compact"] = el),
-                textContent: "Sidebar controls always compact (requires window resize or page refresh to recalculate)",
-            }),
+            sidebarControl,
             /*
             $el("div", [
                 $el("p", ["Default sidebar width"]),
@@ -3858,6 +3865,12 @@ class ModelManager extends ComfyDialog {
     #tabInfoContents = null;
     
     /** @type {HTMLButtonElement} */
+    #sidebarButtonGroup = null;
+    
+    /** @type {HTMLButtonElement} */
+    #sidebarSelect = null;
+    
+    /** @type {HTMLButtonElement} */
     #closeModelInfoButton = null;
     
     constructor() {
@@ -3867,6 +3880,7 @@ class ModelManager extends ComfyDialog {
         
         this.#settingsView = new SettingsView(
             this.#refreshModels,
+            () => this.#updateSidebarButtons(),
         );
         
         this.#modelInfo = new ModelInfo(
@@ -3914,6 +3928,8 @@ class ModelManager extends ComfyDialog {
                 () => { this.element.dataset["sidebarState"] = "left"; },
             ],
         );
+        this.#sidebarButtonGroup = sidebarButtonGroup;
+        this.#sidebarSelect = sidebarSelect;
         sidebarButtonGroup.classList.add("sidebar-buttons");
         const sidebarButtonGroupChildren = sidebarButtonGroup.children;
         for (let i = 0; i < sidebarButtonGroupChildren.length; i++) {
@@ -3980,19 +3996,7 @@ class ModelManager extends ComfyDialog {
         
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 768)).observe(modelManager);
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 768)).observe(modelManager);
-        new ResizeObserver(() => {
-            const managerRect = document.body.getBoundingClientRect();
-            const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
-            const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
-            if (isNarrow || alwaysShowCompactSidebarControls) {
-                sidebarButtonGroup.style.display = "none";
-                sidebarSelect.style.display = "";
-            }
-            else {
-                sidebarButtonGroup.style.display = "";
-                sidebarSelect.style.display = "none";
-            }
-        }).observe(modelManager);
+        new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
         
         this.#init();
     }
@@ -4061,6 +4065,20 @@ class ModelManager extends ComfyDialog {
             this.#tabManagerContents.style.display = "";
         }
         return true;
+    }
+    
+    #updateSidebarButtons = () => {
+        const managerRect = document.body.getBoundingClientRect();
+        const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
+        const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
+        if (isNarrow || alwaysShowCompactSidebarControls) {
+            this.#sidebarButtonGroup.style.display = "none";
+            this.#sidebarSelect.style.display = "";
+        }
+        else {
+            this.#sidebarButtonGroup.style.display = "";
+            this.#sidebarSelect.style.display = "none";
+        }
     }
 }
 
