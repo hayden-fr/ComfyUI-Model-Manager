@@ -28,6 +28,21 @@
     gap: 16px;
 }
 
+.model-manager .no-highlight {
+    user-select: none;
+    -moz-user-select: none;
+    -webkit-text-select: none;
+    -webkit-user-select: none;
+}
+
+.model-manager label:has(> *){
+    pointer-events: none;
+}
+
+.model-manager label > * {
+    pointer-events: auto;
+}
+
 /* sidebar buttons */
 .model-manager .sidebar-buttons {
     overflow: hidden;
@@ -605,7 +620,9 @@
 
 /* model manager settings */
 .model-manager .model-manager-settings > div,
-.model-manager .model-manager-settings > label {
+.model-manager .model-manager-settings > label,
+.model-manager .tag-generator-settings > label,
+.model-manager .tag-generator-settings > div {
     display: flex;
     flex-direction: row;
     align-items: center;
@@ -613,20 +630,13 @@
     margin: 16px 0;
 }
 
-.model-manager label {
-    pointer-events: none;
-}
-
-.model-manager label > * {
-    pointer-events: auto;
-}
-
 .model-manager .model-manager-settings button {
     height: 40px;
     width: 120px;
 }
 
-.model-manager .model-manager-settings input[type="number"] {
+.model-manager .model-manager-settings input[type="number"],
+.model-manager .tag-generator-settings input[type="number"]{
     width: 50px;
 }
 

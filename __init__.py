@@ -191,6 +191,9 @@ def ui_rules():
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
         Rule("download-save-description-as-text-file", True, bool),
+        Rule("tag-generator-sampler-method", "Frequency", str),
+        Rule("tag-generator-count", 10, int),
+        Rule("tag-generator-threshold", 2, int),
     ]
 
 
