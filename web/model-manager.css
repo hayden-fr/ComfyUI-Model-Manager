@@ -337,6 +337,10 @@
     row-gap: 16px;
 }
 
+.model-manager .download-button {
+    max-width: fit-content;
+}
+
 /* models tab */
 .model-manager [data-name="Models"] .row {
     position: sticky;

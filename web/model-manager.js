@@ -3158,6 +3158,28 @@ class DownloadView {
     }
     
     /**
+     * Returns empty string on failure
+     * @param {float | undefined} fileSizeKB 
+     * @returns {string}
+     */
+    static #fileSizeToFormattedString(fileSizeKB) {
+        if (fileSizeKB === undefined) { return ""; }
+        const sizes = ["KB", "MB", "GB", "TB", "PB"];
+        let fileSizeString = fileSizeKB.toString();
+        const index = fileSizeString.indexOf(".");
+        const indexMove = index % 3 === 0 ? 3 : index % 3;
+        const sizeIndex = Math.floor((index - indexMove) / 3);
+        if (sizeIndex >= sizes.length || sizeIndex < 0) {
+            fileSizeString = fileSizeString.substring(0, fileSizeString.indexOf(".") + 3);
+            return `(${fileSizeString} ${sizes[0]})`;
+        }
+        const split = fileSizeString.split(".");
+        fileSizeString = split[0].substring(0, indexMove) + "." + split[0].substring(indexMove) + split[1];
+        fileSizeString = fileSizeString.substring(0, fileSizeString.indexOf(".") + 3);
+        return `(${fileSizeString} ${sizes[sizeIndex]})`;
+    }
+    
+    /**
      * @param {Object} info
      * @param {ModelData} modelData
      * @param {int} id
@@ -3221,7 +3243,8 @@ class DownloadView {
                         new ComfyButton({
                             icon: "arrow-collapse-down",
                             tooltip: "Download model",
-                            classList: "comfyui-button icon-button",
+                            content: "Download " + DownloadView.#fileSizeToFormattedString(info["details"]["fileSizeKB"]),
+                            classList: "comfyui-button download-button",
                             action: async (e) => {
                                 const pathDirectory = el_saveDirectoryPath.value;
                                 const modelName = (() => {
