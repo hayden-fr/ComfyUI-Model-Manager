@@ -23,7 +23,7 @@ function request(url, options = undefined) {
 async function loadWorkflow(url) {
     const uri = (new URL(url)).searchParams.get("uri");
     const fileNameIndex = Math.max(uri.lastIndexOf("/"), uri.lastIndexOf("\\")) + 1;
-    const fileName = uri.substring(0, fileNameIndex);
+    const fileName = uri.substring(fileNameIndex);
     const response = await fetch(url);
     const data = await response.blob();
     const file = new File([data],  fileName, { type: data.type });
