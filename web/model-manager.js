@@ -167,16 +167,14 @@ function debounce(callback, delay) {
 }
 
 /**
+ * 
  * @param {HTMLButtonElement} element
- * @param {boolean} success
- * @param {string} successClassName
- * @param {string} failureClassName
+ * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined]}
  */
-function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined) {
-    if (element === undefined || element === null) { return; }
-    const nodeName = element.nodeName.toLowerCase();
+function comfyButtonDisambiguate(element) {
     let button = undefined;
     let icon = undefined;
+    const nodeName = element.nodeName.toLowerCase();
     if (nodeName === "button") {
         button = element;
         icon = button.getElementsByTagName("i")[0];
@@ -189,7 +187,19 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
         button = element.parentElement;
         icon = button.getElementsByTagName("i")[0];
     }
+    return [button, icon]
+}
+
+/**
+ * @param {HTMLButtonElement} element
+ * @param {boolean} success
+ * @param {string} successClassName
+ * @param {string} failureClassName
+ */
+function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined) {
+    if (element === undefined || element === null) { return; }
     
+    const [button, icon] = comfyButtonDisambiguate(element);
     if (button === undefined) {
         console.warn("Unable to find button element!");
         console.warn(element);
@@ -353,29 +363,31 @@ function GenerateTabGroup(tabData) {
         const name = data.name;
         const icon = data.icon;
         /** @type {HTMLDivElement} */
-        const tab = $el("div.tab-button", {
-                dataset: { name: name, icon: icon },
-                onclick: () => {
-                    tabButtons.forEach((tabButton) => {
-                        if (name === tabButton.getAttribute("data-name")) {
-                            tabButton.classList.add(ACTIVE_TAB_CLASS);
-                        }
-                        else {
-                            tabButton.classList.remove(ACTIVE_TAB_CLASS);
-                        }
-                    });
-                    tabContents.forEach((tabContent) => {
-                        if (name === tabContent.getAttribute("data-name")) {
-                            tabContent.style.display = "";
-                        }
-                        else {
-                            tabContent.style.display = "none";
-                        }
-                    });
-                },
+        const tab = new ComfyButton({
+            icon: icon,
+            tooltip: "Open " + name.toLowerCase() + " tab",
+            classList: "comfyui-button tab-button",
+            content: name,
+            action: () => {
+                tabButtons.forEach((tabButton) => {
+                    if (name === tabButton.getAttribute("data-name")) {
+                        tabButton.classList.add(ACTIVE_TAB_CLASS);
+                    }
+                    else {
+                        tabButton.classList.remove(ACTIVE_TAB_CLASS);
+                    }
+                });
+                tabContents.forEach((tabContent) => {
+                    if (name === tabContent.getAttribute("data-name")) {
+                        tabContent.style.display = "";
+                    }
+                    else {
+                        tabContent.style.display = "none";
+                    }
+                });
             },
-            [name],
-        );
+        }).element;
+        tab.dataset.name = name;
         const content = $el("div.tab-content", {
             dataset: {
                 name: data.name,
@@ -400,10 +412,12 @@ function GenerateDynamicTabTextCallback(element, tabButtons, minWidth) {
             return;
         }
         const managerRect = element.getBoundingClientRect();
-        const isNarrow = managerRect.width < minWidth; // TODO: `minWidth` is a magic value
+        const isIcon = managerRect.width < minWidth; // TODO: `minWidth` is a magic value
+        const iconDisplay = isIcon ? "" : "none";
+        const spanDisplay = isIcon ? "none" : "";
         tabButtons.forEach((tabButton) => {
-            const attribute = isNarrow ? "data-icon" : "data-name";
-            tabButton.innerText = tabButton.getAttribute(attribute);
+            tabButton.getElementsByTagName("i")[0].style.display = iconDisplay;
+            tabButton.getElementsByTagName("span")[0].style.display = spanDisplay;
         });
     };
 }
@@ -2140,10 +2154,10 @@ class ModelInfo {
         ]);
         
         [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
-            { name: "Overview", icon: "ℹ️", tabContent: this.element },
-            { name: "Metadata", icon: "📄", tabContent: $el("div", ["Metadata"]) },
-            { name: "Tags", icon: "🏷️", tabContent: $el("div", ["Tags"]) },
-            { name: "Notes", icon: "✏️", tabContent: $el("div", ["Notes"]) },
+            { name: "Overview", icon: "information-box-outline", tabContent: this.element },
+            { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
+            { name: "Tags", icon: "tag-outline", tabContent: $el("div", ["Tags"]) },
+            { name: "Notes", icon: "lead-pencil", tabContent: $el("div", ["Notes"]) },
         ]);
     }
     
@@ -3958,9 +3972,9 @@ class ModelManager extends ComfyDialog {
         );
         
         const [tabManagerButtons, tabManagerContents] = GenerateTabGroup([
-            { name: "Download", icon: "⬇️", tabContent: this.#downloadView.element },
-            { name: "Models", icon: "📁", tabContent: this.#browseView.element },
-            { name: "Settings", icon: "⚙️", tabContent: this.#settingsView.element },
+            { name: "Download", icon: "download", tabContent: this.#downloadView.element },
+            { name: "Models", icon: "folder-search-outline", tabContent: this.#browseView.element },
+            { name: "Settings", icon: "cog-outline", tabContent: this.#settingsView.element },
         ]);
         tabManagerButtons[0]?.click();
         
@@ -4054,8 +4068,8 @@ class ModelManager extends ComfyDialog {
             ]
         );
         
-        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 768)).observe(modelManager);
-        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 768)).observe(modelManager);
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 704)).observe(modelManager);
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
         
         this.#init();
@@ -4129,7 +4143,7 @@ class ModelManager extends ComfyDialog {
     
     #updateSidebarButtons = () => {
         const managerRect = document.body.getBoundingClientRect();
-        const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
+        const isNarrow = managerRect.width < 704; // TODO: `minWidth` is a magic value
         const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
         if (isNarrow || alwaysShowCompactSidebarControls) {
             this.#sidebarButtonGroup.style.display = "none";
