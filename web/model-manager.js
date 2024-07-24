@@ -3680,6 +3680,32 @@ class SettingsView {
         }).element;
         this.elements.saveButton = saveButton;
         
+        const correctPreviewsButton = new ComfyButton({
+            content: "Fix Preview Extensions",
+            tooltip: "Correct image extensions in all model directories",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const data = await request(
+                    "/model-manager/preview/correct-extensions")
+                .catch((err) => {
+                    return { "success": false };
+                });
+                const success = data["success"];
+                if (success) {
+                    const detectPlural = data["detected"] === 1 ? "" : "s";
+                    const correctPlural = data["corrected"] === 1 ? "" : "s";
+                    const message = `Detected ${data["detected"]} extension${detectPlural}.\nCorrected ${data["corrected"]} extension${correctPlural}.`;
+                    window.alert(message);
+                }
+                comfyButtonAlert(e.target, success);
+                if (data["corrected"] > 0) {
+                    await this.reload(true);
+                }
+                button.disabled = false;
+            },
+        }).element;
+        
         $el("div.model-manager-settings", {
             $: (el) => (this.element = el),
         }, [
@@ -3821,6 +3847,10 @@ class SettingsView {
                     step: 1,
                     min: 1,
                 }),
+            ]),
+            $el("h2", ["Preview"]),
+            $el("div", [
+                correctPreviewsButton,
             ]),
         ]);
     }

@@ -540,6 +540,63 @@ async def delete_model_preview(request):
     return web.json_response(result)
 
 
+def correct_image_extensions(root_dir):
+    detected_image_count = 0
+    corrected_image_count = 0
+    for root, dirs, files in os.walk(root_dir):
+        for file_name in files:
+            file_path = root + os.path.sep + file_name
+            image_format = None
+            try:
+                with Image.open(file_path) as image:
+                    image_format = image.format
+            except:
+                continue
+            image_path = file_path
+            image_dir_and_name, image_ext = os.path.splitext(image_path)
+            if not image_format_is_equal(image_format, image_ext):
+                detected_image_count += 1
+                corrected_image_path = image_dir_and_name + "." + image_format.lower()
+                if os.path.exists(corrected_image_path):
+                    print("WARNING: '" + image_path + "' has wrong extension!")
+                else:
+                    try:
+                        os.rename(image_path, corrected_image_path)
+                    except:
+                        print("WARNING: Unable to rename '" + image_path + "'!")
+                        continue
+                    ext0 = os.path.splitext(image_path)[1]
+                    ext1 = os.path.splitext(corrected_image_path)[1]
+                    print(f"({ext0} -> {ext1}): {corrected_image_path}")
+                    corrected_image_count += 1
+    return (detected_image_count, corrected_image_count)
+
+
+@server.PromptServer.instance.routes.get("/model-manager/preview/correct-extensions")
+async def correct_preview_extensions(request):
+    result = { "success": False }
+
+    detected = 0
+    corrected = 0
+
+    model_types = os.listdir(comfyui_model_uri)
+    model_types.remove("configs")
+    model_types.sort()
+
+    for model_type in model_types:
+        for base_path_index, model_base_path in enumerate(folder_paths_get_folder_paths(model_type)):
+            if not os.path.exists(model_base_path): # TODO: Bug in main code? ("ComfyUI\output\checkpoints", "ComfyUI\output\clip", "ComfyUI\models\t2i_adapter", "ComfyUI\output\vae")
+                continue
+            d, c = correct_image_extensions(model_base_path)
+            detected += d
+            corrected += c
+
+    result["success"] = True
+    result["detected"] = detected
+    result["corrected"] = corrected
+    return web.json_response(result)
+
+
 @server.PromptServer.instance.routes.get("/model-manager/models/list")
 async def get_model_list(request):
     use_safetensor_thumbnail = (
