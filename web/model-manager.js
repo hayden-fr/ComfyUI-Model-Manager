@@ -169,37 +169,42 @@ function debounce(callback, delay) {
 /**
  * 
  * @param {HTMLButtonElement} element
- * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined]}
+ * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined, HTMLSpanElement | undefined]} [button, icon, span]
  */
 function comfyButtonDisambiguate(element) {
     let button = undefined;
     let icon = undefined;
+    let span = undefined;
     const nodeName = element.nodeName.toLowerCase();
     if (nodeName === "button") {
         button = element;
         icon = button.getElementsByTagName("i")[0];
+        span = button.getElementsByTagName("span")[0];
     }
     else if (nodeName === "i") {
         icon = element;
         button = element.parentElement;
+        span = button.getElementsByTagName("span")[0];
     }
     else if (nodeName === "span") {
         button = element.parentElement;
         icon = button.getElementsByTagName("i")[0];
+        span = element;
     }
-    return [button, icon]
+    return [button, icon, span]
 }
 
 /**
  * @param {HTMLButtonElement} element
  * @param {boolean} success
- * @param {string} successClassName
- * @param {string} failureClassName
+ * @param {string?} successClassName
+ * @param {string?} failureClassName
+ * @param {boolean?} [disableCallback=false]
  */
-function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined) {
+function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined, disableCallback = false) {
     if (element === undefined || element === null) { return; }
     
-    const [button, icon] = comfyButtonDisambiguate(element);
+    const [button, icon, span] = comfyButtonDisambiguate(element);
     if (button === undefined) {
         console.warn("Unable to find button element!");
         console.warn(element);
@@ -216,18 +221,22 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
             icon.classList.add(iconClassName);
         }
         icon.classList.add(colorClassName);
-        window.setTimeout((element, iconClassName, colorClassName) => {
-            if (iconClassName !== "") {
-                element.classList.remove(iconClassName);
-            }
-            element.classList.remove(colorClassName);
-        }, 1000, icon, iconClassName, colorClassName);
+        if (!disableCallback) {
+            window.setTimeout((element, iconClassName, colorClassName) => {
+                if (iconClassName !== "") {
+                    element.classList.remove(iconClassName);
+                }
+                element.classList.remove(colorClassName);
+            }, 1000, icon, iconClassName, colorClassName);
+        }
     }
     
     button.classList.add(colorClassName);
-    window.setTimeout((element, colorClassName) => {
-        element.classList.remove(colorClassName);
-    }, 1000, button, colorClassName);
+    if (!disableCallback) {
+        window.setTimeout((element, colorClassName) => {
+            element.classList.remove(colorClassName);
+        }, 1000, button, colorClassName);
+    }
 }
 
 /**
@@ -749,10 +758,13 @@ class ImageSelect {
                 tooltip: "Search models",
                 classList: "comfyui-button icon-button",
                 action: async (e) => {
+                    const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                    button.disabled = true;
                     const value = el_customUrl.value;
                     el_customUrlPreview.src = await getCustomPreviewUrl(value);
                     e.stopPropagation();
                     el_customUrl.blur();
+                    button.disabled = false;
                 },
             }).element,
         ]);
@@ -1979,10 +1991,11 @@ class ModelInfo {
             tooltip: "Overwrite currrent preview with selected image",
             content: "Set as Preview",
             action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
                 const confirmation = window.confirm("Change preview image(s) PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
-                    e.target.disabled = true;
                     const container = this.elements.info;
                     const path = container.dataset.path;
                     const imageUrl = await previewSelect.getImage();
@@ -2036,10 +2049,9 @@ class ModelInfo {
                         previewSelect.resetModelInfoPreview();
                         this.element.style.display = "none";
                     }
-                    
-                    e.target.disabled = false;
                 }
                 comfyButtonAlert(e.target, updatedPreview);
+                button.disabled = false;
             },
         }).element;
         this.elements.setPreviewButton = setPreviewButton;
@@ -2059,6 +2071,8 @@ class ModelInfo {
                         tooltip: "Delete model FOREVER",
                         classList: "comfyui-button icon-button",
                         action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
                             const affirmation = "delete";
                             const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
                             let deleted = false;
@@ -2092,6 +2106,7 @@ class ModelInfo {
                             if (!deleted) {
                                 comfyButtonAlert(e.target, false);
                             }
+                            button.disabled = false;
                         },
                     }).element,
                     $el("div.search-models", [
@@ -2102,6 +2117,8 @@ class ModelInfo {
                         icon: "file-move-outline",
                         tooltip: "Move file",
                         action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
                             const confirmation = window.confirm("Move this file?");
                             let moved = false;
                             if (confirmation) {
@@ -2143,6 +2160,7 @@ class ModelInfo {
                                 });
                             }
                             comfyButtonAlert(e.target, moved);
+                            button.disabled = false;
                         },
                     }).element,
                 ]),
@@ -2274,6 +2292,8 @@ class ModelInfo {
                             tooltip: "Change file name",
                             classList: "comfyui-button icon-button",
                             action: async(e) => {
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
                                 const container = this.elements.info;
                                 const oldFile = container.dataset.path;
                                 const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
@@ -2317,6 +2337,7 @@ class ModelInfo {
                                     });
                                 }
                                 comfyButtonAlert(e.target, renamed);
+                                button.disabled = false;
                             },
                         }).element,
                     ]),
@@ -2549,8 +2570,11 @@ class ModelInfo {
                             tooltip: "Save note",
                             classList: "comfyui-button icon-button",
                             action: async (e) => {
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
                                 const saved = await this.trySave(false);
                                 comfyButtonAlert(e.target, saved);
+                                button.disabled = false;
                             },
                         }).element,
                     ]),
@@ -3071,7 +3095,12 @@ class DownloadView {
                     icon: "magnify",
                     tooltip: "Search url",
                     classList: "comfyui-button icon-button",
-                    action: async() => await update(),
+                    action: async(e) => {
+                        const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                        button.disabled = true;
+                        await update();
+                        button.disabled = false;
+                    },
                 }).element,
             ]),
             $el("div.download-model-infos", {
@@ -3208,7 +3237,8 @@ class DownloadView {
                                 const image = await downloadPreviewSelect.getImage();
                                 formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);
-                                e.target.disabled = true;
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
                                 const [success, resultText] = await request(
                                     "/model-manager/model/download",
                                     {
@@ -3236,8 +3266,8 @@ class DownloadView {
                                     }
                                     this.#updateModels();
                                 }
-                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
-                                e.target.disabled = success;
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick", true);
+                                button.disabled = success;
                             },
                         }).element,
                         $el("div.row.tab-header-flex-block", [
@@ -3407,18 +3437,33 @@ class BrowseView {
                         icon: "reload",
                         tooltip: "Reload model grid",
                         classList: "comfyui-button icon-button",
-                        action: async() => updateModels(),
+                        action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
+                            updateModels();
+                            button.disabled = false;
+                        },
                     }).element,
                     $el("select.model-select-dropdown", {
                         $: (el) => (this.elements.modelTypeSelect = el),
                         name: "model-type",
-                        onchange: () => updateModelGrid(),
+                        onchange: (e) => {
+                            const select = e.target;
+                            select.disabled = true;
+                            updateModelGrid();
+                            select.disabled = false;
+                        },
                     }),
                     $el("select.model-select-dropdown",
                         {
                             $: (el) => (this.elements.modelSortSelect = el),
                             name: "model select dropdown",
-                            onchange: () => updateModelGrid(),
+                            onchange: (e) => {
+                                const select = e.target;
+                                select.disabled = true;
+                                updateModelGrid();
+                                select.disabled = false;
+                            },
                         },
                         [
                             $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest first)"]),
@@ -3441,7 +3486,12 @@ class BrowseView {
                         icon: "magnify",
                         tooltip: "Search models",
                         classList: "comfyui-button icon-button",
-                        action: () => updateModelGrid(),
+                        action: (e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
+                            updateModelGrid();
+                            button.disabled = false;
+                        },
                     }).element,
                 ]),
             ]),
@@ -3581,14 +3631,24 @@ class SettingsView {
         const reloadButton = new ComfyButton({
             content: "Reload",
             tooltip: "Reload settings and model manager files",
-            action: async() => await this.reload(true),
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                await this.reload(true);
+                button.disabled = false;
+            },
         }).element;
         this.elements.reloadButton = reloadButton;
         
         const saveButton = new ComfyButton({
             content: "Save",
             tooltip: "Save settings and reload model manager",
-            action: async() => await this.save(),
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                await this.save();
+                button.disabled = false;
+            },
         }).element;
         this.elements.saveButton = saveButton;
         
