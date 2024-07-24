@@ -4005,8 +4005,8 @@ class ModelManager extends ComfyDialog {
         }
         
         const closeModelInfoButton = new ComfyButton({
-            icon: "arrow-left",
-            tooltip: "Close model info",
+            icon: "arrow-u-left-bottom",
+            tooltip: "Return to model search",
             classList: "comfyui-button icon-button",
             action: async() => await this.#tryHideModelInfo(true),
         }).element;
@@ -4202,7 +4202,7 @@ app.registerExtension({
         
         // [Beta] mobile menu
         app.menu?.settingsGroup?.append(new ComfyButton({
-            icon: "folder-search-outline",
+            icon: "folder-search",
             tooltip: "Opens model manager",
             action: () => toggleModelManager(),
             content: "Model Manager",
