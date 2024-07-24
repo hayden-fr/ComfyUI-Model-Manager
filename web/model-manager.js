@@ -2157,7 +2157,7 @@ class ModelInfo {
             { name: "Overview", icon: "information-box-outline", tabContent: this.element },
             { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
             { name: "Tags", icon: "tag-outline", tabContent: $el("div", ["Tags"]) },
-            { name: "Notes", icon: "lead-pencil", tabContent: $el("div", ["Notes"]) },
+            { name: "Notes", icon: "pencil-outline", tabContent: $el("div", ["Notes"]) },
         ]);
     }
     
@@ -3185,7 +3185,7 @@ class DownloadView {
                 $el("div.download-settings-wrapper", [
                     $el("div.download-settings", [
                         new ComfyButton({
-                            icon: "download",
+                            icon: "arrow-collapse-down",
                             tooltip: "Download model",
                             classList: "comfyui-button icon-button",
                             action: async (e) => {
@@ -3972,7 +3972,7 @@ class ModelManager extends ComfyDialog {
         );
         
         const [tabManagerButtons, tabManagerContents] = GenerateTabGroup([
-            { name: "Download", icon: "download", tabContent: this.#downloadView.element },
+            { name: "Download", icon: "arrow-collapse-down", tabContent: this.#downloadView.element },
             { name: "Models", icon: "folder-search-outline", tabContent: this.#browseView.element },
             { name: "Settings", icon: "cog-outline", tabContent: this.#settingsView.element },
         ]);
