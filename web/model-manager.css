@@ -628,7 +628,6 @@
 .model-manager .tag-generator-settings > div {
     display: flex;
     flex-direction: row;
-    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     margin: 16px 0;
