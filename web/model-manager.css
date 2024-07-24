@@ -215,6 +215,7 @@
     cursor: default;
     position: relative;
     z-index: 1;
+    pointer-events: none;
 }
 
 .model-manager .model-manager-body {

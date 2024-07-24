@@ -4132,10 +4132,10 @@ class ModelManager extends ComfyDialog {
                             ]),
                             $el("div.topbar-left", [
                                 $el("div", [
-                                    $el("div.model-tab-group", {
+                                    $el("div.model-tab-group.no-highlight", {
                                         $: (el) => (this.#tabManagerButtons = el),
                                     }, tabManagerButtons),
-                                    $el("div.model-tab-group", {
+                                    $el("div.model-tab-group.no-highlight", {
                                         $: (el) => (this.#tabInfoButtons = el),
                                         style: { display: "none"},
                                     }, tabInfoButtons),
