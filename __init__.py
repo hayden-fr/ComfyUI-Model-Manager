@@ -293,6 +293,8 @@ def get_image_info(image):
 def image_format_is_equal(f1, f2):
     if not isinstance(f1, str) or not isinstance(f2, str):
         return False
+    if f1[0] == ".": f1 = f1[1:]
+    if f2[0] == ".": f2 = f2[1:]
     f1 = f1.upper()
     f2 = f2.upper()
     return f1 == f2 or (f1 == "JPG" and f2 == "JPEG") or (f1 == "JPEG" and f2 == "JPG")
@@ -484,8 +486,21 @@ def download_model_preview(formdata):
         image_data = file.read()
         with open(image_path, "wb") as f:
             f.write(image_data)
+        print("Saved file: " + image_path)
 
     delete_same_name_files(path_without_extension, preview_extensions, image_extension)
+
+    # detect and fix wrong file extension
+    image_format = None
+    with Image.open(image_path) as image:
+        image_format = image.format
+    image_dir_and_name, image_ext = os.path.splitext(image_path)
+    if not image_format_is_equal(image_format, image_ext):
+        corrected_image_path = image_dir_and_name + "." + image_format.lower()
+        os.rename(image_path, corrected_image_path)
+        print("Saved file: " + corrected_image_path)
+        image_path = corrected_image_path
+    return image_path # return in-case need corrected path
 
 
 @server.PromptServer.instance.routes.post("/model-manager/preview/set")
