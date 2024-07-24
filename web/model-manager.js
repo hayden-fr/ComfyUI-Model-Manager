@@ -20,11 +20,14 @@ function request(url, options = undefined) {
 /**
  * @param {string} url
  */
-async function load_workflow(url) {
+async function loadWorkflow(url) {
+    const uri = (new URL(url)).searchParams.get("uri");
+    const fileNameIndex = Math.max(uri.lastIndexOf("/"), uri.lastIndexOf("\\")) + 1;
+    const fileName = uri.substring(fileNameIndex);
     const response = await fetch(url);
     const data = await response.blob();
-    const type = data.type;
-    const file = new File([data], "model-manager-workflow-file", { type });
+    const datatype = data.type;
+    const file = new File([data],  fileName, { datatype });
     app.handleFile(file);
 }
 
@@ -1833,7 +1836,7 @@ class ModelGrid {
                                 const uri = urlSearchParams.get("uri");
                                 const v = urlSearchParams.get("v");
                                 const urlFull = urlString.substring(0, urlString.indexOf("?")) + "?uri=" + uri + "&v=" + v;
-                                load_workflow(urlFull);
+                                await loadWorkflow(urlFull);
                             },
                         }).element,
                     );
@@ -2376,7 +2379,10 @@ class ModelInfo {
                     new ComfyButton({
                         content: "Load Workflow",
                         tooltip: "Attempt to load preview image workflow",
-                        action: () => load_workflow(previewSelect.elements.defaultPreviews.children[0].src),
+                        action: async () => {
+                            const urlString = previewSelect.elements.defaultPreviews.children[0].src;
+                            await loadWorkflow(urlString);
+                        },
                     }).element,
                 ]),
                 $el("div.row.tab-header-flex-block", [
