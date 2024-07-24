@@ -4187,12 +4187,12 @@ app.registerExtension({
         );
         
         // [Beta] mobile menu
-        app?.menu?.actionsGroup.element.appendChild(new ComfyButton({
+        app.menu?.settingsGroup?.append(new ComfyButton({
             icon: "folder-search-outline",
             tooltip: "Opens model manager",
             action: () => toggleModelManager(),
             content: "Model Manager",
             popup: getInstance(),
-        }).element);
+        }));
     },
 });
