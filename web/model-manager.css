@@ -21,6 +21,8 @@
     max-height: unset;
     max-width: unset;
     transform: none;
+    /*disable double-tap zoom on model manager*/
+    touch-action: manipulation;
 }
 
 .model-manager .comfy-modal-content {
