@@ -149,7 +149,6 @@
 }
 
 .model-manager .icon-button {
-    padding: 0;
     height: 40px;
     width: 40px;
     line-height: 1.15;
@@ -173,12 +172,12 @@
     min-width: 0;
 }
 
-.model-manager .button-success {
+.model-manager .comfy-button-success {
     color: green;
     border-color: green;
 }
 
-.model-manager .button-failure {
+.model-manager .comfy-button-failure {
     color: darkred;
     border-color: darkred;
 }
@@ -633,6 +632,7 @@
 .model-manager .model-manager-settings button {
     height: 40px;
     width: 120px;
+    justify-content: center;
 }
 
 .model-manager .model-manager-settings input[type="number"],

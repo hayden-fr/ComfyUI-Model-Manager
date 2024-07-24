@@ -169,26 +169,55 @@ function debounce(callback, delay) {
 /**
  * @param {HTMLButtonElement} element
  * @param {boolean} success
- * @param {string} [successText=""]
- * @param {string} [failureText=""]
- * @param {string} [resetText=""]
+ * @param {string} successClassName
+ * @param {string} failureClassName
  */
-function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
-    if (element === undefined || element === null) {
+function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined) {
+    if (element === undefined || element === null) { return; }
+    const nodeName = element.nodeName.toLowerCase();
+    let button = undefined;
+    let icon = undefined;
+    if (nodeName === "button") {
+        button = element;
+        icon = button.getElementsByTagName("i")[0];
+    }
+    else if (nodeName === "i") {
+        icon = element;
+        button = element.parentElement;
+    }
+    else if (nodeName === "span") {
+        button = element.parentElement;
+        icon = button.getElementsByTagName("i")[0];
+    }
+    
+    if (button === undefined) {
+        console.warn("Unable to find button element!");
+        console.warn(element);
         return;
     }
-    const name = success ? "button-success" : "button-failure";
-    element.classList.add(name);
-    if (successText != "" && failureText != "") {
-        element.innerHTML = success ? successText : failureText;
-    }
-    // TODO: debounce would be nice to get working...
-    window.setTimeout((element, name, innerHTML) => {
-        element.classList.remove(name);
-        if (innerHTML != "") {
-            element.innerHTML = innerHTML;
+    
+    // TODO: debounce would be nice, but needs some sort of "global" to avoid creating/destroying many objects
+    
+    const colorClassName = success ? "comfy-button-success" : "comfy-button-failure";
+    
+    if (icon) {
+        const iconClassName = (success ? successClassName : failureClassName) ?? "";
+        if (iconClassName !== "") {
+            icon.classList.add(iconClassName);
         }
-    }, 1000, element, name, resetText);
+        icon.classList.add(colorClassName);
+        window.setTimeout((element, iconClassName, colorClassName) => {
+            if (iconClassName !== "") {
+                element.classList.remove(iconClassName);
+            }
+            element.classList.remove(colorClassName);
+        }, 1000, icon, iconClassName, colorClassName);
+    }
+    
+    button.classList.add(colorClassName);
+    window.setTimeout((element, colorClassName) => {
+        element.classList.remove(colorClassName);
+    }, 1000, button, colorClassName);
 }
 
 /**
@@ -701,15 +730,17 @@ class ImageSelect {
             style: { display: "none" },
         }, [
             el_customUrl,
-            $el("button.icon-button", {
-                textContent: "🔍︎",
-                onclick: async (e) => {
+            new ComfyButton({
+                icon: "magnify",
+                tooltip: "Search models",
+                classList: "comfyui-button icon-button",
+                action: async (e) => {
                     const value = el_customUrl.value;
                     el_customUrlPreview.src = await getCustomPreviewUrl(value);
                     e.stopPropagation();
                     el_customUrl.blur();
                 },
-            }),
+            }).element,
         ]);
         
         const el_previewButtons = $el("div.model-preview-overlay", {
@@ -717,14 +748,18 @@ class ImageSelect {
                 display: el_defaultPreviews.children.length > 1 ? "block" : "none",
             },
         }, [
-            $el("button.icon-button.model-preview-button-left", {
-                textContent: "←",
-                onclick: () => this.stepDefaultPreviews(-1),
-            }),
-            $el("button.icon-button.model-preview-button-right", {
-                textContent: "→",
-                onclick: () => this.stepDefaultPreviews(1),
-            }),
+            new ComfyButton({
+                icon: "arrow-left",
+                tooltip: "Previous image",
+                classList: "comfyui-button icon-button model-preview-button-left",
+                action: () => this.stepDefaultPreviews(-1),
+            }).element,
+            new ComfyButton({
+                icon: "arrow-right",
+                tooltip: "Next image",
+                classList: "comfyui-button icon-button model-preview-button-right",
+                action: () => this.stepDefaultPreviews(1),
+            }).element,
         ]);
         const el_previews = $el("div.item", {
             $: (el) => (this.elements.previews = el),
@@ -1570,7 +1605,7 @@ class ModelGrid {
             }
             event.stopPropagation();
         }
-        buttonAlert(event.target, success, "✔", "✖", "✚");
+        comfyButtonAlert(event.target, success, "mdi-check-bold", "mdi-close-thick");
     }
 
     static #getWidgetComboIndices(node, value) {
@@ -1686,7 +1721,7 @@ class ModelGrid {
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
         }
-        buttonAlert(event.target, success, "✔", "✖", "⧉︎");
+        comfyButtonAlert(event.target, success, "mdi-check-bold", "mdi-close-thick");
     }
     
     /**
@@ -1730,41 +1765,42 @@ class ModelGrid {
                 let actionButtons = [];
                 if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
                     actionButtons.push(
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "⧉︎",
-                            onclick: (e) => ModelGrid.#copyModelToClipboard(
+                        new ComfyButton({
+                            icon: "content-copy",
+                            tooltip: "Copy model to clipboard",
+                            classList: "comfyui-button icon-button model-button",
+                            action: (e) => ModelGrid.#copyModelToClipboard(
                                 e, 
                                 modelType, 
                                 path, 
-                                removeEmbeddingExtension
+                                removeEmbeddingExtension,
                             ),
-                            draggable: false,
-                        })
+                        }).element,
                     );
                 }
                 if (showCopyButton) {
                     actionButtons.push(
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "✚",
-                            onclick: (e) => ModelGrid.#addModel(
+                        new ComfyButton({
+                            icon: "plus-box-outline",
+                            tooltip: "Add model to node grid",
+                            classList: "comfyui-button icon-button model-button",
+                            action: (e) => ModelGrid.#addModel(
                                 e, 
                                 modelType, 
                                 path, 
                                 removeEmbeddingExtension, 
-                                addOffset
+                                addOffset, 
                             ),
-                            draggable: false,
-                        })
+                        }).element,
                     );
                 }
                 if (showLoadWorkflowButton) {
                     actionButtons.push(
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "↙︎",
-                            onclick: async (e) => {
+                        new ComfyButton({
+                            icon: "arrow-bottom-left-bold-box-outline",
+                            tooltip: "Load preview workflow",
+                            classList: "comfyui-button icon-button model-button",
+                            action: async (e) => {
                                 const urlString = previewThumbnail.src;
                                 const url = new URL(urlString);
                                 const urlSearchParams = url.searchParams;
@@ -1773,16 +1809,16 @@ class ModelGrid {
                                 const urlFull = urlString.substring(0, urlString.indexOf("?")) + "?uri=" + uri + "&v=" + v;
                                 load_workflow(urlFull);
                             },
-                        }),
+                        }).element,
                     );
                 }
                 const infoButtons = [
-                    $el("button.icon-button.model-button", {
-                        type: "button",
-                        textContent: "ⓘ",
-                        onclick: async() => { await showModelInfo(searchPath) },
-                        draggable: false,
-                    }),
+                    new ComfyButton({
+                        icon: "information-outline",
+                        tooltip: "View model information",
+                        classList: "comfyui-button icon-button model-button",
+                        action: async() => { await showModelInfo(searchPath) },
+                    }).element,
                 ];
                 const dragAdd = (e) => ModelGrid.#dragAddModel(
                     e, 
@@ -1925,10 +1961,10 @@ class ModelInfo {
         this.previewSelect = previewSelect;
         previewSelect.elements.previews.style.display = "flex";
         
-        const setPreviewButton = $el("button", {
-            $: (el) => (this.elements.setPreviewButton = el),
-            textContent: "Set as Preview",
-            onclick: async(e) => {
+        const setPreviewButton = new ComfyButton({
+            tooltip: "Overwrite currrent preview with selected image",
+            content: "Set as Preview",
+            action: async(e) => {
                 const confirmation = window.confirm("Change preview image(s) PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
@@ -1989,9 +2025,10 @@ class ModelInfo {
                     
                     e.target.disabled = false;
                 }
-                buttonAlert(e.target, updatedPreview);
+                comfyButtonAlert(e.target, updatedPreview);
             },
-        });
+        }).element;
+        this.elements.setPreviewButton = setPreviewButton;
         previewSelect.elements.radioButtons.addEventListener("change", (e) => {
             setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         });
@@ -2003,9 +2040,11 @@ class ModelInfo {
                 display: "block",
             }, [
                 $el("div.row.tab-header-flex-block", [
-                    $el("button.icon-button", {
-                        textContent: "🗑︎",
-                        onclick: async(e) => {
+                    new ComfyButton({
+                        icon: "trash-can-outline",
+                        tooltip: "Delete model FOREVER",
+                        classList: "comfyui-button icon-button",
+                        action: async(e) => {
                             const affirmation = "delete";
                             const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
                             let deleted = false;
@@ -2037,17 +2076,18 @@ class ModelInfo {
                                 });
                             }
                             if (!deleted) {
-                                buttonAlert(e.target, false);
+                                comfyButtonAlert(e.target, false);
                             }
                         },
-                    }),
+                    }).element,
                     $el("div.search-models", [
                         moveDestinationInput,
                         searchDropdown.element,
                     ]),
-                    $el("button", {
-                        textContent: "Move",
-                        onclick: async(e) => {
+                    new ComfyButton({
+                        icon: "file-move-outline",
+                        tooltip: "Move file",
+                        action: async(e) => {
                             const confirmation = window.confirm("Move this file?");
                             let moved = false;
                             if (confirmation) {
@@ -2088,9 +2128,9 @@ class ModelInfo {
                                     return false;
                                 });
                             }
-                            buttonAlert(e.target, moved);
+                            comfyButtonAlert(e.target, moved);
                         },
-                    }),
+                    }).element,
                 ]),
             ]),
             $el("div.model-info-container", {
@@ -2215,9 +2255,11 @@ class ModelInfo {
                         filename,
                     ]),
                     $el("div", [
-                        $el("button.icon-button", {
-                            textContent: "✎",
-                            onclick: async(e) => {
+                        new ComfyButton({
+                            icon: "pencil",
+                            tooltip: "Change file name",
+                            classList: "comfyui-button icon-button",
+                            action: async(e) => {
                                 const container = this.elements.info;
                                 const oldFile = container.dataset.path;
                                 const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
@@ -2260,9 +2302,9 @@ class ModelInfo {
                                         return false;
                                     });
                                 }
-                                buttonAlert(e.target, renamed);
+                                comfyButtonAlert(e.target, renamed);
                             },
-                        }),
+                        }).element,
                     ]),
                 ]),
             );
@@ -2296,12 +2338,11 @@ class ModelInfo {
             previewSelect.elements.previews,
             $el("div.row.tab-header", [
                 $el("div", [
-                    $el("button", {
-                        textContent: "Load Workflow",
-                        onclick: async (e) => {
-                            load_workflow(previewSelect.elements.defaultPreviews.children[0].src);
-                        },
-                    }),
+                    new ComfyButton({
+                        content: "Load Workflow",
+                        tooltip: "Attempt to load preview image workflow",
+                        action: () => load_workflow(previewSelect.elements.defaultPreviews.children[0].src),
+                    }).element,
                 ]),
                 $el("div.row.tab-header-flex-block", [
                     previewSelect.elements.radioGroup,
@@ -2453,10 +2494,10 @@ class ModelInfo {
                     ]),
                 ]),
                 tagGeneratorRandomizedOutput,
-                $el("button", {
-                    textContent: "Randomize",
-                    style: { width: "100%" },
-                    onclick: (e) => {
+                new ComfyButton({
+                    content: "Randomize",
+                    tooltip: "Randomly generate subset of tags",
+                    action: () => {
                         const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
                         const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
                         const sampleCount = tagGenerationCount.value;
@@ -2465,7 +2506,7 @@ class ModelInfo {
                         const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
                         tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
                     },
-                }),
+                }).element,
             ]),
             $el("h2", ["Training Tags"]),
             tagsParagraph,
@@ -2489,13 +2530,15 @@ class ModelInfo {
                         style: { margin: "0px 0px 16px" },
                     }, [
                         $el("h1", { style: { "margin-top": "0px", "margin-bottom": "0px" } }, ["Notes"]),
-                        $el("button.icon-button", {
-                            textContent: "💾",
-                            onclick: async (e) => {
+                        new ComfyButton({
+                            icon: "content-save",
+                            tooltip: "Save note",
+                            classList: "comfyui-button icon-button",
+                            action: async (e) => {
                                 const saved = await this.trySave(false);
-                                buttonAlert(e.target, saved);
+                                comfyButtonAlert(e.target, saved);
                             },
-                        }),
+                        }).element,
                     ]),
                     $el("div", {
                         style: { "display": "flex", "height": "100%", "min-height": "60px" },
@@ -3010,10 +3053,12 @@ class DownloadView {
                         }
                     },
                 }),
-                $el("button.icon-button", {
-                    onclick: async () => { await update(); },
-                    textContent: "🔍︎",
-                }),
+                new ComfyButton({
+                    icon: "magnify",
+                    tooltip: "Search url",
+                    classList: "comfyui-button icon-button",
+                    action: async() => await update(),
+                }).element,
             ]),
             $el("div.download-model-infos", {
                 $: (el) => (this.elements.infos = el),
@@ -3125,9 +3170,11 @@ class DownloadView {
                 downloadPreviewSelect.elements.previews,
                 $el("div.download-settings-wrapper", [
                     $el("div.download-settings", [
-                        $el("button.icon-button", {
-                            textContent: "📥︎",
-                            onclick: async (e) => {
+                        new ComfyButton({
+                            icon: "download",
+                            tooltip: "Download model",
+                            classList: "comfyui-button icon-button",
+                            action: async (e) => {
                                 const pathDirectory = el_saveDirectoryPath.value;
                                 const modelName = (() => {
                                     const filename = info["fileName"];
@@ -3175,10 +3222,10 @@ class DownloadView {
                                     }
                                     this.#updateModels();
                                 }
-                                buttonAlert(e.target, success, "✔", "✖", resultText);
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
                                 e.target.disabled = success;
                             },
-                        }),
+                        }).element,
                         $el("div.row.tab-header-flex-block", [
                             el_saveDirectoryPath,
                             searchDropdown.element,
@@ -3342,11 +3389,12 @@ class BrowseView {
         this.element = $el("div", [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "⟳",
-                        onclick: () => updateModels(),
-                    }),
+                    new ComfyButton({
+                        icon: "reload",
+                        tooltip: "Reload model grid",
+                        classList: "comfyui-button icon-button",
+                        action: async() => updateModels(),
+                    }).element,
                     $el("select.model-select-dropdown", {
                         $: (el) => (this.elements.modelTypeSelect = el),
                         name: "model-type",
@@ -3375,11 +3423,12 @@ class BrowseView {
                         searchInput,
                         searchDropdown.element,
                     ]),
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "🔍︎",
-                        onclick: () => updateModelGrid(),
-                    }),
+                    new ComfyButton({
+                        icon: "magnify",
+                        tooltip: "Search models",
+                        classList: "comfyui-button icon-button",
+                        action: () => updateModelGrid(),
+                    }).element,
                 ]),
             ]),
             modelGrid,
@@ -3461,7 +3510,7 @@ class SettingsView {
         const data = await request("/model-manager/settings/load");
         const settingsData = data["settings"];
         this.#setSettings(settingsData, updateModels);
-        buttonAlert(this.elements.reloadButton, true);
+        comfyButtonAlert(this.elements.reloadButton, true);
     }
     
     /** @returns {Promise<void>} */
@@ -3496,7 +3545,7 @@ class SettingsView {
             const settingsData = data["settings"];
             this.#setSettings(settingsData, true);
         }
-        buttonAlert(this.elements.saveButton, success);
+        comfyButtonAlert(this.elements.saveButton, success);
     }
     
     /**
@@ -3515,23 +3564,27 @@ class SettingsView {
             updateSidebarButtons();
         });
         
+        const reloadButton = new ComfyButton({
+            content: "Reload",
+            tooltip: "Reload settings and model manager files",
+            action: async() => await this.reload(true),
+        }).element;
+        this.elements.reloadButton = reloadButton;
+        
+        const saveButton = new ComfyButton({
+            content: "Save",
+            tooltip: "Save settings and reload model manager",
+            action: async() => await this.save(),
+        }).element;
+        this.elements.saveButton = saveButton;
+        
         $el("div.model-manager-settings", {
             $: (el) => (this.element = el),
         }, [
             $el("h1", ["Settings"]),
             $el("div", [
-                $el("button", {
-                    $: (el) => (this.elements.reloadButton = el),
-                    type: "button",
-                    textContent: "Reload", // ⟳
-                    onclick: async () => { await this.reload(true); },
-                }),
-                $el("button", {
-                    $: (el) => (this.elements.saveButton = el),
-                    type: "button",
-                    textContent: "Save", // 💾︎
-                    onclick: async () => { await this.save(); },
-                }),
+                reloadButton,
+                saveButton,
             ]),
             $el("a", {
                     style: { color: "var(--fg-color)" },
@@ -3937,6 +3990,15 @@ class ModelManager extends ComfyDialog {
             sidebarButtonGroupChildren[i].classList.add("icon-button");
         }
         
+        const closeModelInfoButton = new ComfyButton({
+            icon: "arrow-left",
+            tooltip: "Close model info",
+            classList: "comfyui-button icon-button",
+            action: async() => await this.#tryHideModelInfo(true),
+        }).element;
+        this.#closeModelInfoButton = closeModelInfoButton;
+        closeModelInfoButton.style.display = "none";
+        
         const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
@@ -3951,21 +4013,18 @@ class ModelManager extends ComfyDialog {
                             $el("div.topbar-right", {
                                 $: (el) => (this.#topbarRight = el),
                             }, [
-                                $el("button.icon-button", {
-                                    textContent: "✖",
-                                    onclick: async() => {
+                                new ComfyButton({
+                                    icon: "window-close",
+                                    tooltip: "Close model manager",
+                                    classList: "comfyui-button icon-button",
+                                    action: async() => {
                                         const saved = await this.#modelInfo.trySave(true);
                                         if (saved) {
                                             this.close();
                                         }
-                                    }
-                                }),
-                                $el("button.icon-button", {
-                                    $: (el) => (this.#closeModelInfoButton = el),
-                                    style: { display: "none" },
-                                    textContent: "⬅",
-                                    onclick: async() => { await this.#tryHideModelInfo(true); },
-                                }),
+                                    },
+                                }).element,
+                                closeModelInfoButton,
                                 sidebarSelect,
                                 sidebarButtonGroup,
                             ]),
