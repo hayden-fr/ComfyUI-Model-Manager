@@ -3026,11 +3026,11 @@ async function getModelInfos(urlText) {
                 const images = version["images"];
                 const tags = version["tags"];
                 const description = [
-                        tags !== undefined ? "# Tags" : undefined,
+                        tags !== undefined ? "# Trigger Words" : undefined,
                         tags?.join(", "),
-                        version["description"] !== undefined ? "# Version Description" : undefined,
+                        version["description"] !== undefined ? "# About this version " : undefined,
                         version["description"],
-                        civitaiInfo["description"] !== undefined ? "# Description" : undefined,
+                        civitaiInfo["description"] !== undefined ? "# " + name  : undefined,
                         civitaiInfo["description"],
                     ].filter(x => x !== undefined).join("\n\n")
                     .replaceAll("</p><p>", "\n\n")
