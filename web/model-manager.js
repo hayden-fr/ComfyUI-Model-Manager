@@ -3458,7 +3458,7 @@ class DownloadView {
                     }),
                     $checkbox({
                         $: (el) => { this.elements.downloadNotes = el; },
-                        textContent: "Save Model Descriptions in Text Files.",
+                        textContent: "Save Notes.",
                         checked: settings["download-save-description-as-text-file"].checked,
                     }),
                 ])
