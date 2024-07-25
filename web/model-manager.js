@@ -3055,7 +3055,8 @@ async function getModelInfos(urlText) {
                     // <span></span>
                     .replace(/<[^>]+>/g, "") // quick hack
                     .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
-                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=");
+                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=")
+                    .replaceAll("&amp;", "&");
                 //console.log(description);
                 version["files"].forEach((file) => {
                     infos.push({
