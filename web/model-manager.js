@@ -2744,7 +2744,8 @@ class Civitai {
                 return image["url"];
             }),
             "name": modelVersionInfo["name"],
-            "description": modelVersionInfo["description"] ?? "",
+            "description": modelVersionInfo["description"],
+            "tags": modelVersionInfo["trainedWords"],
         };
     }
     
@@ -2780,7 +2781,8 @@ class Civitai {
             return {
                 "name": modelVersionInfo["model"]["name"],
                 "type": modelVersionInfo["model"]["type"],
-                "description": modelVersionInfo["description"] ?? "",
+                "description": modelVersionInfo["description"],
+                "tags": modelVersionInfo["trainedWords"],
                 "versions": [filesInfo]
             }
         }
@@ -3019,11 +3021,42 @@ async function getModelInfos(urlText) {
             const name = civitaiInfo["name"];
             const infos = [];
             const type = civitaiInfo["type"];
-            const modelInfo = civitaiInfo["description"]?? "";
+            //console.log(civitaiInfo);
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
-                const versionDescription = version["description"]??"";
-                const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
+                const tags = version["tags"];
+                const description = [
+                        tags !== undefined ? "# Tags" : undefined,
+                        tags?.join(", "),
+                        version["description"] !== undefined ? "# Version Description" : undefined,
+                        version["description"],
+                        civitaiInfo["description"] !== undefined ? "# Description" : undefined,
+                        civitaiInfo["description"],
+                    ].filter(x => x !== undefined).join("\n\n")
+                    .replaceAll("</p><p>", "\n\n")
+                    .replaceAll("<strong>", "**").replaceAll("</strong>", "**")
+                    .replaceAll("<ol>", "\n").replaceAll("</ol>", "\n") // wrong
+                    .replaceAll("<ul>", "\n").replaceAll("</ul>", "\n")
+                    .replaceAll("<li>", "- ").replaceAll("</li>", "\n")
+                    .replaceAll("<em>", "*").replaceAll("</em>", "*")
+                    .replaceAll("<code>", "`").replaceAll("</code>", "`")
+                    .replaceAll("<blockquote", "\n<blockquote").replaceAll("</blockquote>", "\n")
+                    .replaceAll("<br", "\n<br")
+                    .replaceAll("<hr>", "\n\n---\n\n")
+                    .replaceAll("<h1", "\n# <h1").replaceAll("</h1>", "\n")
+                    .replaceAll("<h2", "\n## <h2").replaceAll("</h2>", "\n")
+                    .replaceAll("<h3", "\n### <h3").replaceAll("</h3>", "\n")
+                    .replaceAll("<h4", "\n#### <h4").replaceAll("</h4>", "\n")
+                    .replaceAll("<h5", "\n##### <h5").replaceAll("</h5>", "\n")
+                    .replaceAll("<h6", "\n###### <h6").replaceAll("</h6>", "\n")
+                    .replace(/href="(\S*)">/g, 'href=""> $1 <a href="">')
+                    .replace(/src="(\S*)">/g, 'src=""> $1 <img src="">')
+                    // <script></script>
+                    // <span></span>
+                    .replace(/<[^>]+>/g, "") // quick hack
+                    .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
+                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=");
+                //console.log(description);
                 version["files"].forEach((file) => {
                     infos.push({
                         "images": images,
@@ -3372,6 +3405,13 @@ class DownloadView {
                             el_filename,
                         ]),
                         downloadPreviewSelect.elements.radioGroup,
+                        $el("textarea.comfy-multiline-input", {
+                            name: "model info notes",
+                            value: info["description"]??"",
+                            rows: 10,
+                            disabled: true,
+                            style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
+                        })
                     ]),
                 ]),
             ]),
