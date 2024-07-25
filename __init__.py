@@ -182,6 +182,7 @@ def ui_rules():
         Rule("model-real-time-search", True, bool),
         Rule("model-persistent-search", True, bool),
         Rule("model-show-label-extensions", False, bool),
+        Rule("model-info-autosave-notes", False, bool),
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
@@ -226,6 +227,11 @@ def get_def_headers(url=""):
             def_headers["Authorization"] = f"Bearer {api_key}"
     
     return def_headers
+
+
+@server.PromptServer.instance.routes.get("/model-manager/timestamp")
+async def get_timestamp(request):
+    return web.json_response({ "timestamp": datetime.now().timestamp() })
 
 
 @server.PromptServer.instance.routes.get("/model-manager/settings/load")
@@ -1166,6 +1172,8 @@ async def set_notes(request):
     body = await request.json()
     result = { "success": False }
 
+    dt_epoch = body.get("timestamp", None)
+
     text = body.get("notes", None)
     if type(text) is not str:
         result["alert"] = "Invalid note!"
@@ -1179,15 +1187,23 @@ async def set_notes(request):
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     file_path_without_extension, _ = split_valid_ext(model_path, model_extensions)
     filename = os.path.normpath(file_path_without_extension + model_info_extension)
+    
+    if dt_epoch is not None and os.path.exists(filename) and os.path.getmtime(filename) > dt_epoch:
+        # discard late save
+        result["success"] = True
+        return web.json_response(result)
+    
     if text.isspace() or text == "":
         if os.path.exists(filename):
             os.remove(filename)
-            print("Deleted file: " + filename)
+            #print("Deleted file: " + filename)  # autosave -> too verbose
     else:
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(text)
-            print("Saved file: " + filename)
+            if dt_epoch is not None:
+                os.utime(filename, (dt_epoch, dt_epoch))
+            #print("Saved file: " + filename)  # autosave -> too verbose
         except ValueError as e:
             print(e, file=sys.stderr, flush=True)
             result["alert"] = "Failed to save notes!\n\n" + str(e)

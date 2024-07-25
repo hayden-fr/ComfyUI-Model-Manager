@@ -32,7 +32,7 @@ Download, browse and delete models in ComfyUI.
 <img src="demo-tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View model metadata and file info.
-- Read, edit and save notes in a `.txt` file beside the model.
+- Read, edit and save notes in a `.txt` file beside the model. (Autosave optional.)
 - Change or remove a model's preview image (add a different one using a url or local upload).
 - Rename, move or **permanently** remove model files.
 

@@ -18,6 +18,21 @@ function request(url, options = undefined) {
 }
 
 /**
+ * @param {(...args) => Promise<void>} callback
+ * @param {number | undefined} delay
+ * @returns {(...args) => void}
+ */
+function debounce(callback, delay) {
+    let timeoutId = null;
+    return (...args) => {
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+            callback(...args);
+        }, delay);
+    };
+}
+
+/**
  * @param {string} url
  */
 async function loadWorkflow(url) {
@@ -154,21 +169,6 @@ const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
- * @param {(...args) => void} callback
- * @param {number | undefined} delay
- * @returns {(...args) => void}
- */
-function debounce(callback, delay) {
-    let timeoutId = null;
-    return (...args) => {
-        window.clearTimeout(timeoutId);
-        timeoutId = window.setTimeout(() => {
-            callback(...args);
-        }, delay);
-    };
-}
-
-/**
  * 
  * @param {HTMLButtonElement} element
  * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined, HTMLSpanElement | undefined]} [button, icon, span]
@@ -248,6 +248,11 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
  * @returns {Promise<boolean>}
  */
 async function saveNotes(modelPath, newValue) {
+    const timestamp = await request("/model-manager/timestamp")
+    .catch((err) => {
+        console.warn(err);
+        return false;
+    });
     return await request(
         "/model-manager/notes/save",
         {
@@ -256,6 +261,7 @@ async function saveNotes(modelPath, newValue) {
                 "path": modelPath,
                 "notes": newValue,
             }),
+            timestamp: timestamp,
         }
     ).then((result) => {
         const saved = result["success"];
@@ -2201,7 +2207,7 @@ class ModelInfo {
     }
     
     /**
-     * @param {boolean}
+     * @param {boolean} promptUser
      * @returns {Promise<boolean>}
      */
     async trySave(promptUser) {
@@ -2567,6 +2573,33 @@ class ModelInfo {
         const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
         tagButton.style.display = isTags ? "" : "none";
         
+        const saveIcon = "content-save";
+        const savingIcon = "cloud-upload-outline";
+        
+        const saveNotesButton = new ComfyButton({
+            icon: saveIcon,
+            tooltip: "Save note",
+            classList: "comfyui-button icon-button",
+            action: async (e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const saved = await this.trySave(false);
+                comfyButtonAlert(e.target, saved);
+                button.disabled = false;
+            },
+        }).element;
+        
+        const saveDebounce = debounce(async() => {
+            const saveIconClass = "mdi-" + saveIcon;
+            const savingIconClass = "mdi-" + savingIcon;
+            const iconElement = saveNotesButton.getElementsByTagName("i")[0];
+            iconElement.classList.remove(saveIconClass);
+            iconElement.classList.add(savingIconClass);
+            const saved = await this.trySave(false);
+            iconElement.classList.remove(savingIconClass);
+            iconElement.classList.add(saveIconClass);
+        }, 2000);
+        
         /** @type {HTMLDivElement} */
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
         notesElement.innerHTML = "";
@@ -2575,6 +2608,11 @@ class ModelInfo {
                 const notes = $el("textarea.comfy-multiline-input", {
                     name: "model notes",
                     value: noteText, 
+                    oninput: (e) => {
+                        if (this.#settingsElements["model-info-autosave-notes"].checked) {
+                            saveDebounce();
+                        }
+                    },
                 });
                 this.elements.notes = notes;
                 this.#savedNotesValue = noteText;
@@ -2583,18 +2621,7 @@ class ModelInfo {
                         style: { "align-items": "center" },
                     }, [
                         $el("h1", ["Notes"]),
-                        new ComfyButton({
-                            icon: "content-save",
-                            tooltip: "Save note",
-                            classList: "comfyui-button icon-button",
-                            action: async (e) => {
-                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                                button.disabled = true;
-                                const saved = await this.trySave(false);
-                                comfyButtonAlert(e.target, saved);
-                                button.disabled = false;
-                            },
-                        }).element,
+                        saveNotesButton,
                     ]),
                     $el("div", {
                         style: { "display": "flex", "height": "100%", "min-height": "60px" },
@@ -3614,6 +3641,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
+            /** @type {HTMLInputElement} */ "model-info-autosave-notes": null,
             /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
             
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
@@ -3818,6 +3846,10 @@ class SettingsView {
             $checkbox({
                 $: (el) => (settings["model-show-label-extensions"] = el),
                 textContent: "Show model file extension in labels",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-info-autosave-notes"] = el),
+                textContent: "Autosave notes",
             }),
             $checkbox({
                 $: (el) => (settings["model-preview-fallback-search-safetensors-thumbnail"] = el),
