@@ -3410,6 +3410,7 @@ class BrowseView {
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
         /** @type {HTMLSelectElement} */ modelSortSelect: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
+        /** @type {HTMLButtonElement} */ searchButton: null,
     };
     
     /** @type {Array} */
@@ -3480,6 +3481,9 @@ class BrowseView {
                 showModelInfo,
             );
             updateModelGridCallback();
+            
+            const searchButtonIsVisible = this.#settingsElements["model-real-time-search"].checked ? "none" : "";
+            this.elements.searchButton.style.display = searchButtonIsVisible;
         }
         this.updateModelGrid = updateModelGrid;
         
@@ -3514,6 +3518,7 @@ class BrowseView {
                 searchButton.style.display = "";
             }
         });
+        this.elements.searchButton = searchButton;
         
         this.element = $el("div", [
             $el("div.row.tab-header", [
