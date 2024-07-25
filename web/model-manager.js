@@ -2814,7 +2814,7 @@ class Civitai {
             return {
                 "name": modelInfo["name"],
                 "type": modelInfo["type"],
-                "description": modelInfo["description"] ?? "",
+                "description": modelInfo["description"],
                 "versions": modelVersions,
             }
         }
