@@ -3873,7 +3873,7 @@ class SettingsView {
             ]),
             $select({
                 $: (el) => (settings["model-default-browser-model-type"] = el),
-                textContent: "Default search model type on startup",
+                textContent: "Default model search type (on start up)",
                 options: ["checkpoints", "clip", "clip_vision", "controlnet", "diffusers", "embeddings", "gligen", "hypernetworks", "loras", "photomaker", "style_models", "unet", "vae", "vae_approx"],
             }),
             $checkbox({
@@ -3882,52 +3882,49 @@ class SettingsView {
             }),
             $checkbox({
                 $: (el) => (settings["model-persistent-search"] = el),
-                textContent: "Persistent search text across model types",
+                textContent: "Persistent search text (across model types)",
             }),
-            $checkbox({
-                $: (el) => (settings["model-show-label-extensions"] = el),
-                textContent: "Show model file extension in labels",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-info-autosave-notes"] = el),
-                textContent: "Autosave notes",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-preview-fallback-search-safetensors-thumbnail"] = el),
-                textContent: "Fallback on embedded thumbnail in safetensors (refresh slow)",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-show-add-button"] = el),
-                textContent: "Show add button",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-show-copy-button"] = el),
-                textContent: "Show copy button",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-show-load-workflow-button"] = el),
-                textContent: "Show load workflow button",
-            }),
-            $checkbox({
-                $: (el) => (settings["model-info-button-on-left"] = el),
-                textContent: "Model info button on the left",
-            }),
+            $el("h2", ["Model Search Thumbnails"]),
             $select({
                 $: (el) => (settings["model-preview-thumbnail-type"] = el),
                 textContent: "Preview thumbnail type",
                 options: ["AUTO", "JPEG"], // should use AUTO to avoid artifacts from changing between formats; use JPEG for backward compatibility
             }),
-            $el("h2", ["Model Add"]),
+            $checkbox({
+                $: (el) => (settings["model-preview-fallback-search-safetensors-thumbnail"] = el),
+                textContent: "Fallback to embedded safetensors image (slow)",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-label-extensions"] = el),
+                textContent: "Show file extension",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-copy-button"] = el),
+                textContent: "Show \"Copy\" button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-add-button"] = el),
+                textContent: "Show \"Add\" button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-load-workflow-button"] = el),
+                textContent: "Show \"Load Workflow\" button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-info-button-on-left"] = el),
+                textContent: "\"Model Info\" button on left",
+            }),
+            $el("h2", ["Node Graph"]),
             $checkbox({
                 $: (el) => (settings["model-add-embedding-extension"] = el),
-                textContent: "Add extension to embedding",
+                textContent: "Add embedding with extension",
             }),
             $checkbox({
-                $: (el) => (settings["model-add-drag-strict-on-field"] = el),
-                textContent: "Strict dragging model onto a node's model field to add",
+                $: (el) => (settings["model-add-drag-strict-on-field"] = el), // true -> must drag on field; false -> can drag on node when unambiguous
+                textContent: "Must always drag thumbnail onto node's input field",
             }),
             $el("label", [
-                "Add model offset",
+                "Add offset", // if a node already was added to the same spot, add the next one with an offset
                 $el("input", {
                     $: (el) => (settings["model-add-offset"] = el),
                     type: "number",
@@ -3938,36 +3935,31 @@ class SettingsView {
             $el("h2", ["Download"]),
             $checkbox({
                 $: (el) => (settings["download-save-description-as-text-file"] = el),
-                textContent: "Save model descriptions in .txt files by default.",
+                textContent: "Save notes by default.",
             }),
             $el("h2", ["Window"]),
             sidebarControl,
             /*
-            $el("div", [
-                $el("p", ["Default sidebar width"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-width"] = el),
-                    type: "number",
-                    name: "default sidebar width",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            $el("div", [
-                $el("p", ["Default sidebar height"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-height"] = el),
-                    type: "number",
-                    name: "default sidebar height",
-                    textContent: "Default sidebar height",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
+            $el("input", {
+                $: (el) => (settings["sidebar-default-width"] = el),
+                type: "number",
+                name: "default sidebar width",
+                textContent: "Initial sidebar width",
+                value: 0.5,
+                min: 0.0,
+                max: 1.0,
+                step: 0.05,
+            }),
+            $el("input", {
+                $: (el) => (settings["sidebar-default-height"] = el),
+                type: "number",
+                name: "default sidebar height",
+                textContent: "Initial sidebar height",
+                value: 0.5,
+                min: 0.0,
+                max: 1.0,
+                step: 0.05,
+            }),
             */
             $el("h2", ["Random Tag Generator"]),
             $select({
