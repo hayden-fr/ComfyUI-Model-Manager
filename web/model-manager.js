@@ -3819,8 +3819,8 @@ class SettingsView {
         this.elements.saveButton = saveButton;
         
         const correctPreviewsButton = new ComfyButton({
-            content: "Fix Preview Extensions",
-            tooltip: "Correct image extensions in all model directories",
+            content: "Fix Extensions",
+            tooltip: "Correct image file extensions in all model directories",
             action: async(e) => {
                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
                 button.disabled = true;
@@ -3961,6 +3961,10 @@ class SettingsView {
                 step: 0.05,
             }),
             */
+            $el("h2", ["Model Preview Images"]),
+            $el("div", [
+                correctPreviewsButton,
+            ]),
             $el("h2", ["Random Tag Generator"]),
             $select({
                 $: (el) => (settings["tag-generator-sampler-method"] = el),
@@ -3986,10 +3990,6 @@ class SettingsView {
                     step: 1,
                     min: 1,
                 }),
-            ]),
-            $el("h2", ["Preview"]),
-            $el("div", [
-                correctPreviewsButton,
             ]),
         ]);
     }
