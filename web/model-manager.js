@@ -1909,7 +1909,10 @@ class ModelGrid {
         const models = modelData.models;
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
-            modelType = "checkpoints"; // TODO: magic value
+            modelType = settings["model-default-browser-model-type"].value;
+        }
+        if (models[modelType] === undefined) {
+            modelType = "checkpoints"; // panic fallback
         }
 
         if (modelType !== previousModelType.value) {
@@ -3607,6 +3610,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
             
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
+            /** @type {HTMLInputElement} */ "model-default-browser-model-type": null,
             /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
@@ -3798,6 +3802,11 @@ class SettingsView {
                     }),
                 ]),
             ]),
+            $select({
+                $: (el) => (settings["model-default-browser-model-type"] = el),
+                textContent: "Default search model type on startup",
+                options: ["checkpoints", "clip", "clip_vision", "controlnet", "diffusers", "embeddings", "gligen", "hypernetworks", "loras", "photomaker", "style_models", "unet", "vae", "vae_approx"],
+            }),
             $checkbox({
                 $: (el) => (settings["model-real-time-search"] = el),
                 textContent: "Real-time search",
@@ -4258,9 +4267,9 @@ class ModelManager extends ComfyDialog {
         this.#init();
     }
     
-    #init() {
-        this.#settingsView.reload(false);
-        this.#refreshModels();
+    async #init() {
+        await this.#settingsView.reload(false);
+        await this.#refreshModels();
     }
     
     #resetManagerContentsScroll = () => {
