@@ -1103,6 +1103,9 @@ class DirectoryDropdown {
     /** @type {Any} */
     #touchSelectionStart = null;
     
+    /** @type {() => Boolean} */
+    #isDynamicSearch = () => { return false; };
+    
     /**
      * @param {ModelData} modelData
      * @param {HTMLInputElement} input
@@ -1126,6 +1129,7 @@ class DirectoryDropdown {
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
+        this.#isDynamicSearch = isDynamicSearch;
         
         input.addEventListener("input", async(e) => {
             const path = this.#updateOptions();
@@ -1229,6 +1233,8 @@ class DirectoryDropdown {
                     e.stopPropagation();
                     const input = e.target;
                     if (dropdown.style.display !== "none") {
+                        /*
+                        // This is WAY too confusing.
                         const selection = options[iSelection];
                         if (selection !== undefined && selection !== null) {
                             DirectoryDropdown.selectionToInput(
@@ -1243,6 +1249,7 @@ class DirectoryDropdown {
                             }
                             updateCallback();
                         }
+                        */
                     }
                     await submitCallback();
                     input.blur();
@@ -1430,6 +1437,9 @@ class DirectoryDropdown {
                 }
             }
             this.#updateCallback();
+            if (this.#isDynamicSearch()) {
+                await this.#submitCallback();
+            }
         };
         const touch_selection_select = async(e) => {
             const [startX, startY] = this.#touchSelectionStart;
@@ -2439,7 +2449,7 @@ class ModelInfo {
         const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
         metadataElement.innerHTML = "";
         metadataElement.append.apply(metadataElement, [
-            $el("h1", { style: { "margin-top": "0px" } }, ["Metadata"]),
+            $el("h1", ["Metadata"]),
             $el("div", (() => {
                     const tableRows = [];
                     if (isMetadata) {
@@ -2512,8 +2522,8 @@ class ModelInfo {
         }
         tagsElement.innerHTML = "";
         tagsElement.append.apply(tagsElement, [
-            $el("h1", { style: { "margin-top": "0px", "margin-bottom": "0px" } }, ["Tags"]),
-            $el("h2", ["Random Tag Generator"]),
+            $el("h1", ["Tags"]),
+            $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
             $el("div", [
                 $el("details.tag-generator-settings", {
                     style: { margin: "10px 0", display: "none" },
@@ -2548,7 +2558,7 @@ class ModelInfo {
                     },
                 }).element,
             ]),
-            $el("h2", ["Training Tags"]),
+            $el("h2", {style: { margin: "24px 0px 8px 0px" } }, ["Training Tags"]),
             tagsParagraph,
         ]);
         const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
@@ -2567,9 +2577,9 @@ class ModelInfo {
                 this.#savedNotesValue = noteText;
                 return [
                     $el("div.row", {
-                        style: { margin: "0px 0px 16px" },
+                        style: { "align-items": "center" },
                     }, [
-                        $el("h1", { style: { "margin-top": "0px", "margin-bottom": "0px" } }, ["Notes"]),
+                        $el("h1", ["Notes"]),
                         new ComfyButton({
                             icon: "content-save",
                             tooltip: "Save note",
@@ -3078,6 +3088,12 @@ class DownloadView {
         this.#domParser = new DOMParser();
         this.#updateModels = updateModels;
         const update = async() => { await this.#update(modelData, settings); };
+        const reset = () => {
+            this.elements.infos.innerHTML = "";
+            this.elements.infos.appendChild(
+                $el("h1", ["Input a URL to select a model to download."])
+            );
+        };
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -3087,15 +3103,30 @@ class DownloadView {
                     type: "text",
                     name: "model download url",
                     autocomplete: "off",
-                    placeholder: "Search URL...",
+                    placeholder: "Search URL",
                     onkeydown: async (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
-                            await update();
+                            if (this.elements.url.value === "") {
+                                reset();
+                            }
+                            else {
+                                await update();
+                            }
                             e.target.blur();
                         }
                     },
                 }),
+                new ComfyButton({
+                    icon: "close",
+                    tooltip: "Clear search",
+                    classList: "comfyui-button icon-button",
+                    action: async(e) => {
+                        e.stopPropagation();
+                        this.elements.url.value = "";
+                        reset();
+                    },
+                }).element,
                 new ComfyButton({
                     icon: "magnify",
                     tooltip: "Search url",
@@ -3103,7 +3134,12 @@ class DownloadView {
                     action: async(e) => {
                         const [button, icon, span] = comfyButtonDisambiguate(e.target);
                         button.disabled = true;
-                        await update();
+                        if (this.elements.url.value === "") {
+                            reset();
+                        }
+                        else {
+                            await update();
+                        }
                         button.disabled = false;
                     },
                 }).element,
@@ -3418,7 +3454,7 @@ class BrowseView {
             type: "text",
             name: "model search",
             autocomplete: "off",
-            placeholder: "/Search...",
+            placeholder: "/Search",
         });
         
         const updatePreviousModelFilter = () => {
@@ -3457,6 +3493,27 @@ class BrowseView {
             () => { return this.#settingsElements["model-real-time-search"].checked; },
         );
         this.directoryDropdown = searchDropdown;
+        
+        const searchButton = new ComfyButton({
+            icon: "magnify",
+            tooltip: "Search models",
+            classList: "comfyui-button icon-button",
+            action: (e) => {
+                e.stopPropagation();
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                updateModelGrid();
+                button.disabled = false;
+            },
+        }).element;
+        settingsElements["model-real-time-search"].addEventListener("change", () => {
+            if (this.#settingsElements["model-real-time-search"].checked) {
+                searchButton.style.display = "none";
+            }
+            else {
+                searchButton.style.display = "";
+            }
+        });
         
         this.element = $el("div", [
             $el("div.row.tab-header", [
@@ -3511,16 +3568,19 @@ class BrowseView {
                         searchDropdown.element,
                     ]),
                     new ComfyButton({
-                        icon: "magnify",
-                        tooltip: "Search models",
+                        icon: "close",
+                        tooltip: "Clear search",
                         classList: "comfyui-button icon-button",
                         action: (e) => {
+                            e.stopPropagation();
                             const [button, icon, span] = comfyButtonDisambiguate(e.target);
                             button.disabled = true;
+                            this.elements.modelContentFilter.value = "";
                             updateModelGrid();
                             button.disabled = false;
                         },
                     }).element,
+                    searchButton,
                 ]),
             ]),
             modelGrid,
@@ -4173,7 +4233,7 @@ class ModelManager extends ComfyDialog {
                             ]),
                         ]),
                         $el("div.model-manager-body", [
-                            $el("div", {
+                            $el("div.tab-contents", {
                                 $: (el) => (this.#tabManagerContents = el),
                             }, tabManagerContents),
                             $el("div.tab-contents", {
