@@ -62,7 +62,6 @@ class KeyComboListener {
             if (keyCodes.includes(code) && !combo.includes(code)) {
                 combo.push(code);
             }
-            console.log(this.#combo);
             if (combo.length === 0 || keyCodes.length !== combo.length) {
                 return;
             }
@@ -78,7 +77,6 @@ class KeyComboListener {
         element.addEventListener("keyup", (e) => {
             const code = e.code;
             this.#combo = this.#combo.filter(x => x !== code);
-            console.log(this.#combo);
         });
     }
 }
