@@ -4475,7 +4475,6 @@ class ModelManager extends ComfyDialog {
         await this.#refreshModels();
         
         const settings = this.#settingsView.elements.settings;
-        console.log(settings);
         
         {
             const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
