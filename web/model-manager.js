@@ -32,6 +32,57 @@ function debounce(callback, delay) {
     };
 }
 
+class KeyComboListener {
+    /** @type {string[]} */
+    #keyCodes = [];
+    
+    /** @type {() => Promise<void>} */
+    action;
+    
+    /** @type {Element} */
+    element;
+    
+    /** @type {string[]} */
+    #combo = [];
+    
+    /**
+     * @param {string[]} keyCodes
+     * @param {() => Promise<void>} action
+     * @param {Element} element
+     */
+    constructor(keyCodes, action, element) {
+        this.#keyCodes = keyCodes;
+        this.action = action;
+        this.element = element;
+        
+        element.addEventListener("keydown", (e) => {
+            const code = e.code;
+            const keyCodes = this.#keyCodes;
+            const combo = this.#combo;
+            if (keyCodes.includes(code) && !combo.includes(code)) {
+                combo.push(code);
+            }
+            console.log(this.#combo);
+            if (combo.length === 0 || keyCodes.length !== combo.length) {
+                return;
+            }
+            for (let i = 0; i < combo.length; i++) {
+                if (keyCodes[i] !== combo[i]) {
+                    return;
+                }
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            this.action();
+        });
+        element.addEventListener("keyup", (e) => {
+            const code = e.code;
+            this.#combo = this.#combo.filter(x => x !== code);
+            console.log(this.#combo);
+        });
+    }
+}
+
 /**
  * @param {string} url
  */
@@ -2598,7 +2649,7 @@ class ModelInfo {
             const saved = await this.trySave(false);
             iconElement.classList.remove(savingIconClass);
             iconElement.classList.add(saveIconClass);
-        }, 2000);
+        }, 1000);
         
         /** @type {HTMLDivElement} */
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
@@ -2614,6 +2665,28 @@ class ModelInfo {
                         }
                     },
                 });
+                
+                new KeyComboListener(
+                    ["ControlLeft", "KeyS"],
+                    saveDebounce,
+                    notes,
+                );
+                new KeyComboListener(
+                    ["ControlRight", "KeyS"],
+                    saveDebounce,
+                    notes,
+                );
+                new KeyComboListener(
+                    ["ControlLeft", "KeyS"],
+                    saveDebounce,
+                    notes,
+                );
+                new KeyComboListener(
+                    ["ControlRight", "KeyS"],
+                    saveDebounce,
+                    notes,
+                );
+                
                 this.elements.notes = notes;
                 this.#savedNotesValue = noteText;
                 return [
@@ -3673,28 +3746,30 @@ class SettingsView {
         /** @type {HTMLButtonElement} */ saveButton: null,
         /** @type {HTMLDivElement} */ setPreviewButton: null,
         settings: {
-            //"sidebar-default-height": null,
-            //"sidebar-default-width": null,
-            /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
-            
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
             /** @type {HTMLInputElement} */ "model-default-browser-model-type": null,
             /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
-            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
-            /** @type {HTMLInputElement} */ "model-info-autosave-notes": null,
-            /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
             
+            /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
+            /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
+            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
             /** @type {HTMLInputElement} */ "model-show-load-workflow-button": null,
             /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
-            /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
+            
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
             
+            /** @type {HTMLInputElement} */ "model-info-autosave-notes": null,
+            
             /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
+            
+            //"sidebar-default-height": null,
+            //"sidebar-default-width": null,
+            /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
             
             /** @type {HTMLInputElement} */ "tag-generator-sampler-method": null,
             /** @type {HTMLInputElement} */ "tag-generator-count": null,
@@ -3932,6 +4007,11 @@ class SettingsView {
                     step: 5,
                 }),
             ]),
+            $el("h2", ["Model Info"]),
+            $checkbox({
+                $: (el) => (settings["model-info-autosave-notes"] = el), // note history deleted on model info close
+                textContent: "Autosave notes",
+            }),
             $el("h2", ["Download"]),
             $checkbox({
                 $: (el) => (settings["download-save-description-as-text-file"] = el),
