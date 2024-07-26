@@ -3206,17 +3206,22 @@ class DownloadView {
         /** @type {HTMLDivElement} */ infos: null,
         /** @type {HTMLInputElement} */ overwrite: null,
         /** @type {HTMLInputElement} */ downloadNotes: null,
+        /** @type {HTMLButtonElement} */ searchButton: null,
+        /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
     
     /** @type {DOMParser} */
     #domParser = null;
+    
+    /** @type {Object.<string, HTMLElement>} */
+    #settings = null;
     
     /** @type {() => Promise<void>} */
     #updateModels = () => {};
     
     /**
      * @param {ModelData} modelData
-     * @param {any} settings
+     * @param {Object.<string, HTMLElement>} settings
      * @param {() => Promise<void>} updateModels
      */
     constructor(modelData, settings, updateModels) {
@@ -3229,6 +3234,49 @@ class DownloadView {
                 $el("h1", ["Input a URL to select a model to download."])
             );
         };
+        
+        const searchButton = new ComfyButton({
+            icon: "magnify",
+            tooltip: "Search url",
+            classList: "comfyui-button icon-button",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                if (this.elements.url.value === "") {
+                    reset();
+                }
+                else {
+                    await update();
+                }
+                button.disabled = false;
+            },
+        }).element;
+        settings["model-real-time-search"].addEventListener("change", () => {
+            const hideSearchButton = settings["text-input-always-hide-search-button"].checked;
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        settings["text-input-always-hide-search-button"].addEventListener("change", () => {
+            const hideSearchButton = settings["text-input-always-hide-search-button"].checked;
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        this.elements.searchButton = searchButton;
+        
+        const clearSearchButton = new ComfyButton({
+            icon: "close",
+            tooltip: "Clear search",
+            classList: "comfyui-button icon-button",
+            action: async(e) => {
+                e.stopPropagation();
+                this.elements.url.value = "";
+                reset();
+            },
+        }).element;
+        settings["text-input-always-hide-clear-button"].addEventListener("change", () => {
+            const hideClearButton = settings["text-input-always-hide-clear-button"].checked;
+            clearSearchButton.style.display = hideClearButton ? "none" : "";
+        });
+        this.elements.clearSearchButton = clearSearchButton;
+        
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -3252,32 +3300,8 @@ class DownloadView {
                         }
                     },
                 }),
-                new ComfyButton({
-                    icon: "close",
-                    tooltip: "Clear search",
-                    classList: "comfyui-button icon-button",
-                    action: async(e) => {
-                        e.stopPropagation();
-                        this.elements.url.value = "";
-                        reset();
-                    },
-                }).element,
-                new ComfyButton({
-                    icon: "magnify",
-                    tooltip: "Search url",
-                    classList: "comfyui-button icon-button",
-                    action: async(e) => {
-                        const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                        button.disabled = true;
-                        if (this.elements.url.value === "") {
-                            reset();
-                        }
-                        else {
-                            await update();
-                        }
-                        button.disabled = false;
-                    },
-                }).element,
+                clearSearchButton,
+                searchButton,
             ]),
             $el("div.download-model-infos", {
                 $: (el) => (this.elements.infos = el),
@@ -3540,6 +3564,12 @@ class DownloadView {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
+        
+        const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
+        this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+        
+        const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
+        this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
     }
 }
 
@@ -3553,6 +3583,7 @@ class BrowseView {
         /** @type {HTMLSelectElement} */ modelSortSelect: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
         /** @type {HTMLButtonElement} */ searchButton: null,
+        /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
     
     /** @type {Array} */
@@ -3624,8 +3655,14 @@ class BrowseView {
             );
             updateModelGridCallback();
             
-            const searchButtonIsVisible = this.#settingsElements["model-real-time-search"].checked ? "none" : "";
-            this.elements.searchButton.style.display = searchButtonIsVisible;
+            const hideSearchButtons = (
+                this.#settingsElements["model-real-time-search"].checked |
+                this.#settingsElements["text-input-always-hide-search-button"].checked
+            );
+            this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+            
+            const hideClearSearchButtons = this.#settingsElements["text-input-always-hide-clear-button"].checked;
+            this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
         }
         this.updateModelGrid = updateModelGrid;
         
@@ -3653,14 +3690,39 @@ class BrowseView {
             },
         }).element;
         settingsElements["model-real-time-search"].addEventListener("change", () => {
-            if (this.#settingsElements["model-real-time-search"].checked) {
-                searchButton.style.display = "none";
-            }
-            else {
-                searchButton.style.display = "";
-            }
+            const hideSearchButton = (
+                this.#settingsElements["text-input-always-hide-search-button"].checked ||
+                this.#settingsElements["model-real-time-search"].checked
+            );
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        settingsElements["text-input-always-hide-search-button"].addEventListener("change", () => {
+            const hideSearchButton = (
+                this.#settingsElements["text-input-always-hide-search-button"].checked ||
+                this.#settingsElements["model-real-time-search"].checked
+            );
+            searchButton.style.display = hideSearchButton ? "none" : "";
         });
         this.elements.searchButton = searchButton;
+        
+        const clearSearchButton = new ComfyButton({
+            icon: "close",
+            tooltip: "Clear search",
+            classList: "comfyui-button icon-button",
+            action: (e) => {
+                e.stopPropagation();
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                this.elements.modelContentFilter.value = "";
+                updateModelGrid();
+                button.disabled = false;
+            },
+        }).element;
+        settingsElements["text-input-always-hide-clear-button"].addEventListener("change", () => {
+            const hideClearSearchButton = this.#settingsElements["text-input-always-hide-clear-button"].checked;
+            clearSearchButton.style.display = hideClearSearchButton ? "none" : "";
+        });
+        this.elements.clearSearchButton = clearSearchButton;
         
         this.element = $el("div", [
             $el("div.row.tab-header", [
@@ -3714,19 +3776,7 @@ class BrowseView {
                         searchInput,
                         searchDropdown.element,
                     ]),
-                    new ComfyButton({
-                        icon: "close",
-                        tooltip: "Clear search",
-                        classList: "comfyui-button icon-button",
-                        action: (e) => {
-                            e.stopPropagation();
-                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                            button.disabled = true;
-                            this.elements.modelContentFilter.value = "";
-                            updateModelGrid();
-                            button.disabled = false;
-                        },
-                    }).element,
+                    clearSearchButton,
                     searchButton,
                 ]),
             ]),
@@ -3768,6 +3818,8 @@ class SettingsView {
             //"sidebar-default-height": null,
             //"sidebar-default-width": null,
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
+            /** @type {HTMLInputElement} */ "text-input-always-hide-search-button": null,
+            /** @type {HTMLInputElement} */ "text-input-always-hide-clear-button": null,
             
             /** @type {HTMLInputElement} */ "tag-generator-sampler-method": null,
             /** @type {HTMLInputElement} */ "tag-generator-count": null,
@@ -3782,7 +3834,7 @@ class SettingsView {
      * @param {Object} settingsData 
      * @param {boolean} updateModels 
      */
-    #setSettings(settingsData, updateModels) {
+    async #setSettings(settingsData, updateModels) {
         const settings = this.elements.settings;
         for (const [key, value] of Object.entries(settingsData)) {
             const setting = settings[key];
@@ -3801,7 +3853,7 @@ class SettingsView {
         }
 
         if (updateModels) {
-            this.#updateModels(); // Is this slow?
+            await this.#updateModels(); // Is this slow?
         }
     }
     
@@ -3812,7 +3864,7 @@ class SettingsView {
     async reload(updateModels) {
         const data = await request("/model-manager/settings/load");
         const settingsData = data["settings"];
-        this.#setSettings(settingsData, updateModels);
+        await this.#setSettings(settingsData, updateModels);
         comfyButtonAlert(this.elements.reloadButton, true);
     }
     
@@ -3846,7 +3898,7 @@ class SettingsView {
         const success = data["success"];
         if (success) {
             const settingsData = data["settings"];
-            this.#setSettings(settingsData, true);
+            await this.#setSettings(settingsData, true);
         }
         comfyButtonAlert(this.elements.saveButton, success);
     }
@@ -4016,7 +4068,6 @@ class SettingsView {
                 textContent: "Save notes by default.",
             }),
             $el("h2", ["Window"]),
-            sidebarControl,
             /*
             $el("input", {
                 $: (el) => (settings["sidebar-default-width"] = el),
@@ -4039,6 +4090,15 @@ class SettingsView {
                 step: 0.05,
             }),
             */
+            sidebarControl,
+            $checkbox({
+                $: (el) => (settings["text-input-always-hide-search-button"] = el),
+                textContent: "Always hide \"Search\" buttons.",
+            }),
+            $checkbox({
+                $: (el) => (settings["text-input-always-hide-clear-button"] = el),
+                textContent: "Always hide \"Clear Search\" buttons.",
+            }),
             $el("h2", ["Model Preview Images"]),
             $el("div", [
                 correctPreviewsButton,
@@ -4413,6 +4473,16 @@ class ModelManager extends ComfyDialog {
     async #init() {
         await this.#settingsView.reload(false);
         await this.#refreshModels();
+        
+        const settings = this.#settingsView.elements.settings;
+        console.log(settings);
+        
+        {
+            const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
+            const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
+            this.#downloadView.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+            this.#downloadView.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
+        }
     }
     
     #resetManagerContentsScroll = () => {

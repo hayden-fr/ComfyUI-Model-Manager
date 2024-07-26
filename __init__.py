@@ -174,25 +174,33 @@ def model_type_to_dir_name(model_type):
 def ui_rules():
     Rule = config_loader.Rule
     return [
-        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
-        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
-        Rule("sidebar-control-always-compact", False, bool),
         Rule("model-search-always-append", "", str),
         Rule("model-default-browser-model-type", "checkpoints", str),
         Rule("model-real-time-search", True, bool),
         Rule("model-persistent-search", True, bool),
-        Rule("model-show-label-extensions", False, bool),
-        Rule("model-info-autosave-notes", False, bool),
+        
+        Rule("model-preview-thumbnail-type", "AUTO", str),
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
+        Rule("model-show-label-extensions", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
         Rule("model-show-load-workflow-button", True, bool),
         Rule("model-info-button-on-left", False, bool),
-        Rule("model-preview-thumbnail-type", "AUTO", str),
+        
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
+        
+        Rule("model-info-autosave-notes", False, bool),
+        
         Rule("download-save-description-as-text-file", True, bool),
+        
+        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-control-always-compact", False, bool),
+        Rule("text-input-always-hide-search-button", False, bool),
+        Rule("text-input-always-hide-clear-button", False, bool),
+        
         Rule("tag-generator-sampler-method", "Frequency", str),
         Rule("tag-generator-count", 10, int),
         Rule("tag-generator-threshold", 2, int),
