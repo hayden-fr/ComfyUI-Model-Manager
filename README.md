@@ -40,6 +40,8 @@ Download, browse and delete models in ComfyUI.
 
 ### ComfyUI Node Graph
 
+<img src="demo-tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
+
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Button to load workflows embedded in previews. (Can alternatively drag full-sized image in model info onto node graph.)
@@ -50,6 +52,8 @@ Download, browse and delete models in ComfyUI.
 - Drag preview image in model info onto the graph to load embedded workflow.
 
 ### Settings Tab
+
+<img src="demo-tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.

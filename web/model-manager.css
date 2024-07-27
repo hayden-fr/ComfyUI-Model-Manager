@@ -99,21 +99,29 @@
 
 .model-manager[data-sidebar-state="left"] {
     width: var(--model-manager-sidebar-width-left);
+    max-width: 95vw;
+    min-width: 22vw;
     right: auto;
 }
 
 .model-manager[data-sidebar-state="top"] {
     height: var(--model-manager-sidebar-height-top);
+    max-height: 95vh;
+    min-height: 22vh;
     bottom: auto;
 }
 
 .model-manager[data-sidebar-state="bottom"] {
     height: var(--model-manager-sidebar-height-bottom);
+    max-height: 95vh;
+    min-height: 22vh;
     top: auto;
 }
 
 .model-manager[data-sidebar-state="right"] {
     width: var(--model-manager-sidebar-width-right);
+    max-width: 95vw;
+    min-width: 22vw;
     left: auto;
 }
 

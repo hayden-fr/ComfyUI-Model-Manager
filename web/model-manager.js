@@ -3,6 +3,10 @@ import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 import { ComfyButton } from "../../scripts/ui/components/button.js";
 
+function clamp(x, min, max) {
+    return Math.min(Math.max(x, min), max);
+}
+
 /**
  * @param {string} url
  * @param {any} [options=undefined]
@@ -3094,7 +3098,6 @@ async function getModelInfos(urlText) {
             const name = civitaiInfo["name"];
             const infos = [];
             const type = civitaiInfo["type"];
-            //console.log(civitaiInfo);
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
                 const tags = version["tags"];
@@ -3130,7 +3133,6 @@ async function getModelInfos(urlText) {
                     .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
                     .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=")
                     .replaceAll("&amp;", "&");
-                //console.log(description);
                 version["files"].forEach((file) => {
                     infos.push({
                         "images": images,
@@ -3506,7 +3508,7 @@ class DownloadView {
                         $el("textarea.comfy-multiline-input", {
                             name: "model info notes",
                             value: info["description"]??"",
-                            rows: 10,
+                            rows: 6,
                             disabled: true,
                             style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
                         })
@@ -4080,7 +4082,7 @@ class SettingsView {
                     value: 0.5,
                     min: 0.0,
                     max: 1.0,
-                    step: 0.01,
+                    step: 0.05,
                 }),
             ]),
             $el("label", [
@@ -4092,7 +4094,7 @@ class SettingsView {
                     value: 0.5,
                     min: 0.0,
                     max: 1.0,
-                    step: 0.01,
+                    step: 0.05,
                 }),
             ]),
             $checkbox({
@@ -4535,7 +4537,6 @@ class ModelManager extends ComfyDialog {
                 return;
             }
             
-            /** @type {HTMLDivElement} */
             const left = modelManager.offsetLeft;
             const top = modelManager.offsetTop;
             const width = modelManager.offsetWidth;
@@ -4582,19 +4583,19 @@ class ModelManager extends ComfyDialog {
             const pageHeight = document.documentElement.scrollHeight;
             
             if (sidebarState === "left") {
-                const pixels = this.#clampSidebarWidth(x).toString() + "px";
+                const pixels = clamp(x, 0, pageWidth).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-width-left", pixels);
             }
             else if (sidebarState === "right") {
-                const pixels = this.#clampSidebarWidth(pageWidth - x).toString() + "px";
+                const pixels = clamp(pageWidth - x, 0, pageWidth).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-width-right", pixels);
             }
             else if (sidebarState === "top") {
-                const pixels = this.#clampSidebarHeight(y).toString() + "px";
+                const pixels = clamp(y, 0, pageHeight).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-height-top", pixels);
             }
             else if (sidebarState === "bottom") {
-                const pixels = this.#clampSidebarHeight(pageHeight - y).toString() + "px";
+                const pixels = clamp(pageHeight - y, 0, pageHeight).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
             }
         };
@@ -4626,22 +4627,16 @@ class ModelManager extends ComfyDialog {
             const x = Math.floor(pageWidth * settings["sidebar-default-width"].value);
             const y = Math.floor(pageHeight * settings["sidebar-default-height"].value);
             
-            console.log(settings["sidebar-default-width"].value);
-            console.log(settings["sidebar-default-height"].value);
-            
-            console.log(x);
-            console.log(y);
-            
-            const leftPixels = this.#clampSidebarWidth(x).toString() + "px";
+            const leftPixels = x.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
             
-            const rightPixels = this.#clampSidebarWidth(pageWidth - x).toString() + "px";
+            const rightPixels = x.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
             
-            const topPixels = this.#clampSidebarHeight(y).toString() + "px";
+            const topPixels = y.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
             
-            const bottomPixels = this.#clampSidebarHeight(pageHeight - y).toString() + "px";
+            const bottomPixels = y.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
         }
     }
@@ -4719,28 +4714,6 @@ class ModelManager extends ComfyDialog {
             this.#sidebarButtonGroup.style.display = "";
             this.#sidebarSelect.style.display = "none";
         }
-    }
-    
-    /**
-     * @param {Number} x
-     * @returns {Number}
-     */
-    #clampSidebarWidth(x) {
-        const pageWidth = document.documentElement.scrollWidth;
-        const min = Math.floor(pageWidth * 0.15); // TODO: magic numbers
-        const max = Math.floor(pageWidth * 0.95); // TODO: magic numbers
-        return Math.min(Math.max(x, min), max);
-    }
-    
-    /**
-     * @param {Number} y
-     * @returns {Number}
-     */
-    #clampSidebarHeight(y) {
-        const pageHeight = document.documentElement.scrollHeight;
-        const min = Math.floor(pageHeight * 0.15); // TODO: magic numbers
-        const max = Math.floor(pageHeight * 0.95); // TODO: magic numbers
-        return Math.min(Math.max(y, min), max);
     }
 }
 
