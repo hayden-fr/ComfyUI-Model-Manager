@@ -246,12 +246,14 @@
     height: 100%;
     width: auto;
     overflow-x: auto;
+    overflow-y: hidden;
 }
 
 .model-manager .model-manager-body .tab-content {
     display: flex;
     flex-direction: column;
     height: 100%;
+    overflow-y: auto;
 }
 
 /* model info view */

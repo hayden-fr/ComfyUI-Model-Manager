@@ -445,9 +445,11 @@ function GenerateTabGroup(tabData) {
                 });
                 tabContents.forEach((tabContent) => {
                     if (name === tabContent.getAttribute("data-name")) {
+                        tabContent.scrollTop = tabContent.dataset["scrollTop"] ?? 0;
                         tabContent.style.display = "";
                     }
                     else {
+                        tabContent.dataset["scrollTop"] = tabContent.scrollTop;
                         tabContent.style.display = "none";
                     }
                 });
