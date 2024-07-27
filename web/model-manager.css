@@ -260,7 +260,6 @@
 .model-manager .model-manager-body {
     background-color: var(--bg-color);
     border: 2px solid var(--border-color);
-    padding: 0;
 }
 
 .model-manager .model-manager-panel {
@@ -273,7 +272,7 @@
 .model-manager .model-manager-body {
     flex: 1;
     overflow: hidden;
-    padding: 8px 16px;
+    padding: 8px 0px 8px 16px;
 }
 
 .model-manager .model-manager-body .tab-contents {
@@ -291,19 +290,10 @@
     flex-direction: column;
     height: 100%;
     overflow-y: auto;
+    padding-right: 16px;
 }
 
 /* model info view */
-.model-manager .model-info-view {
-    background-color: var(--bg-color);
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow-wrap: break-word;
-    overflow-y: auto;
-    position: relative;
-}
-
 .model-manager .model-info-container {
     background-color: var(--bg-color);
     border-radius: 16px;

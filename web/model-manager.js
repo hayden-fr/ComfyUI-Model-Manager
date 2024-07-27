@@ -2131,7 +2131,7 @@ class ModelInfo {
             setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         });
         
-        this.element = $el("div.model-info-view", {
+        this.element = $el("div", {
             style: { display: "none" },
         }, [
             $el("div.row.tab-header", {
