@@ -2,15 +2,15 @@
 
 Download, browse and delete models in ComfyUI.
 
-<img src="beta-menu-model-manager-button-settings-group.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/beta-menu-model-manager-button-settings-group.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
-<img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 ## Features
 
 ### Download Tab
 
-<img src="demo-tab-download.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-download.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View multiple models associated with a url.
 - Select a download directory.
@@ -20,7 +20,7 @@ Download, browse and delete models in ComfyUI.
 
 ### Models Tab
 
-<img src="demo-tab-models-dropdown.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-models-dropdown.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - Search bar in models tab.
 - Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
@@ -31,7 +31,7 @@ Download, browse and delete models in ComfyUI.
 
 ### Model Info View
 
-<img src="demo-tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View model metadata and file info.
 - Read, edit and save notes in a `.txt` file beside the model.
@@ -42,7 +42,7 @@ Download, browse and delete models in ComfyUI.
 
 ### ComfyUI Node Graph
 
-<img src="demo-tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
@@ -55,7 +55,7 @@ Download, browse and delete models in ComfyUI.
 
 ### Settings Tab
 
-<img src="demo-tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - Settings tab saved in `ui_settings.yaml`.
   - Hide/Show 'add' and 'copy-to-clipboard' buttons.
