@@ -4474,17 +4474,19 @@ class ModelManager extends ComfyDialog {
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
         
-        const EDGE_DELTA = 4;
+        const EDGE_DELTA = 8;
         
-        document.addEventListener("mouseup", (e) => {
+        const endDragSidebar = (e) => {
             this.#dragSidebarState = "";
             modelManager.classList.remove("cursor-drag-left");
             modelManager.classList.remove("cursor-drag-top");
             modelManager.classList.remove("cursor-drag-right");
             modelManager.classList.remove("cursor-drag-bottom");
-        });
+        };
+        document.addEventListener("mouseup", (e) => endDragSidebar(e));
+        document.addEventListener("touchend", (e) => endDragSidebar(e));
         
-        modelManager.addEventListener("mousedown", (e) => {
+        const detectDragSidebar = (e) => {
             const left = modelManager.offsetLeft;
             const top = modelManager.offsetTop;
             const width = modelManager.offsetWidth;
@@ -4521,10 +4523,13 @@ class ModelManager extends ComfyDialog {
             
             if (this.#dragSidebarState !== "") {
                 e.preventDefault();
+                e.stopPropagation();
             }
-        });
+        };
+        modelManager.addEventListener("mousedown", (e) => detectDragSidebar(e));
+        modelManager.addEventListener("touchstart", (e) => detectDragSidebar(e));
         
-        modelManager.addEventListener("mousemove", (e) => {
+        const updateSidebarCursor = (e) => {
             if (this.#dragSidebarState !== "") {
                 // do not update cursor style while dragging
                 return;
@@ -4558,9 +4563,11 @@ class ModelManager extends ComfyDialog {
             updateClass(isOnEdgeTop, "cursor-drag-top");
             updateClass(isOnEdgeRight, "cursor-drag-right");
             updateClass(isOnEdgeBottom, "cursor-drag-bottom");
-        });
+        };
+        modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e));
+        modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e));
         
-        document.addEventListener("mousemove", (e) => {
+        const updateDragSidebar = (e) => {
             const sidebarState = this.#dragSidebarState;
             if (sidebarState === "") {
                 return;
@@ -4590,11 +4597,9 @@ class ModelManager extends ComfyDialog {
                 const pixels = this.#clampSidebarHeight(pageHeight - y).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
             }
-        });
-        
-        new ResizeObserver(() => {
-            //
-        }).observe(modelManager);
+        };
+        document.addEventListener("mousemove", (e) => updateDragSidebar(e));
+        document.addEventListener("touchmove", (e) => updateDragSidebar(e));
         
         this.#init();
     }
@@ -4722,7 +4727,7 @@ class ModelManager extends ComfyDialog {
      */
     #clampSidebarWidth(x) {
         const pageWidth = document.documentElement.scrollWidth;
-        const min = Math.min(375, pageWidth); // TODO: magic numbers
+        const min = Math.floor(pageWidth * 0.15); // TODO: magic numbers
         const max = Math.floor(pageWidth * 0.95); // TODO: magic numbers
         return Math.min(Math.max(x, min), max);
     }
@@ -4733,7 +4738,7 @@ class ModelManager extends ComfyDialog {
      */
     #clampSidebarHeight(y) {
         const pageHeight = document.documentElement.scrollHeight;
-        const min = Math.min(250, pageHeight); // TODO: magic numbers
+        const min = Math.floor(pageHeight * 0.15); // TODO: magic numbers
         const max = Math.floor(pageHeight * 0.95); // TODO: magic numbers
         return Math.min(Math.max(y, min), max);
     }
