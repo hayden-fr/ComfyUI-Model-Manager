@@ -9,8 +9,6 @@
     padding: 8px;
     position: fixed;
     overflow: hidden;
-    top: 0;
-    left: 0;
     width: 100%;
     z-index: 2000;
     
@@ -18,8 +16,8 @@
     border-radius: 0;
     box-shadow: none;
     justify-content: unset;
-    max-height: unset;
-    max-width: unset;
+    max-height: 100vh;
+    max-width: 100vw;
     transform: none;
     /*disable double-tap zoom on model manager*/
     touch-action: manipulation;
@@ -45,6 +43,45 @@
     pointer-events: auto;
 }
 
+/* sidebar */
+
+.model-manager {
+    --model-manager-sidebar-width-left: 50vw;
+    --model-manager-sidebar-width-right: 50vw;
+    --model-manager-sidebar-height-top: 50vh;
+    --model-manager-sidebar-height-bottom: 50vh;
+    
+    --model-manager-left: 0;
+    --model-manager-right: 0;
+    --model-manager-top: 0;
+    --model-manager-bottom: 0;
+    
+    left: var(--model-manager-left);
+    top: var(--model-manager-right);
+    right: var(--model-manager-top);
+    bottom: var(--model-manager-bottom);
+}
+
+.model-manager.cursor-drag-left,
+.model-manager.cursor-drag-right {
+    cursor: ew-resize;
+}
+
+.model-manager.cursor-drag-top,
+.model-manager.cursor-drag-bottom {
+    cursor: ns-resize;
+}
+
+.model-manager.cursor-drag-top.cursor-drag-left,
+.model-manager.cursor-drag-bottom.cursor-drag-right {
+    cursor: nwse-resize;
+}
+
+.model-manager.cursor-drag-top.cursor-drag-right,
+.model-manager.cursor-drag-bottom.cursor-drag-left {
+    cursor: nesw-resize;
+}
+
 /* sidebar buttons */
 .model-manager .sidebar-buttons {
     overflow: hidden;
@@ -61,23 +98,23 @@
 }
 
 .model-manager[data-sidebar-state="left"] {
-    width: 50%;
-    left: 0%;
+    width: var(--model-manager-sidebar-width-left);
+    right: auto;
 }
 
 .model-manager[data-sidebar-state="top"] {
-    height: 50%;
-    top: 0%;
+    height: var(--model-manager-sidebar-height-top);
+    bottom: auto;
 }
 
 .model-manager[data-sidebar-state="bottom"] {
-    height: 50%;
-    top: 50%;
+    height: var(--model-manager-sidebar-height-bottom);
+    top: auto;
 }
 
 .model-manager[data-sidebar-state="right"] {
-    width: 50%;
-    left: 50%;
+    width: var(--model-manager-sidebar-width-right);
+    left: auto;
 }
 
 /* common */

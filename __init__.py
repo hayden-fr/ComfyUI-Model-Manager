@@ -195,9 +195,9 @@ def ui_rules():
         
         Rule("download-save-description-as-text-file", True, bool),
         
-        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
-        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
         Rule("sidebar-control-always-compact", False, bool),
+        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
         Rule("text-input-always-hide-search-button", False, bool),
         Rule("text-input-always-hide-clear-button", False, bool),
         

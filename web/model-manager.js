@@ -3817,8 +3817,8 @@ class SettingsView {
             
             /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
             
-            //"sidebar-default-height": null,
-            //"sidebar-default-width": null,
+            /** @type {HTMLInputElement} */ "sidebar-default-width": null,
+            /** @type {HTMLInputElement} */ "sidebar-default-height": null,
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-search-button": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-clear-button": null,
@@ -4070,29 +4070,31 @@ class SettingsView {
                 textContent: "Save notes by default.",
             }),
             $el("h2", ["Window"]),
-            /*
-            $el("input", {
-                $: (el) => (settings["sidebar-default-width"] = el),
-                type: "number",
-                name: "default sidebar width",
-                textContent: "Initial sidebar width",
-                value: 0.5,
-                min: 0.0,
-                max: 1.0,
-                step: 0.05,
-            }),
-            $el("input", {
-                $: (el) => (settings["sidebar-default-height"] = el),
-                type: "number",
-                name: "default sidebar height",
-                textContent: "Initial sidebar height",
-                value: 0.5,
-                min: 0.0,
-                max: 1.0,
-                step: 0.05,
-            }),
-            */
             sidebarControl,
+            $el("label", [
+                "Sidebar width  (on start up)",
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-width"] = el),
+                    type: "range",
+                    name: "default sidebar width",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.01,
+                }),
+            ]),
+            $el("label", [
+                "Sidebar height (on start up)",
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-height"] = el),
+                    type: "range",
+                    name: "default sidebar height",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.01,
+                }),
+            ]),
             $checkbox({
                 $: (el) => (settings["text-input-always-hide-search-button"] = el),
                 textContent: "Always hide \"Search\" buttons.",
@@ -4338,6 +4340,9 @@ class ModelManager extends ComfyDialog {
     /** @type {HTMLButtonElement} */
     #closeModelInfoButton = null;
     
+    /** @type {String} */
+    #dragSidebarState = "";
+    
     constructor() {
         super();
         
@@ -4469,6 +4474,128 @@ class ModelManager extends ComfyDialog {
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
         
+        const EDGE_DELTA = 4;
+        
+        document.addEventListener("mouseup", (e) => {
+            this.#dragSidebarState = "";
+            modelManager.classList.remove("cursor-drag-left");
+            modelManager.classList.remove("cursor-drag-top");
+            modelManager.classList.remove("cursor-drag-right");
+            modelManager.classList.remove("cursor-drag-bottom");
+        });
+        
+        modelManager.addEventListener("mousedown", (e) => {
+            const left = modelManager.offsetLeft;
+            const top = modelManager.offsetTop;
+            const width = modelManager.offsetWidth;
+            const height = modelManager.offsetHeight;
+            const right = left + width;
+            const bottom = top + height;
+            
+            const x = e.pageX;
+            const y = e.pageY;
+            
+            if (!(x >= left && x <= right && y >= top && y <= bottom)) {
+                // click was not in model manager
+                return;
+            }
+            
+            const isOnEdgeLeft = x - left <= EDGE_DELTA;
+            const isOnEdgeRight = right - x <= EDGE_DELTA;
+            const isOnEdgeTop = y - top <= EDGE_DELTA;
+            const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
+            
+            const sidebarState = this.element.dataset["sidebarState"];
+            if (sidebarState === "left" && isOnEdgeRight) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "right" && isOnEdgeLeft) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "top" && isOnEdgeBottom) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "bottom" && isOnEdgeTop) {
+                this.#dragSidebarState = sidebarState;
+            }
+            
+            if (this.#dragSidebarState !== "") {
+                e.preventDefault();
+            }
+        });
+        
+        modelManager.addEventListener("mousemove", (e) => {
+            if (this.#dragSidebarState !== "") {
+                // do not update cursor style while dragging
+                return;
+            }
+            
+            /** @type {HTMLDivElement} */
+            const left = modelManager.offsetLeft;
+            const top = modelManager.offsetTop;
+            const width = modelManager.offsetWidth;
+            const height = modelManager.offsetHeight;
+            const right = left + width;
+            const bottom = top + height;
+            
+            const x = e.pageX;
+            const y = e.pageY;
+            
+            const isOnEdgeLeft = x - left <= EDGE_DELTA;
+            const isOnEdgeRight = right - x <= EDGE_DELTA;
+            const isOnEdgeTop = y - top <= EDGE_DELTA;
+            const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
+            
+            const updateClass = (add, className) => {
+                if (add) {
+                    modelManager.classList.add(className);
+                }
+                else {
+                    modelManager.classList.remove(className);
+                }
+            };
+            updateClass(isOnEdgeLeft, "cursor-drag-left");
+            updateClass(isOnEdgeTop, "cursor-drag-top");
+            updateClass(isOnEdgeRight, "cursor-drag-right");
+            updateClass(isOnEdgeBottom, "cursor-drag-bottom");
+        });
+        
+        document.addEventListener("mousemove", (e) => {
+            const sidebarState = this.#dragSidebarState;
+            if (sidebarState === "") {
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const x = e.pageX;
+            const y = e.pageY;
+            
+            const pageWidth = document.documentElement.scrollWidth;
+            const pageHeight = document.documentElement.scrollHeight;
+            
+            if (sidebarState === "left") {
+                const pixels = this.#clampSidebarWidth(x).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-width-left", pixels);
+            }
+            else if (sidebarState === "right") {
+                const pixels = this.#clampSidebarWidth(pageWidth - x).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-width-right", pixels);
+            }
+            else if (sidebarState === "top") {
+                const pixels = this.#clampSidebarHeight(y).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-height-top", pixels);
+            }
+            else if (sidebarState === "bottom") {
+                const pixels = this.#clampSidebarHeight(pageHeight - y).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
+            }
+        });
+        
+        new ResizeObserver(() => {
+            //
+        }).observe(modelManager);
+        
         this.#init();
     }
     
@@ -4479,10 +4606,38 @@ class ModelManager extends ComfyDialog {
         const settings = this.#settingsView.elements.settings;
         
         {
+            // initialize buttons' visibility state
             const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
             const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
             this.#downloadView.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
             this.#downloadView.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
+        }
+        
+        {
+            // set initial sidebar widths & heights
+            const pageWidth = document.documentElement.scrollWidth;
+            const pageHeight = document.documentElement.scrollHeight;
+            
+            const x = Math.floor(pageWidth * settings["sidebar-default-width"].value);
+            const y = Math.floor(pageHeight * settings["sidebar-default-height"].value);
+            
+            console.log(settings["sidebar-default-width"].value);
+            console.log(settings["sidebar-default-height"].value);
+            
+            console.log(x);
+            console.log(y);
+            
+            const leftPixels = this.#clampSidebarWidth(x).toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
+            
+            const rightPixels = this.#clampSidebarWidth(pageWidth - x).toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
+            
+            const topPixels = this.#clampSidebarHeight(y).toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
+            
+            const bottomPixels = this.#clampSidebarHeight(pageHeight - y).toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
         }
     }
     
@@ -4559,6 +4714,28 @@ class ModelManager extends ComfyDialog {
             this.#sidebarButtonGroup.style.display = "";
             this.#sidebarSelect.style.display = "none";
         }
+    }
+    
+    /**
+     * @param {Number} x
+     * @returns {Number}
+     */
+    #clampSidebarWidth(x) {
+        const pageWidth = document.documentElement.scrollWidth;
+        const min = Math.min(375, pageWidth); // TODO: magic numbers
+        const max = Math.floor(pageWidth * 0.95); // TODO: magic numbers
+        return Math.min(Math.max(x, min), max);
+    }
+    
+    /**
+     * @param {Number} y
+     * @returns {Number}
+     */
+    #clampSidebarHeight(y) {
+        const pageHeight = document.documentElement.scrollHeight;
+        const min = Math.min(250, pageHeight); // TODO: magic numbers
+        const max = Math.floor(pageHeight * 0.95); // TODO: magic numbers
+        return Math.min(Math.max(y, min), max);
     }
 }
 
