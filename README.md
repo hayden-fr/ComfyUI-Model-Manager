@@ -2,6 +2,8 @@
 
 Download, browse and delete models in ComfyUI.
 
+<img src="beta-menu-model-manager-button-settings-group.png" alt="Model Manager Demo Screenshot" width="65%"/>
+
 <img src="demo-tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 ## Features
