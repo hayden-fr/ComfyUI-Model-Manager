@@ -86,6 +86,37 @@ class KeyComboListener {
 }
 
 /**
+ * Handles Firefox's drag event, which returns different coordinates and then fails when calling `elementFromPoint`.
+ * @param {DragEvent} event 
+ * @returns {[Number, Number, HTMLElement]} [clientX, clientY, targetElement]
+ */
+function elementFromDragEvent(event) {
+    let clientX = null;
+    let clientY = null;
+    let target;
+    const userAgentString = navigator.userAgent;
+    if (userAgentString.indexOf("Firefox") > -1) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+        const screenOffsetX = window.screenLeft;
+        if (clientX >= screenOffsetX) {
+            clientX = clientX - screenOffsetX;
+        }
+        const screenOffsetY = window.screenTop;
+        if (clientY >= screenOffsetY) {
+            clientY = clientY - screenOffsetY;
+        }
+        target = document.elementFromPoint(clientX, clientY);
+    }
+    else {
+        clientX = event.clientX;
+        clientY = event.clientY;
+        target = document.elementFromPoint(event.clientX, event.clientY);
+    }
+    return [clientX, clientY, target];
+}
+
+/**
  * @param {string} url
  */
 async function loadWorkflow(url) {
@@ -227,6 +258,7 @@ const PREVIEW_THUMBNAIL_HEIGHT = 480;
  * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined, HTMLSpanElement | undefined]} [button, icon, span]
  */
 function comfyButtonDisambiguate(element) {
+    // TODO: This likely can be removed by using a css rule that disables clicking on the inner elements of the button.
     let button = undefined;
     let icon = undefined;
     let span = undefined;
@@ -1718,16 +1750,18 @@ class ModelGrid {
     }
 
     /**
-     * @param {Event} event
+     * @param {DragEvent} event
      * @param {string} modelType
      * @param {string} path
      * @param {boolean} removeEmbeddingExtension
      * @param {boolean} strictlyOnWidget
      */
     static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictlyOnWidget) {
-        const target = document.elementFromPoint(event.x, event.y);
+        const [clientX, clientY, target] = elementFromDragEvent(event);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
-            const pos = app.canvas.convertEventToCanvasOffset(event);
+            //const pos = app.canvas.convertEventToCanvasOffset(event);
+            const pos = app.canvas.convertEventToCanvasOffset({ clientX: clientX, clientY: clientY });
+            
             const node = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
             let widgetIndex = -1;
@@ -4422,7 +4456,13 @@ class ModelManager extends ComfyDialog {
             {
                 $: (el) => (this.element = el),
                 parent: document.body,
-                dataset: { "sidebarState": "none" },
+                dataset: {
+                    "sidebarState": "none",
+                    "sidebarLeftWidthDecimal": "",
+                    "sidebarRightWidthDecimal": "",
+                    "sidebarTopHeightDecimal": "",
+                    "sidebarBottomHeightDecimal": "",
+                },
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
@@ -4475,15 +4515,52 @@ class ModelManager extends ComfyDialog {
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 704)).observe(modelManager);
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
+        modelManager.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            const leftDecimal = modelManager.dataset["sidebarLeftWidthDecimal"];
+            const rightDecimal = modelManager.dataset["sidebarRightWidthDecimal"];
+            const topDecimal = modelManager.dataset["sidebarTopHeightDecimal"];
+            const bottomDecimal = modelManager.dataset["sidebarBottomHeightDecimal"];
+            
+            // restore decimal after resize
+            modelManager.style.setProperty("--model-manager-sidebar-width-left", (leftDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
+          });
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            const leftDecimal = modelManager.dataset["sidebarLeftWidthDecimal"];
+            const rightDecimal = modelManager.dataset["sidebarRightWidthDecimal"];
+            const topDecimal = modelManager.dataset["sidebarTopHeightDecimal"];
+            const bottomDecimal = modelManager.dataset["sidebarBottomHeightDecimal"];
+            
+            // restore decimal after resize
+            modelManager.style.setProperty("--model-manager-sidebar-width-left", (leftDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
+          });
         
         const EDGE_DELTA = 8;
         
         const endDragSidebar = (e) => {
             this.#dragSidebarState = "";
+            
             modelManager.classList.remove("cursor-drag-left");
             modelManager.classList.remove("cursor-drag-top");
             modelManager.classList.remove("cursor-drag-right");
             modelManager.classList.remove("cursor-drag-bottom");
+            
+            // cache for window resize
+            modelManager.dataset["sidebarLeftWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-left")) / window.innerWidth;
+            modelManager.dataset["sidebarRightWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-right")) / window.innerWidth;
+            modelManager.dataset["sidebarTopHeightDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-height-top")) / window.innerHeight;
+            modelManager.dataset["sidebarBottomHeightDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-height-bottom")) / window.innerHeight;
         };
         document.addEventListener("mouseup", (e) => endDragSidebar(e));
         document.addEventListener("touchend", (e) => endDragSidebar(e));
@@ -4496,8 +4573,8 @@ class ModelManager extends ComfyDialog {
             const right = left + width;
             const bottom = top + height;
             
-            const x = e.pageX;
-            const y = e.pageY;
+            const x = e.clientX;
+            const y = e.clientY;
             
             if (!(x >= left && x <= right && y >= top && y <= bottom)) {
                 // click was not in model manager
@@ -4544,8 +4621,8 @@ class ModelManager extends ComfyDialog {
             const right = left + width;
             const bottom = top + height;
             
-            const x = e.pageX;
-            const y = e.pageY;
+            const x = e.clientX;
+            const y = e.clientY;
             
             const isOnEdgeLeft = x - left <= EDGE_DELTA;
             const isOnEdgeRight = right - x <= EDGE_DELTA;
@@ -4576,26 +4653,26 @@ class ModelManager extends ComfyDialog {
             
             e.preventDefault();
             
-            const x = e.pageX;
-            const y = e.pageY;
+            const x = e.clientX;
+            const y = e.clientY;
             
-            const pageWidth = document.documentElement.scrollWidth;
-            const pageHeight = document.documentElement.scrollHeight;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
             
             if (sidebarState === "left") {
-                const pixels = clamp(x, 0, pageWidth).toString() + "px";
+                const pixels = clamp(x, 0, width).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-width-left", pixels);
             }
             else if (sidebarState === "right") {
-                const pixels = clamp(pageWidth - x, 0, pageWidth).toString() + "px";
+                const pixels = clamp(width - x, 0, width).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-width-right", pixels);
             }
             else if (sidebarState === "top") {
-                const pixels = clamp(y, 0, pageHeight).toString() + "px";
+                const pixels = clamp(y, 0, height).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-height-top", pixels);
             }
             else if (sidebarState === "bottom") {
-                const pixels = clamp(pageHeight - y, 0, pageHeight).toString() + "px";
+                const pixels = clamp(height - y, 0, height).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
             }
         };
@@ -4621,11 +4698,19 @@ class ModelManager extends ComfyDialog {
         
         {
             // set initial sidebar widths & heights
-            const pageWidth = document.documentElement.scrollWidth;
-            const pageHeight = document.documentElement.scrollHeight;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
             
-            const x = Math.floor(pageWidth * settings["sidebar-default-width"].value);
-            const y = Math.floor(pageHeight * settings["sidebar-default-height"].value);
+            const xDecimal = settings["sidebar-default-width"].value;
+            const yDecimal = settings["sidebar-default-height"].value;
+            
+            this.element.dataset["sidebarLeftWidthDecimal"] = xDecimal;
+            this.element.dataset["sidebarRightWidthDecimal"] = xDecimal;
+            this.element.dataset["sidebarTopHeightDecimal"] = yDecimal;
+            this.element.dataset["sidebarBottomHeightDecimal"] = yDecimal;
+            
+            const x = Math.floor(width * xDecimal);
+            const y = Math.floor(height * yDecimal);
             
             const leftPixels = x.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
@@ -4704,7 +4789,7 @@ class ModelManager extends ComfyDialog {
     
     #updateSidebarButtons = () => {
         const managerRect = document.body.getBoundingClientRect();
-        const isNarrow = managerRect.width < 704; // TODO: `minWidth` is a magic value
+        const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
         const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
         if (isNarrow || alwaysShowCompactSidebarControls) {
             this.#sidebarButtonGroup.style.display = "none";
