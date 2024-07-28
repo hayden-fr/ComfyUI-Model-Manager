@@ -36,7 +36,7 @@ Download, browse and delete models in ComfyUI.
 - View model metadata and file info.
 - Read, edit and save notes in a `.txt` file beside the model.
   - `Ctrl+S` to save when note textarea is in focus.
-  - Optionally enable autosave.
+  - Optionally enable autosave in settings.
 - Change or remove a model's preview image (add a different one using a url or local upload).
 - Rename, move or **permanently** remove model files.
 
