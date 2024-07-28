@@ -4550,16 +4550,13 @@ class ModelManager extends ComfyDialog {
         document.addEventListener("mouseup", (e) => endDragSidebar(e));
         document.addEventListener("touchend", (e) => endDragSidebar(e));
         
-        const detectDragSidebar = (e) => {
+        const detectDragSidebar = (e, x, y) => {
             const left = modelManager.offsetLeft;
             const top = modelManager.offsetTop;
             const width = modelManager.offsetWidth;
             const height = modelManager.offsetHeight;
             const right = left + width;
             const bottom = top + height;
-            
-            const x = e.clientX;
-            const y = e.clientY;
             
             if (!(x >= left && x <= right && y >= top && y <= bottom)) {
                 // click was not in model manager
@@ -4590,10 +4587,10 @@ class ModelManager extends ComfyDialog {
                 e.stopPropagation();
             }
         };
-        modelManager.addEventListener("mousedown", (e) => detectDragSidebar(e));
-        modelManager.addEventListener("touchstart", (e) => detectDragSidebar(e));
+        modelManager.addEventListener("mousedown", (e) => detectDragSidebar(e, e.clientX, e.clientY));
+        modelManager.addEventListener("touchstart", (e) => detectDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
         
-        const updateSidebarCursor = (e) => {
+        const updateSidebarCursor = (e, x, y) => {
             if (this.#dragSidebarState !== "") {
                 // do not update cursor style while dragging
                 return;
@@ -4605,9 +4602,6 @@ class ModelManager extends ComfyDialog {
             const height = modelManager.offsetHeight;
             const right = left + width;
             const bottom = top + height;
-            
-            const x = e.clientX;
-            const y = e.clientY;
             
             const isOnEdgeLeft = x - left <= EDGE_DELTA;
             const isOnEdgeRight = right - x <= EDGE_DELTA;
@@ -4629,19 +4623,16 @@ class ModelManager extends ComfyDialog {
             updateClass(sidebarState === "left" && isOnEdgeRight, "cursor-drag-right");
             updateClass(sidebarState === "top" && isOnEdgeBottom, "cursor-drag-bottom");
         };
-        modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e));
-        modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e));
+        modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e, e.clientX, e.clientY));
+        modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e, e.touches[0].clientX, e.touches[0].clientY));
         
-        const updateDragSidebar = (e) => {
+        const updateDragSidebar = (e, x, y) => {
             const sidebarState = this.#dragSidebarState;
             if (sidebarState === "") {
                 return;
             }
             
             e.preventDefault();
-            
-            const x = e.clientX;
-            const y = e.clientY;
             
             const width = window.innerWidth;
             const height = window.innerHeight;
@@ -4663,8 +4654,8 @@ class ModelManager extends ComfyDialog {
                 modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
             }
         };
-        document.addEventListener("mousemove", (e) => updateDragSidebar(e));
-        document.addEventListener("touchmove", (e) => updateDragSidebar(e));
+        document.addEventListener("mousemove", (e) => updateDragSidebar(e, e.clientX, e.clientY));
+        document.addEventListener("touchmove", (e) => updateDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
         
         this.#init();
     }
