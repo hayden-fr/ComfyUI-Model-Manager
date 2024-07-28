@@ -2,69 +2,66 @@
 
 Download, browse and delete models in ComfyUI.
 
+Designed to support desktop, mobile and multi-screen devices.
+
 <img src="demo/beta-menu-model-manager-button-settings-group.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 <img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 ## Features
 
+### Node Graph
+
+<img src="demo/tab-model-drag-add.gif" alt="Model Manager Demo Screenshot" width="65%"/>
+
+- Drag a model thumbnail onto the graph to add a new node.
+- Drag a model thumbnail onto an existing node to set the input field.
+  - If there are multiple valid possible fields, then the drag must be exact.
+- Drag an embedding thumbnail onto a text area, or highlight any number of nodes, to append it onto the end of the text.
+- Drag the preview image in a model's info view onto the graph to load the embedded workflow (if it exists).
+
+<img src="demo/tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
+
+- Press the "copy" button to copy a model to ComfyUI's clipboard or copy the embedding to the system clipboard. (Copying the embedding to the system clipboard requires a secure http connection.)
+- Press the "add" button to add the model to the ComfyUI graph or append the embedding to one or more selected nodes.
+- Press the "load workflow" button to try and load a workflow embedded in a model's preview image.
+
 ### Download Tab
 
 <img src="demo/tab-download.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - View multiple models associated with a url.
-- Select a download directory.
-- Optionally also download a model preview image (a default image along side the model, from another url or locally uploaded).
-- Optionally also download descriptions as a note (`.txt` file).
-- Civitai and HuggingFace API token configurable in `server_settings.yaml`.
+- Select a save directory and input a filename.
+- Optionally set a model's preview image.
+- Optionally save descriptions as a .txt note. (Default option can be set in the settings tab.)
+- Add Civitai and HuggingFace API tokens in `server_settings.yaml`.
 
 ### Models Tab
 
 <img src="demo/tab-models-dropdown.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
-- Search bar in models tab.
-- Advanced keyword search using `"multiple words in quotes"` or a minus sign to `-exclude`.
-- Search `/`subdirectories of model directories based on your file structure (for example, `/0/1.5/styles/clothing`).
-  - Add `/` at the start of the search bar to see auto-complete suggestions.
-- Include models listed in ComfyUI's `extra_model_paths.yaml` or added in `ComfyUI/models/`.
-- Sort for models (Date Created, Date Modified, Name).
+- Search in real-time for models using the search bar.
+- Use advance keyword search by typing `"multiple words in quotes"` or a minus sign before to `-exclude` a word or phrase.
+- Add `/` at the start of a search to view a dropdown list of subdirectories (for example, `/0/1.5/styles/clothing`).
+  - Any directory paths in ComfyUI's `extra_model_paths.yaml` or directories added in `ComfyUI/models/` will automatically be detected.
+- Sort models by "Date Created", "Date Modified", "Name" and "File Size".
 
 ### Model Info View
 
 <img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
-- View model metadata and file info.
-- Read, edit and save notes in a `.txt` file beside the model.
-  - `Ctrl+S` to save when note textarea is in focus.
-  - Optionally enable autosave in settings.
-- Change or remove a model's preview image (add a different one using a url or local upload).
-- Rename, move or **permanently** remove model files.
-
-### ComfyUI Node Graph
-
-<img src="demo/tab-model-drag-add.gif" alt="Model Manager Demo Screenshot" width="65%"/>
-
-- Drag a model onto the graph to add a new node.
-- Drag a model onto an existing node to set the model field. (Must be exact on input if multiple inputs use model name text.)
-- Drag an embedding onto a text area, or highlight any number of nodes, to add it to the end.
-- Drag preview image in model info onto the graph to load embedded workflow.
-
-<img src="demo/tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
-
-- Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
-- Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
-- Button to load workflows embedded in previews. (Can alternatively drag full-sized image in model info onto node graph.)
+- View file info and metadata.
+- Rename, move or **permanently** remove a model and all of it's related files.
+- Read, edit and save notes. (Saved as a `.txt` file beside the model).
+  - `Ctrl+S` to save a note when the textarea is in focus.
+  - Autosave can be enabled in settings. (Note: Once the model info view is closed, the undo history is lost.)
+- Change or remove a model's preview image.
+- View training tags and use the random tag generator to generate prompt ideas.
 
 ### Settings Tab
 
 <img src="demo/tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
-- Settings tab saved in `ui_settings.yaml`.
-  - Hide/Show 'add' and 'copy-to-clipboard' buttons.
-  - Text to always included in search.
-  - Show/Hide add embedding extension.
-- Colors follow ComfyUI's current theme.
-
-### Known Issues
-
-- Pinch to Zoom can cause an invisible scrolling bug.
+- The settings tab settings are saved to `ui_settings.yaml`.
+- Most settings should update immediately, but a few may require a page reload to take effect.
+- Press the "Fix Extensions" button to correct all image file extensions in the model directories. (Note: This may take a minute or so to complete.)
