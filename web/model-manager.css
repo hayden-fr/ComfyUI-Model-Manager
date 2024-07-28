@@ -598,6 +598,11 @@
 }
 
 /* search dropdown */
+.model-manager .input-dropdown-container {
+    position: relative;
+}
+
+
 .model-manager .search-models {
     display: flex;
     flex: 1;
