@@ -2716,26 +2716,30 @@ class ModelInfo {
                     },
                 });
                 
-                new KeyComboListener(
-                    ["ControlLeft", "KeyS"],
-                    saveDebounce,
-                    notes,
-                );
-                new KeyComboListener(
-                    ["ControlRight", "KeyS"],
-                    saveDebounce,
-                    notes,
-                );
-                new KeyComboListener(
-                    ["MetaLeft", "KeyS"],
-                    saveDebounce,
-                    notes,
-                );
-                new KeyComboListener(
-                    ["MetaRight", "KeyS"],
-                    saveDebounce,
-                    notes,
-                );
+                if (navigator.userAgent.includes("Mac")) {
+                    new KeyComboListener(
+                        ["MetaLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["MetaRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
+                else {
+                    new KeyComboListener(
+                        ["ControlLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["ControlRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
                 
                 this.elements.notes = notes;
                 this.#savedNotesValue = noteText;
