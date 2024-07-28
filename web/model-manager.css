@@ -102,6 +102,7 @@
     max-width: 95vw;
     min-width: 22vw;
     right: auto;
+    border-right: solid var(--border-color) 2px;
 }
 
 .model-manager[data-sidebar-state="top"] {
@@ -109,6 +110,7 @@
     max-height: 95vh;
     min-height: 22vh;
     bottom: auto;
+    border-bottom: solid var(--border-color) 2px;
 }
 
 .model-manager[data-sidebar-state="bottom"] {
@@ -116,6 +118,7 @@
     max-height: 95vh;
     min-height: 22vh;
     top: auto;
+    border-top: solid var(--border-color) 2px;
 }
 
 .model-manager[data-sidebar-state="right"] {
@@ -123,6 +126,7 @@
     max-width: 95vw;
     min-width: 22vw;
     left: auto;
+    border-left: solid var(--border-color) 2px;
 }
 
 /* common */
