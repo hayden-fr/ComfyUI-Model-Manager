@@ -59,11 +59,12 @@ class KeyComboListener {
         this.action = action;
         this.element = element;
         
-        element.addEventListener("keydown", (e) => {
+        document.addEventListener("keydown", (e) => {
             const code = e.code;
             const keyCodes = this.#keyCodes;
             const combo = this.#combo;
             if (keyCodes.includes(code) && !combo.includes(code)) {
+                console.log(`COMBO ADD: ${code}, COMBO:${combo}`);
                 combo.push(code);
             }
             if (combo.length === 0 || keyCodes.length !== combo.length) {
@@ -74,13 +75,24 @@ class KeyComboListener {
                     return;
                 }
             }
+            if (document.activeElement !== this.element) {
+                console.log("not active");
+                return;
+            }
+            console.log("SAVE");
             e.preventDefault();
             e.stopPropagation();
             this.action();
         });
-        element.addEventListener("keyup", (e) => {
+        document.addEventListener("keyup", (e) => {
+            // Mac keyup doesn't fire when meta key is held: https://stackoverflow.com/a/73419500
             const code = e.code;
-            this.#combo = this.#combo.filter(x => x !== code);
+            if (code === "MetaLeft" || code === "MetaRight") {
+                this.#combo.length = 0;
+            }
+            else {
+                this.#combo = this.#combo.filter(x => x !== code);
+            }
         });
     }
 }
@@ -2715,12 +2727,12 @@ class ModelInfo {
                     notes,
                 );
                 new KeyComboListener(
-                    ["ControlLeft", "KeyS"],
+                    ["MetaLeft", "KeyS"],
                     saveDebounce,
                     notes,
                 );
                 new KeyComboListener(
-                    ["ControlRight", "KeyS"],
+                    ["MetaRight", "KeyS"],
                     saveDebounce,
                     notes,
                 );

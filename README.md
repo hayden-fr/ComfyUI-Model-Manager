@@ -53,7 +53,7 @@ Designed to support desktop, mobile and multi-screen devices.
 - View file info and metadata.
 - Rename, move or **permanently** remove a model and all of it's related files.
 - Read, edit and save notes. (Saved as a `.txt` file beside the model).
-  - `Ctrl+S` to save a note when the textarea is in focus.
+  - `Ctrl+s` to save a note when the textarea is in focus.
   - Autosave can be enabled in settings. (Note: Once the model info view is closed, the undo history is lost.)
 - Change or remove a model's preview image.
 - View training tags and use the random tag generator to generate prompt ideas.
