@@ -4622,10 +4622,12 @@ class ModelManager extends ComfyDialog {
                     modelManager.classList.remove(className);
                 }
             };
-            updateClass(isOnEdgeLeft, "cursor-drag-left");
-            updateClass(isOnEdgeTop, "cursor-drag-top");
-            updateClass(isOnEdgeRight, "cursor-drag-right");
-            updateClass(isOnEdgeBottom, "cursor-drag-bottom");
+            
+            const sidebarState = this.element.dataset["sidebarState"];
+            updateClass(sidebarState === "right" && isOnEdgeLeft, "cursor-drag-left");
+            updateClass(sidebarState === "bottom" && isOnEdgeTop, "cursor-drag-top");
+            updateClass(sidebarState === "left" && isOnEdgeRight, "cursor-drag-right");
+            updateClass(sidebarState === "top" && isOnEdgeBottom, "cursor-drag-bottom");
         };
         modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e));
         modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e));
