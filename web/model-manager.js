@@ -2219,7 +2219,7 @@ class ModelInfo {
                             button.disabled = false;
                         },
                     }).element,
-                    $el("div.search-models.input-dropdown-container", [
+                    $el("div.search-models.input-dropdown-container", [ // TODO: magic class
                         moveDestinationInput,
                         searchDropdown.element,
                     ]),
@@ -3531,7 +3531,7 @@ class DownloadView {
                                 button.disabled = success;
                             },
                         }).element,
-                        $el("div.row.tab-header-flex-block.input-dropdown-container", [
+                        $el("div.row.tab-header-flex-block.input-dropdown-container", [ // TODO: magic class
                             el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
@@ -3810,7 +3810,7 @@ class BrowseView {
                     ),
                 ]),
                 $el("div.row.tab-header-flex-block", [
-                    $el("div.search-models.input-dropdown-container", [
+                    $el("div.search-models.input-dropdown-container", [ // TODO: magic class
                         searchInput,
                         searchDropdown.element,
                     ]),
