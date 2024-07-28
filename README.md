@@ -42,16 +42,18 @@ Download, browse and delete models in ComfyUI.
 
 ### ComfyUI Node Graph
 
+<img src="demo/tab-model-drag-add.gif" alt="Model Manager Demo Screenshot" width="65%"/>
+
+- Drag a model onto the graph to add a new node.
+- Drag a model onto an existing node to set the model field. (Must be exact on input if multiple inputs use model name text.)
+- Drag an embedding onto a text area, or highlight any number of nodes, to add it to the end.
+- Drag preview image in model info onto the graph to load embedded workflow.
+
 <img src="demo/tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
 - Button to copy a model to the ComfyUI clipboard or embedding to system clipboard. (Embedding copying requires secure http connection.)
 - Button to add model to ComfyUI graph or embedding to selected nodes. (For small screens/low resolution.)
 - Button to load workflows embedded in previews. (Can alternatively drag full-sized image in model info onto node graph.)
-- Right, left, top and bottom toggleable sidebar modes.
-- Drag a model onto the graph to add a new node.
-- Drag a model onto an existing node to set the model field. (Must be exact on input if multiple inputs use model name text.)
-- Drag an embedding onto a text area, or highlight any number of nodes, to add it to the end.
-- Drag preview image in model info onto the graph to load embedded workflow.
 
 ### Settings Tab
 

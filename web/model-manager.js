@@ -4529,7 +4529,7 @@ class ModelManager extends ComfyDialog {
             modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
             modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
             modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
-          });
+        });
         
         const EDGE_DELTA = 8;
         
@@ -4773,7 +4773,7 @@ class ModelManager extends ComfyDialog {
     }
     
     #updateSidebarButtons = () => {
-        const managerRect = document.body.getBoundingClientRect();
+        const managerRect = this.element.getBoundingClientRect();
         const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
         const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
         if (isNarrow || alwaysShowCompactSidebarControls) {
