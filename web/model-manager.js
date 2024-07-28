@@ -4515,21 +4515,6 @@ class ModelManager extends ComfyDialog {
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 704)).observe(modelManager);
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
-        modelManager.addEventListener('resize', () => {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            
-            const leftDecimal = modelManager.dataset["sidebarLeftWidthDecimal"];
-            const rightDecimal = modelManager.dataset["sidebarRightWidthDecimal"];
-            const topDecimal = modelManager.dataset["sidebarTopHeightDecimal"];
-            const bottomDecimal = modelManager.dataset["sidebarBottomHeightDecimal"];
-            
-            // restore decimal after resize
-            modelManager.style.setProperty("--model-manager-sidebar-width-left", (leftDecimal * width) + "px");
-            modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
-            modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
-            modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
-          });
         window.addEventListener('resize', () => {
             const width = window.innerWidth;
             const height = window.innerHeight;
