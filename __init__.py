@@ -458,7 +458,10 @@ async def get_model_list(request):
     )
 
     model_types = os.listdir(comfyui_model_uri)
-    model_types.remove("configs")
+
+    if "configs" in model_types:
+        model_types.remove("configs")
+
     model_types.sort()
 
     models = {}
