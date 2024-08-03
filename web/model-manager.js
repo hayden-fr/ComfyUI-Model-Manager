@@ -3543,7 +3543,7 @@ class DownloadView {
                                     }
                                     this.#updateModels();
                                 }
-                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick", true);
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick", success);
                                 button.disabled = success;
                             },
                         }).element,
