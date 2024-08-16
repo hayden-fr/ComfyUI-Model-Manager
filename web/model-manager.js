@@ -12,7 +12,7 @@ function clamp(x, min, max) {
  * @param {any} [options=undefined]
  * @returns {Promise}
  */
-function request(url, options = undefined) {
+function comfyRequest(url, options = undefined) {
     return new Promise((resolve, reject) => {
         api.fetchApi(url, options)
             .then((response) => response.json())
@@ -343,12 +343,12 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
  * @returns {Promise<boolean>}
  */
 async function saveNotes(modelPath, newValue) {
-    const timestamp = await request("/model-manager/timestamp")
+    const timestamp = await comfyRequest("/model-manager/timestamp")
     .catch((err) => {
         console.warn(err);
         return false;
     });
-    return await request(
+    return await comfyRequest(
         "/model-manager/notes/save",
         {
             method: "POST",
@@ -2121,7 +2121,7 @@ class ModelInfo {
                     const imageUrl = await previewSelect.getImage();
                     if (imageUrl === PREVIEW_NONE_URI) {
                         const encodedPath = encodeURIComponent(path);
-                        updatedPreview = await request(
+                        updatedPreview = await comfyRequest(
                             `/model-manager/preview/delete?path=${encodedPath}`,
                             {
                                 method: "POST",
@@ -2144,7 +2144,7 @@ class ModelInfo {
                         formData.append("path", path);
                         const image = imageUrl[0] == "/" ? "" : imageUrl;
                         formData.append("image", image);
-                        updatedPreview = await request(
+                        updatedPreview = await comfyRequest(
                             `/model-manager/preview/set`,
                             {
                                 method: "POST",
@@ -2199,7 +2199,7 @@ class ModelInfo {
                             if (confirmation === affirmation) {
                                 const container = this.elements.info;
                                 const path = encodeURIComponent(container.dataset.path);
-                                deleted = await request(
+                                deleted = await comfyRequest(
                                     `/model-manager/model/delete?path=${path}`,
                                     {
                                         method: "POST",
@@ -2250,7 +2250,7 @@ class ModelInfo {
                                     modelData.searchSeparator + 
                                     oldFileName
                                 );
-                                moved = await request(
+                                moved = await comfyRequest(
                                     `/model-manager/model/move`,
                                     {
                                         method: "POST",
@@ -2366,7 +2366,7 @@ class ModelInfo {
      */
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
-        const [info, metadata, tags, noteText] = await request(`/model-manager/model/info?path=${path}`)
+        const [info, metadata, tags, noteText] = await comfyRequest(`/model-manager/model/info?path=${path}`)
             .then((result) => {
                 const success = result["success"];
                 const message = result["alert"];
@@ -2427,7 +2427,7 @@ class ModelInfo {
                                         newName + 
                                         SearchPath.splitExtension(oldFile)[1]
                                     );
-                                    renamed = await request(
+                                    renamed = await comfyRequest(
                                         `/model-manager/model/move`,
                                         {
                                             method: "POST",
@@ -2811,7 +2811,9 @@ class Civitai {
     static async requestInfo(id, apiPath) {
         const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get model info from Civitai!", error);
@@ -2975,7 +2977,9 @@ class Civitai {
         const id = stringUrl.substring(imagePostUrlPrefix.length).match(/^\d+/)[0];
         const url = `https://civitai.com/api/v1/images?imageId=${id}`;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get image info from Civitai!", error);
@@ -3001,7 +3005,8 @@ class Civitai {
         const id = parseInt(stringUrl.substring(i0 + 1, i1)).toString();
         const url = `https://civitai.com/api/v1/images?imageId=${id}`;
         try {
-            const imageInfo = await request(url);
+            const response = await fetch(url);
+            const imageInfo = await response.json();
             const items = imageInfo["items"];
             if (items.length === 0) {
                 console.warn("Civitai /api/v1/images returned 0 items.");
@@ -3028,7 +3033,9 @@ class HuggingFace {
     static async requestInfo(id, apiPath = "models") {
         const url = "https://huggingface.co/api/" + apiPath + "/" + id;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get model info from HuggingFace!", error);
@@ -3230,7 +3237,16 @@ async function getModelInfos(urlText) {
             return [name, infos];
         }
         if (urlText.endsWith(".json")) {
-            const indexInfo = await request(urlText).catch(() => []);
+            const indexInfo = await (async() => {
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    return data;
+                }
+                catch {
+                    return [];
+                }
+            })();
             const name = urlText.substring(math.max(urlText.lastIndexOf("/"), 0));
             const infos = indexInfo.map((file) => {
                 return {
@@ -3514,7 +3530,7 @@ class DownloadView {
                                 formData.append("overwrite", this.elements.overwrite.checked);
                                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
                                 button.disabled = true;
-                                const [success, resultText] = await request(
+                                const [success, resultText] = await comfyRequest(
                                     "/model-manager/model/download",
                                     {
                                         method: "POST",
@@ -3914,7 +3930,7 @@ class SettingsView {
      * @returns {Promise<void>}
      */
     async reload(updateModels) {
-        const data = await request("/model-manager/settings/load");
+        const data = await comfyRequest("/model-manager/settings/load");
         const settingsData = data["settings"];
         await this.#setSettings(settingsData, updateModels);
         comfyButtonAlert(this.elements.reloadButton, true);
@@ -3938,7 +3954,7 @@ class SettingsView {
             settingsData[setting] = value;
         }
         
-        const data = await request(
+        const data = await comfyRequest(
             "/model-manager/settings/save",
             {
                 method: "POST",
@@ -4001,7 +4017,7 @@ class SettingsView {
             action: async(e) => {
                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
                 button.disabled = true;
-                const data = await request(
+                const data = await comfyRequest(
                     "/model-manager/preview/correct-extensions")
                 .catch((err) => {
                     return { "success": false };
@@ -4724,10 +4740,10 @@ class ModelManager extends ComfyDialog {
     
     #refreshModels = async() => {
         const modelData = this.#modelData;
-        modelData.systemSeparator = await request("/model-manager/system-separator");
-        const newModels = await request("/model-manager/models/list");
+        modelData.systemSeparator = await comfyRequest("/model-manager/system-separator");
+        const newModels = await comfyRequest("/model-manager/models/list");
         Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
-        const newModelDirectories = await request("/model-manager/models/directory-list");
+        const newModelDirectories = await comfyRequest("/model-manager/models/directory-list");
         modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
         this.#browseView.updateModelGrid();
