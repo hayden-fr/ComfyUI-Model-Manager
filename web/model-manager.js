@@ -3155,13 +3155,7 @@ async function getModelInfos(urlText) {
             const type = civitaiInfo["type"];
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
-                const tags = version["tags"]?.map((tag) => {
-                    tag = tag.trim();
-                    if (tag.slice(-1) === ",") {
-                        return tag.slice(0, -1);
-                    }
-                    return tag;
-                });
+                const tags = version["tags"]?.map((tag) => tag.trim().replace(/,$/, ""));
                 const description = [
                         tags !== undefined ? "# Trigger Words" : undefined,
                         tags?.join(tags.some((tag) => { return tag.includes(","); }) ? "\n" : ", "),
