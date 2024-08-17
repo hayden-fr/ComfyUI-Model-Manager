@@ -33,7 +33,7 @@ Designed to support desktop, mobile and multi-screen devices.
 - View multiple models associated with a url.
 - Select a save directory and input a filename.
 - Optionally set a model's preview image.
-- Optionally edit and save descriptions as a .txt note. (Default option can be set in the settings tab.)
+- Optionally edit and save descriptions as a .txt note. (Default behavior can be set in the settings tab.)
 - Add Civitai and HuggingFace API tokens in `server_settings.yaml`.
 
 ### Models Tab
@@ -56,12 +56,12 @@ Designed to support desktop, mobile and multi-screen devices.
   - `Ctrl+s` or `⌘+S` to save a note when the textarea is in focus.
   - Autosave can be enabled in settings. (Note: Once the model info view is closed, the undo history is lost.)
 - Change or remove a model's preview image.
-- View training tags and use the random tag generator to generate prompt ideas.
+- View training tags and use the random tag generator to generate prompt ideas. (Inspired by the one in A1111.)
 
 ### Settings Tab
 
 <img src="demo/tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
 
-- The settings tab settings are saved to `ui_settings.yaml`.
+- Settings are saved to `ui_settings.yaml`.
 - Most settings should update immediately, but a few may require a page reload to take effect.
 - Press the "Fix Extensions" button to correct all image file extensions in the model directories. (Note: This may take a minute or so to complete.)
