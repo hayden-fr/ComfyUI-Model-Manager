@@ -33,7 +33,7 @@ Designed to support desktop, mobile and multi-screen devices.
 - View multiple models associated with a url.
 - Select a save directory and input a filename.
 - Optionally set a model's preview image.
-- Optionally save descriptions as a .txt note. (Default option can be set in the settings tab.)
+- Optionally edit and save descriptions as a .txt note. (Default option can be set in the settings tab.)
 - Add Civitai and HuggingFace API tokens in `server_settings.yaml`.
 
 ### Models Tab
