@@ -3496,11 +3496,11 @@ class DownloadView {
             },
         });
         
-        const infoNotes = $el("textarea.comfy-multiline-input", {
+        const infoNotes = $el("textarea.comfy-multiline-input.model-info-notes", {
             name: "model info notes",
             value: info["description"]??"",
             rows: 6,
-            disabled: false,
+            disabled: true,
             style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
         });
         
@@ -3624,7 +3624,7 @@ class DownloadView {
                     $checkbox({
                         $: (el) => { this.elements.downloadNotes = el; },
                         textContent: "Save Notes.",
-                        checked: settings["download-save-description-as-text-file"].checked,
+                        checked: false,
                     }),
                 ])
             ]);
@@ -3634,6 +3634,17 @@ class DownloadView {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
+        
+        const downloadNotes = this.elements.downloadNotes;
+        downloadNotes.addEventListener("change", (e) => {
+            const modelInfoNotes = infosHtml.querySelectorAll(`textarea.model-info-notes`);
+            const disabled = !e.currentTarget.checked;
+            for (let i = 0; i < modelInfoNotes.length; i++) {
+                modelInfoNotes[i].disabled = disabled;
+            }
+        });
+        downloadNotes.checked = settings["download-save-description-as-text-file"].checked;
+        downloadNotes.dispatchEvent(new Event('change'));
         
         const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
         this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
