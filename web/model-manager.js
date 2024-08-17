@@ -3496,6 +3496,14 @@ class DownloadView {
             },
         });
         
+        const infoNotes = $el("textarea.comfy-multiline-input", {
+            name: "model info notes",
+            value: info["description"]??"",
+            rows: 6,
+            disabled: false,
+            style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
+        });
+        
         const filepath = info["downloadFilePath"];
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
@@ -3547,12 +3555,12 @@ class DownloadView {
                                     return [false, "📥︎"];
                                 });
                                 if (success) {
-                                    const description = info["description"];
+                                    const description = infoNotes.value;
                                     if (this.elements.downloadNotes.checked && description !== "") {
                                         const modelPath = pathDirectory + searchSeparator + modelName;
                                         const saved = await saveNotes(modelPath, description);
                                         if (!saved) {
-                                            console.warn("Description was note saved as notes!");
+                                            console.warn("Model description was not saved!");
                                         }
                                     }
                                     this.#updateModels();
@@ -3569,13 +3577,7 @@ class DownloadView {
                             el_filename,
                         ]),
                         downloadPreviewSelect.elements.radioGroup,
-                        $el("textarea.comfy-multiline-input", {
-                            name: "model info notes",
-                            value: info["description"]??"",
-                            rows: 6,
-                            disabled: true,
-                            style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
-                        })
+                        infoNotes,
                     ]),
                 ]),
             ]),
