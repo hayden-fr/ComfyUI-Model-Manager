@@ -450,7 +450,8 @@
 }
 
 .model-manager .comfy-grid .model-label {
-	background-color: #000a;
+	background-color: var(--content-hover-bg);
+    opacity: 0.8;
 	width: 100%;
 	height: 2.2rem;
 	position: absolute;
