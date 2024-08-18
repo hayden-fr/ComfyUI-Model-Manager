@@ -3636,15 +3636,17 @@ class DownloadView {
         infosHtml.append.apply(infosHtml, modelInfosHtml);
         
         const downloadNotes = this.elements.downloadNotes;
-        downloadNotes.addEventListener("change", (e) => {
-            const modelInfoNotes = infosHtml.querySelectorAll(`textarea.model-info-notes`);
-            const disabled = !e.currentTarget.checked;
-            for (let i = 0; i < modelInfoNotes.length; i++) {
-                modelInfoNotes[i].disabled = disabled;
-            }
-        });
-        downloadNotes.checked = settings["download-save-description-as-text-file"].checked;
-        downloadNotes.dispatchEvent(new Event('change'));
+        if (downloadNotes !== undefined && downloadNotes !== null) {
+            downloadNotes.addEventListener("change", (e) => {
+                const modelInfoNotes = infosHtml.querySelectorAll(`textarea.model-info-notes`);
+                const disabled = !e.currentTarget.checked;
+                for (let i = 0; i < modelInfoNotes.length; i++) {
+                    modelInfoNotes[i].disabled = disabled;
+                }
+            });
+            downloadNotes.checked = settings["download-save-description-as-text-file"].checked;
+            downloadNotes.dispatchEvent(new Event('change'));
+        }
         
         const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
         this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
