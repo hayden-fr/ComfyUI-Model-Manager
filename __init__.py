@@ -18,6 +18,7 @@ import json
 import requests
 requests.packages.urllib3.disable_warnings()
 
+import comfy.utils
 import folder_paths
 
 comfyui_model_uri = folder_paths.models_dir
@@ -142,11 +143,9 @@ def search_path_to_system_path(model_path):
 
 def get_safetensor_header(path):
     try:
-        with open(path, "rb") as f:
-            length_of_header = struct.unpack("<Q", f.read(8))[0]
-            header_bytes = f.read(length_of_header)
-            header_json = json.loads(header_bytes)
-            return header_json
+        header_bytes = comfy.utils.safetensors_header(path)
+        header_json = json.loads(header_bytes)
+        return header_json if header_json is not None else {}
     except:
         return {}
 
