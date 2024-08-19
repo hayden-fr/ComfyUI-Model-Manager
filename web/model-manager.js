@@ -157,7 +157,7 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
-const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
+const MODEL_EXTENSIONS = [".bin", ".ckpt", "gguf", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [
     ".png", 
     ".webp", 

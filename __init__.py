@@ -33,7 +33,7 @@ no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 
-fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
+fallback_model_extensions = set([".bin", ".ckpt", ".gguf", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
 jpeg_format_names = ["JPG", "JPEG", "JFIF"]
 image_extensions = (
     ".png", # order matters
