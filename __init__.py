@@ -34,11 +34,13 @@ ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 
 fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
+jpeg_format_names = ["JPG", "JPEG", "JFIF"]
 image_extensions = (
     ".png", # order matters
     ".webp", 
     ".jpeg", 
     ".jpg", 
+    ".jfif", 
     ".gif", 
     ".apng", 
 )
@@ -47,6 +49,7 @@ stable_diffusion_webui_civitai_helper_image_extensions = (
     ".preview.webp", 
     ".preview.jpeg", 
     ".preview.jpg", 
+    ".preview.jfif", 
     ".preview.gif", 
     ".preview.apng", 
 )
@@ -312,11 +315,11 @@ def image_format_is_equal(f1, f2):
     if f2[0] == ".": f2 = f2[1:]
     f1 = f1.upper()
     f2 = f2.upper()
-    return f1 == f2 or (f1 == "JPG" and f2 == "JPEG") or (f1 == "JPEG" and f2 == "JPG")
+    return f1 == f2 or (f1 in jpeg_format_names and f2 in jpeg_format_names)
 
 
 def get_auto_thumbnail_format(original_format):
-    if original_format in ["JPEG", "WEBP", "JPG"]:
+    if original_format in ["JPEG", "WEBP", "JPG"]: # JFIF?
         return original_format
     return "JPEG" # default fallback
 
@@ -376,7 +379,7 @@ async def get_model_preview(request):
             if not image_format_is_equal(response_image_format, image_format):
                 exif = image.getexif()
                 metadata = get_image_info(image)
-                if response_image_format in ['JPEG', 'JPG']:
+                if response_image_format in jpeg_format_names:
                     image = image.convert('RGB')
                 image_bytes = io.BytesIO()
                 image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
@@ -424,7 +427,7 @@ async def get_model_preview(request):
                 resampling_method = Image.Resampling.BICUBIC
             image.thumbnail((w, h), resample=resampling_method)
 
-            if not image_format_is_equal(image_format, response_image_format) and response_image_format in ['JPEG', 'JPG']:
+            if not image_format_is_equal(image_format, response_image_format) and response_image_format in jpeg_format_names:
                 image = image.convert('RGB')
             image_bytes = io.BytesIO()
             image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)

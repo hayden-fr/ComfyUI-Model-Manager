@@ -163,6 +163,7 @@ const IMAGE_EXTENSIONS = [
     ".webp", 
     ".jpeg", 
     ".jpg", 
+    ".jfif", 
     ".gif", 
     ".apng", 
 
@@ -170,6 +171,7 @@ const IMAGE_EXTENSIONS = [
     ".preview.webp", 
     ".preview.jpeg", 
     ".preview.jpg", 
+    ".preview.jfif", 
     ".preview.gif", 
     ".preview.apng", 
 ]; // TODO: /model-manager/image/extensions
