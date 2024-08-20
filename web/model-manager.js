@@ -1,19 +1,142 @@
 import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
+import { ComfyButton } from "../../scripts/ui/components/button.js";
+
+function clamp(x, min, max) {
+    return Math.min(Math.max(x, min), max);
+}
 
 /**
  * @param {string} url
  * @param {any} [options=undefined]
  * @returns {Promise}
  */
-function request(url, options = undefined) {
+function comfyRequest(url, options = undefined) {
     return new Promise((resolve, reject) => {
         api.fetchApi(url, options)
             .then((response) => response.json())
             .then(resolve)
             .catch(reject);
     });
+}
+
+/**
+ * @param {(...args) => Promise<void>} callback
+ * @param {number | undefined} delay
+ * @returns {(...args) => void}
+ */
+function debounce(callback, delay) {
+    let timeoutId = null;
+    return (...args) => {
+        window.clearTimeout(timeoutId);
+        timeoutId = window.setTimeout(() => {
+            callback(...args);
+        }, delay);
+    };
+}
+
+class KeyComboListener {
+    /** @type {string[]} */
+    #keyCodes = [];
+    
+    /** @type {() => Promise<void>} */
+    action;
+    
+    /** @type {Element} */
+    element;
+    
+    /** @type {string[]} */
+    #combo = [];
+    
+    /**
+     * @param {string[]} keyCodes
+     * @param {() => Promise<void>} action
+     * @param {Element} element
+     */
+    constructor(keyCodes, action, element) {
+        this.#keyCodes = keyCodes;
+        this.action = action;
+        this.element = element;
+        
+        document.addEventListener("keydown", (e) => {
+            const code = e.code;
+            const keyCodes = this.#keyCodes;
+            const combo = this.#combo;
+            if (keyCodes.includes(code) && !combo.includes(code)) {
+                combo.push(code);
+            }
+            if (combo.length === 0 || keyCodes.length !== combo.length) {
+                return;
+            }
+            for (let i = 0; i < combo.length; i++) {
+                if (keyCodes[i] !== combo[i]) {
+                    return;
+                }
+            }
+            if (document.activeElement !== this.element) {
+                return;
+            }
+            e.preventDefault();
+            e.stopPropagation();
+            this.action();
+            this.#combo.length = 0;
+        });
+        document.addEventListener("keyup", (e) => {
+            // Mac keyup doesn't fire when meta key is held: https://stackoverflow.com/a/73419500
+            const code = e.code;
+            if (code === "MetaLeft" || code === "MetaRight") {
+                this.#combo.length = 0;
+            }
+            else {
+                this.#combo = this.#combo.filter(x => x !== code);
+            }
+        });
+    }
+}
+
+/**
+ * Handles Firefox's drag event, which returns different coordinates and then fails when calling `elementFromPoint`.
+ * @param {DragEvent} event 
+ * @returns {[Number, Number, HTMLElement]} [clientX, clientY, targetElement]
+ */
+function elementFromDragEvent(event) {
+    let clientX = null;
+    let clientY = null;
+    let target;
+    const userAgentString = navigator.userAgent;
+    if (userAgentString.indexOf("Firefox") > -1) {
+        clientX = event.clientX;
+        clientY = event.clientY;
+        const screenOffsetX = window.screenLeft;
+        if (clientX >= screenOffsetX) {
+            clientX = clientX - screenOffsetX;
+        }
+        const screenOffsetY = window.screenTop;
+        if (clientY >= screenOffsetY) {
+            clientY = clientY - screenOffsetY;
+        }
+        target = document.elementFromPoint(clientX, clientY);
+    }
+    else {
+        clientX = event.clientX;
+        clientY = event.clientY;
+        target = document.elementFromPoint(event.clientX, event.clientY);
+    }
+    return [clientX, clientY, target];
+}
+
+/**
+ * @param {string} url
+ */
+async function loadWorkflow(url) {
+    const uri = (new URL(url)).searchParams.get("uri");
+    const fileNameIndex = Math.max(uri.lastIndexOf("/"), uri.lastIndexOf("\\")) + 1;
+    const fileName = uri.substring(fileNameIndex);
+    const response = await fetch(url);
+    const data = await response.blob();
+    const file = new File([data],  fileName, { type: data.type });
+    app.handleFile(file);
 }
 
 const modelNodeType = {
@@ -34,12 +157,13 @@ const modelNodeType = {
     "vae_approx": undefined,
 };
 
-const MODEL_EXTENSIONS = [".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
+const MODEL_EXTENSIONS = [".bin", ".ckpt", "gguf", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [
     ".png", 
     ".webp", 
     ".jpeg", 
     ".jpg", 
+    ".jfif", 
     ".gif", 
     ".apng", 
 
@@ -47,6 +171,7 @@ const IMAGE_EXTENSIONS = [
     ".preview.webp", 
     ".preview.jpeg", 
     ".preview.jpg", 
+    ".preview.jfif", 
     ".preview.gif", 
     ".preview.apng", 
 ]; // TODO: /model-manager/image/extensions
@@ -114,9 +239,10 @@ class SearchPath {
  * @param {string | undefined} [dateImageModified=undefined]
  * @param {string | undefined} [width=undefined]
  * @param {string | undefined} [height=undefined]
+ * @param {string | undefined} [imageFormat=undefined]
  * @returns {string}
  */
-function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined) {
+function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined, imageFormat = undefined) {
     const path = imageSearchPath ?? "no-preview";
     const date = dateImageModified;
     let uri = `/model-manager/preview/get?uri=${path}`;
@@ -129,6 +255,9 @@ function imageUri(imageSearchPath = undefined, dateImageModified = undefined, wi
     if (date !== undefined && date !== null) {
         uri += `&v=${date}`;
     }
+    if (imageFormat !== undefined && imageFormat !== null) {
+        uri += `&image-format=${imageFormat}`;
+    }
     return uri;
 }
 const PREVIEW_NONE_URI = imageUri();
@@ -136,43 +265,77 @@ const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
- * @param {(...args) => void} callback
- * @param {number | undefined} delay
- * @returns {(...args) => void}
+ * 
+ * @param {HTMLButtonElement} element
+ * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined, HTMLSpanElement | undefined]} [button, icon, span]
  */
-function debounce(callback, delay) {
-    let timeoutId = null;
-    return (...args) => {
-        window.clearTimeout(timeoutId);
-        timeoutId = window.setTimeout(() => {
-            callback(...args);
-        }, delay);
-    };
+function comfyButtonDisambiguate(element) {
+    // TODO: This likely can be removed by using a css rule that disables clicking on the inner elements of the button.
+    let button = undefined;
+    let icon = undefined;
+    let span = undefined;
+    const nodeName = element.nodeName.toLowerCase();
+    if (nodeName === "button") {
+        button = element;
+        icon = button.getElementsByTagName("i")[0];
+        span = button.getElementsByTagName("span")[0];
+    }
+    else if (nodeName === "i") {
+        icon = element;
+        button = element.parentElement;
+        span = button.getElementsByTagName("span")[0];
+    }
+    else if (nodeName === "span") {
+        button = element.parentElement;
+        icon = button.getElementsByTagName("i")[0];
+        span = element;
+    }
+    return [button, icon, span]
 }
 
 /**
  * @param {HTMLButtonElement} element
  * @param {boolean} success
- * @param {string} [successText=""]
- * @param {string} [failureText=""]
- * @param {string} [resetText=""]
+ * @param {string?} successClassName
+ * @param {string?} failureClassName
+ * @param {boolean?} [disableCallback=false]
  */
-function buttonAlert(element, success, successText = "", failureText = "", resetText = "") {
-    if (element === undefined || element === null) {
+function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined, disableCallback = false) {
+    if (element === undefined || element === null) { return; }
+    
+    const [button, icon, span] = comfyButtonDisambiguate(element);
+    if (button === undefined) {
+        console.warn("Unable to find button element!");
+        console.warn(element);
         return;
     }
-    const name = success ? "button-success" : "button-failure";
-    element.classList.add(name);
-    if (successText != "" && failureText != "") {
-        element.innerHTML = success ? successText : failureText;
-    }
-    // TODO: debounce would be nice to get working...
-    window.setTimeout((element, name, innerHTML) => {
-        element.classList.remove(name);
-        if (innerHTML != "") {
-            element.innerHTML = innerHTML;
+    
+    // TODO: debounce would be nice, but needs some sort of "global" to avoid creating/destroying many objects
+    
+    const colorClassName = success ? "comfy-button-success" : "comfy-button-failure";
+    
+    if (icon) {
+        const iconClassName = (success ? successClassName : failureClassName) ?? "";
+        if (iconClassName !== "") {
+            icon.classList.add(iconClassName);
         }
-    }, 1000, element, name, resetText);
+        icon.classList.add(colorClassName);
+        if (!disableCallback) {
+            window.setTimeout((element, iconClassName, colorClassName) => {
+                if (iconClassName !== "") {
+                    element.classList.remove(iconClassName);
+                }
+                element.classList.remove(colorClassName);
+            }, 1000, icon, iconClassName, colorClassName);
+        }
+    }
+    
+    button.classList.add(colorClassName);
+    if (!disableCallback) {
+        window.setTimeout((element, colorClassName) => {
+            element.classList.remove(colorClassName);
+        }, 1000, button, colorClassName);
+    }
 }
 
 /**
@@ -182,7 +345,12 @@ function buttonAlert(element, success, successText = "", failureText = "", reset
  * @returns {Promise<boolean>}
  */
 async function saveNotes(modelPath, newValue) {
-    return await request(
+    const timestamp = await comfyRequest("/model-manager/timestamp")
+    .catch((err) => {
+        console.warn(err);
+        return false;
+    });
+    return await comfyRequest(
         "/model-manager/notes/save",
         {
             method: "POST",
@@ -190,6 +358,7 @@ async function saveNotes(modelPath, newValue) {
                 "path": modelPath,
                 "notes": newValue,
             }),
+            timestamp: timestamp,
         }
     ).then((result) => {
         const saved = result["success"];
@@ -212,7 +381,7 @@ function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
     const text = x.textContent;
     const input = $el("input", {
         type: "checkbox", 
-        name: text ?? "checkbox",
+        name: text ?? "checkbox", 
         checked: x.checked ?? false, 
     });
     const label = $el("label", [
@@ -221,6 +390,28 @@ function $checkbox(x = { $: (el) => {}, textContent: "", checked: false }) {
     ]);
     if (x.$ !== undefined){
         x.$(input);
+    }
+    return label;
+}
+
+/**
+ * @returns {HTMLLabelElement}
+ */
+function $select(x = { $: (el) => {}, textContent: "", options: [""] }) {
+    const text = x.textContent;
+    const select = $el("select", {
+        name: text ?? "select",
+    }, x.options.map((option) => {
+        return $el("option", {
+            value: option,
+        }, option);
+    }));
+    const label = $el("label", [
+        text === "" || text === undefined || text === null ? "" : " " + text,
+        select,
+    ]);
+    if (x.$ !== undefined){
+        x.$(select);
     }
     return label;
 }
@@ -247,7 +438,7 @@ function $radioGroup(attr) {
                     checked: index === 0,
                     $: (el) => (inputRef.value = el),
                 }),
-                $el("label", [item.label ?? item.value]),
+                $el("label.no-highlight", item.label ?? item.value),
             ]
         );
     });
@@ -267,6 +458,117 @@ function $radioGroup(attr) {
     });
     
     return $el("div.comfy-radio-group", radioGroup);
+}
+
+/**
+ * @param {{name: string, icon: string, tabContent: HTMLDivElement}[]} tabData
+ * @returns {[HTMLDivElement[], HTMLDivElement[]]}
+ */
+function GenerateTabGroup(tabData) {
+    const ACTIVE_TAB_CLASS = "active";
+
+    /** @type {HTMLDivElement[]} */
+    const tabButtons = [];
+
+    /** @type {HTMLDivElement[]} */
+    const tabContents = [];
+
+    tabData.forEach((data) => {
+        const name = data.name;
+        const icon = data.icon;
+        /** @type {HTMLDivElement} */
+        const tab = new ComfyButton({
+            icon: icon,
+            tooltip: "Open " + name.toLowerCase() + " tab",
+            classList: "comfyui-button tab-button",
+            content: name,
+            action: () => {
+                tabButtons.forEach((tabButton) => {
+                    if (name === tabButton.getAttribute("data-name")) {
+                        tabButton.classList.add(ACTIVE_TAB_CLASS);
+                    }
+                    else {
+                        tabButton.classList.remove(ACTIVE_TAB_CLASS);
+                    }
+                });
+                tabContents.forEach((tabContent) => {
+                    if (name === tabContent.getAttribute("data-name")) {
+                        tabContent.scrollTop = tabContent.dataset["scrollTop"] ?? 0;
+                        tabContent.style.display = "";
+                    }
+                    else {
+                        tabContent.dataset["scrollTop"] = tabContent.scrollTop;
+                        tabContent.style.display = "none";
+                    }
+                });
+            },
+        }).element;
+        tab.dataset.name = name;
+        const content = $el("div.tab-content", {
+            dataset: {
+                name: data.name,
+            }
+        }, [
+            data.tabContent
+        ]);
+        tabButtons.push(tab);
+        tabContents.push(content);
+    });
+    
+    return [tabButtons, tabContents];
+}
+
+/**
+ * @param {HTMLDivElement} element
+ * @param {Record<string, HTMLDivElement>[]} tabButtons
+ */
+function GenerateDynamicTabTextCallback(element, tabButtons, minWidth) {
+    return () => {
+        if (element.style.display === "none") {
+            return;
+        }
+        const managerRect = element.getBoundingClientRect();
+        const isIcon = managerRect.width < minWidth; // TODO: `minWidth` is a magic value
+        const iconDisplay = isIcon ? "" : "none";
+        const spanDisplay = isIcon ? "none" : "";
+        tabButtons.forEach((tabButton) => {
+            tabButton.getElementsByTagName("i")[0].style.display = iconDisplay;
+            tabButton.getElementsByTagName("span")[0].style.display = spanDisplay;
+        });
+    };
+}
+
+/**
+ * @param {[String, int][]} map
+ * @returns {String}
+ */
+function TagCountMapToParagraph(map) {
+    let text = "<p>";
+    for (let i = 0; i < map.length; i++) {
+        const v = map[i];
+        const tag = v[0];
+        const count = v[1];
+        text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
+        if (i !== map.length - 1) {
+            text += ", ";
+        }
+    }
+    text += "</p>";
+    return text;
+}
+
+/**
+ * @param {String} p
+ * @returns {[String, int][]}
+ */
+function ParseTagParagraph(p) {
+    return p.split(",").map(x => {
+        const text = x.endsWith(", ") ? x.substring(0, x.length - 2) : x;
+        const i = text.lastIndexOf("(");
+        const tag = text.substring(0, i).trim();
+        const frequency = parseInt(text.substring(i + 1, text.length - 1));
+        return [tag, frequency];
+    });
 }
 
 class ImageSelect {
@@ -558,15 +860,20 @@ class ImageSelect {
             style: { display: "none" },
         }, [
             el_customUrl,
-            $el("button.icon-button", {
-                textContent: "🔍︎",
-                onclick: async (e) => {
+            new ComfyButton({
+                icon: "magnify",
+                tooltip: "Search models",
+                classList: "comfyui-button icon-button",
+                action: async (e) => {
+                    const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                    button.disabled = true;
                     const value = el_customUrl.value;
                     el_customUrlPreview.src = await getCustomPreviewUrl(value);
                     e.stopPropagation();
                     el_customUrl.blur();
+                    button.disabled = false;
                 },
-            }),
+            }).element,
         ]);
         
         const el_previewButtons = $el("div.model-preview-overlay", {
@@ -574,14 +881,18 @@ class ImageSelect {
                 display: el_defaultPreviews.children.length > 1 ? "block" : "none",
             },
         }, [
-            $el("button.icon-button.model-preview-button-left", {
-                textContent: "←",
-                onclick: () => this.stepDefaultPreviews(-1),
-            }),
-            $el("button.icon-button.model-preview-button-right", {
-                textContent: "→",
-                onclick: () => this.stepDefaultPreviews(1),
-            }),
+            new ComfyButton({
+                icon: "arrow-left",
+                tooltip: "Previous image",
+                classList: "comfyui-button icon-button model-preview-button-left",
+                action: () => this.stepDefaultPreviews(-1),
+            }).element,
+            new ComfyButton({
+                icon: "arrow-right",
+                tooltip: "Next image",
+                classList: "comfyui-button icon-button model-preview-button-right",
+                action: () => this.stepDefaultPreviews(1),
+            }).element,
         ]);
         const el_previews = $el("div.item", {
             $: (el) => (this.elements.previews = el),
@@ -847,8 +1158,8 @@ class ModelDirectories {
     }
 }
 
-const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-dropdown-key-selected";
-const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-dropdown-mouse-selected";
+const DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS = "search-directory-dropdown-key-selected";
+const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-directory-dropdown-mouse-selected";
 
 
 class ModelData {
@@ -897,6 +1208,9 @@ class DirectoryDropdown {
     /** @type {Any} */
     #touchSelectionStart = null;
     
+    /** @type {() => Boolean} */
+    #isDynamicSearch = () => { return false; };
+    
     /**
      * @param {ModelData} modelData
      * @param {HTMLInputElement} input
@@ -904,10 +1218,11 @@ class DirectoryDropdown {
      * @param {() => string} [getModelType= () => { return ""; }]
      * @param {() => void} [updateCallback= () => {}]
      * @param {() => Promise<void>} [submitCallback= () => {}]
+     * @param {() => Boolean} [isDynamicSearch= () => { return false; }]
      */
-    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}) {
+    constructor(modelData, input, showDirectoriesOnly = false, getModelType = () => { return ""; }, updateCallback = () => {}, submitCallback = () => {}, isDynamicSearch = () => { return false; }) {
         /** @type {HTMLDivElement} */
-        const dropdown = $el("div.search-dropdown", { // TODO: change to `search-directory-dropdown`
+        const dropdown = $el("div.search-directory-dropdown", {
             style: {
                 display: "none",
             },
@@ -919,14 +1234,18 @@ class DirectoryDropdown {
         this.#updateCallback = updateCallback;
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
+        this.#isDynamicSearch = isDynamicSearch;
         
-        input.addEventListener("input", () => {
+        input.addEventListener("input", async(e) => {
             const path = this.#updateOptions();
             if (path !== undefined) {
                 this.#restoreSelectedOption(path);
                 this.#updateDeepestPath(path);
             }
             updateCallback();
+            if (isDynamicSearch()) {
+                await submitCallback();
+            }
         });
         input.addEventListener("focus", () => {
             const path = this.#updateOptions();
@@ -975,7 +1294,9 @@ class DirectoryDropdown {
                             this.#updateDeepestPath(path);
                         }
                         updateCallback();
-                        //await submitCallback();
+                        if (isDynamicSearch()) {
+                            await submitCallback();
+                        }
                     }
                 }
                 else if (e.key === "ArrowLeft" && dropdown.style.display !== "none") {
@@ -1007,7 +1328,9 @@ class DirectoryDropdown {
                                 this.#updateDeepestPath(path);
                             }
                             updateCallback();
-                            //await submitCallback();
+                            if (isDynamicSearch()) {
+                                await submitCallback();
+                            }
                         }
                     }
                 }
@@ -1015,6 +1338,8 @@ class DirectoryDropdown {
                     e.stopPropagation();
                     const input = e.target;
                     if (dropdown.style.display !== "none") {
+                        /*
+                        // This is WAY too confusing.
                         const selection = options[iSelection];
                         if (selection !== undefined && selection !== null) {
                             DirectoryDropdown.selectionToInput(
@@ -1029,6 +1354,7 @@ class DirectoryDropdown {
                             }
                             updateCallback();
                         }
+                        */
                     }
                     await submitCallback();
                     input.blur();
@@ -1216,6 +1542,9 @@ class DirectoryDropdown {
                 }
             }
             this.#updateCallback();
+            if (this.#isDynamicSearch()) {
+                await this.#submitCallback();
+            }
         };
         const touch_selection_select = async(e) => {
             const [startX, startY] = this.#touchSelectionStart;
@@ -1419,7 +1748,7 @@ class ModelGrid {
             }
             event.stopPropagation();
         }
-        buttonAlert(event.target, success, "✔", "✖", "✚");
+        comfyButtonAlert(event.target, success, "mdi-check-bold", "mdi-close-thick");
     }
 
     static #getWidgetComboIndices(node, value) {
@@ -1433,16 +1762,18 @@ class ModelGrid {
     }
 
     /**
-     * @param {Event} event
+     * @param {DragEvent} event
      * @param {string} modelType
      * @param {string} path
      * @param {boolean} removeEmbeddingExtension
      * @param {boolean} strictlyOnWidget
      */
     static #dragAddModel(event, modelType, path, removeEmbeddingExtension, strictlyOnWidget) {
-        const target = document.elementFromPoint(event.x, event.y);
+        const [clientX, clientY, target] = elementFromDragEvent(event);
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
-            const pos = app.canvas.convertEventToCanvasOffset(event);
+            //const pos = app.canvas.convertEventToCanvasOffset(event);
+            const pos = app.canvas.convertEventToCanvasOffset({ clientX: clientX, clientY: clientY });
+            
             const node = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
             let widgetIndex = -1;
@@ -1535,7 +1866,7 @@ class ModelGrid {
         else {
             console.warn(`Unable to copy unknown model type '${modelType}.`);
         }
-        buttonAlert(event.target, success, "✔", "✖", "⧉︎");
+        comfyButtonAlert(event.target, success, "mdi-check-bold", "mdi-close-thick");
     }
     
     /**
@@ -1553,47 +1884,87 @@ class ModelGrid {
         const canShowButtons = modelNodeType[modelType] !== undefined;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
         const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
+        const showLoadWorkflowButton = canShowButtons && settingsElements["model-show-load-workflow-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
+        const modelInfoButtonOnLeft = !settingsElements["model-info-button-on-left"].checked;
         const removeEmbeddingExtension = !settingsElements["model-add-embedding-extension"].checked;
+        const previewThumbnailFormat = settingsElements["model-preview-thumbnail-type"].value;
         if (models.length > 0) {
             return models.map((item) => {
                 const previewInfo = item.preview;
+                const previewThumbnail = $el("img.model-preview", {
+                    loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
+                    src: imageUri(
+                        previewInfo?.path, 
+                        previewInfo?.dateModified, 
+                        PREVIEW_THUMBNAIL_WIDTH, 
+                        PREVIEW_THUMBNAIL_HEIGHT, 
+                        previewThumbnailFormat, 
+                    ),
+                    draggable: false,
+                });
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
-                let buttons = [];
+                let actionButtons = [];
                 if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
-                    buttons.push(
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "⧉︎",
-                            onclick: (e) => ModelGrid.#copyModelToClipboard(
+                    actionButtons.push(
+                        new ComfyButton({
+                            icon: "content-copy",
+                            tooltip: "Copy model to clipboard",
+                            classList: "comfyui-button icon-button model-button",
+                            action: (e) => ModelGrid.#copyModelToClipboard(
                                 e, 
                                 modelType, 
                                 path, 
-                                removeEmbeddingExtension
+                                removeEmbeddingExtension,
                             ),
-                            draggable: false,
-                        })
+                        }).element,
                     );
                 }
                 if (showCopyButton) {
-                    buttons.push(
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "✚",
-                            onclick: (e) => ModelGrid.#addModel(
+                    actionButtons.push(
+                        new ComfyButton({
+                            icon: "plus-box-outline",
+                            tooltip: "Add model to node grid",
+                            classList: "comfyui-button icon-button model-button",
+                            action: (e) => ModelGrid.#addModel(
                                 e, 
                                 modelType, 
                                 path, 
                                 removeEmbeddingExtension, 
-                                addOffset
+                                addOffset, 
                             ),
-                            draggable: false,
-                        })
+                        }).element,
                     );
                 }
+                if (showLoadWorkflowButton) {
+                    actionButtons.push(
+                        new ComfyButton({
+                            icon: "arrow-bottom-left-bold-box-outline",
+                            tooltip: "Load preview workflow",
+                            classList: "comfyui-button icon-button model-button",
+                            action: async (e) => {
+                                const urlString = previewThumbnail.src;
+                                const url = new URL(urlString);
+                                const urlSearchParams = url.searchParams;
+                                const uri = urlSearchParams.get("uri");
+                                const v = urlSearchParams.get("v");
+                                const urlFull = urlString.substring(0, urlString.indexOf("?")) + "?uri=" + uri + "&v=" + v;
+                                await loadWorkflow(urlFull);
+                            },
+                        }).element,
+                    );
+                }
+                const infoButtons = [
+                    new ComfyButton({
+                        icon: "information-outline",
+                        tooltip: "View model information",
+                        classList: "comfyui-button icon-button model-button",
+                        action: async() => { await showModelInfo(searchPath) },
+                    }).element,
+                ];
                 const dragAdd = (e) => ModelGrid.#dragAddModel(
                     e, 
                     modelType, 
@@ -1602,16 +1973,7 @@ class ModelGrid {
                     strictDragToAdd
                 );
                 return $el("div.item", {}, [
-                    $el("img.model-preview", {
-                        loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
-                        src: imageUri(
-                            previewInfo?.path, 
-                            previewInfo?.dateModified, 
-                            PREVIEW_THUMBNAIL_WIDTH, 
-                            PREVIEW_THUMBNAIL_HEIGHT, 
-                        ),
-                        draggable: false,
-                    }),
+                    previewThumbnail,
                     $el("div.model-preview-overlay", {
                         ondragend: (e) => dragAdd(e),
                         draggable: true,
@@ -1619,20 +1981,14 @@ class ModelGrid {
                     $el("div.model-preview-top-right", {
                         draggable: false,
                     },
-                        buttons
+                        modelInfoButtonOnLeft ? infoButtons : actionButtons,
                     ),
                     $el("div.model-preview-top-left", {
                         draggable: false,
-                    }, [
-                        $el("button.icon-button.model-button", {
-                            type: "button",
-                            textContent: "ⓘ",
-                            onclick: async() => { await showModelInfo(searchPath) },
-                            draggable: false,
-                        }),
-                    ]),
+                    },
+                    modelInfoButtonOnLeft ? actionButtons : infoButtons,
+                    ),
                     $el("div.model-label", {
-                        ondragend: (e) => dragAdd(e),
                         draggable: false,
                     }, [
                         $el("p", [showModelExtension ? item.name : SearchPath.splitExtension(item.name)[0]])
@@ -1660,7 +2016,10 @@ class ModelGrid {
         const models = modelData.models;
         let modelType = modelSelect.value;
         if (models[modelType] === undefined) {
-            modelType = "checkpoints"; // TODO: magic value
+            modelType = settings["model-default-browser-model-type"].value;
+        }
+        if (models[modelType] === undefined) {
+            modelType = "checkpoints"; // panic fallback
         }
 
         if (modelType !== previousModelType.value) {
@@ -1703,11 +2062,13 @@ class ModelGrid {
     }
 }
 
-class ModelInfoView {
+class ModelInfo {
     /** @type {HTMLDivElement} */
     element = null;
     
     elements = {
+        /** @type {HTMLDivElement[]} */ tabButtons: null,
+        /** @type {HTMLDivElement[]} */ tabContents: null,
         /** @type {HTMLDivElement} */ info: null,
         /** @type {HTMLTextAreaElement} */ notes: null,
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
@@ -1720,11 +2081,16 @@ class ModelInfoView {
     /** @type {string} */
     #savedNotesValue = null;
     
+    /** @type {[HTMLElement][]} */
+    #settingsElements = null;
+    
     /**
      * @param {ModelData} modelData
      * @param {() => Promise<void>} updateModels
+     * @param {any} settingsElements
      */
-    constructor(modelData, updateModels) {
+    constructor(modelData, updateModels, settingsElements) {
+        this.#settingsElements = settingsElements;
         const moveDestinationInput = $el("input.search-text-area", {
             name: "move directory",
             autocomplete: "off",
@@ -1743,20 +2109,21 @@ class ModelInfoView {
         this.previewSelect = previewSelect;
         previewSelect.elements.previews.style.display = "flex";
         
-        const setPreviewButton = $el("button", {
-            $: (el) => (this.elements.setPreviewButton = el),
-            textContent: "Set as Preview",
-            onclick: async(e) => {
+        const setPreviewButton = new ComfyButton({
+            tooltip: "Overwrite currrent preview with selected image",
+            content: "Set as Preview",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
                 const confirmation = window.confirm("Change preview image(s) PERMANENTLY?");
                 let updatedPreview = false;
                 if (confirmation) {
-                    e.target.disabled = true;
                     const container = this.elements.info;
                     const path = container.dataset.path;
                     const imageUrl = await previewSelect.getImage();
                     if (imageUrl === PREVIEW_NONE_URI) {
                         const encodedPath = encodeURIComponent(path);
-                        updatedPreview = await request(
+                        updatedPreview = await comfyRequest(
                             `/model-manager/preview/delete?path=${encodedPath}`,
                             {
                                 method: "POST",
@@ -1779,7 +2146,7 @@ class ModelInfoView {
                         formData.append("path", path);
                         const image = imageUrl[0] == "/" ? "" : imageUrl;
                         formData.append("image", image);
-                        updatedPreview = await request(
+                        updatedPreview = await comfyRequest(
                             `/model-manager/preview/set`,
                             {
                                 method: "POST",
@@ -1804,33 +2171,37 @@ class ModelInfoView {
                         previewSelect.resetModelInfoPreview();
                         this.element.style.display = "none";
                     }
-                    
-                    e.target.disabled = false;
                 }
-                buttonAlert(e.target, updatedPreview);
+                comfyButtonAlert(e.target, updatedPreview);
+                button.disabled = false;
             },
-        });
+        }).element;
+        this.elements.setPreviewButton = setPreviewButton;
         previewSelect.elements.radioButtons.addEventListener("change", (e) => {
             setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         });
         
-        this.element = $el("div.model-info-view", {
+        this.element = $el("div", {
             style: { display: "none" },
         }, [
             $el("div.row.tab-header", {
                 display: "block",
             }, [
                 $el("div.row.tab-header-flex-block", [
-                    $el("button.icon-button", {
-                        textContent: "🗑︎",
-                        onclick: async(e) => {
+                    new ComfyButton({
+                        icon: "trash-can-outline",
+                        tooltip: "Delete model FOREVER",
+                        classList: "comfyui-button icon-button",
+                        action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
                             const affirmation = "delete";
                             const confirmation = window.prompt("Type \"" + affirmation + "\" to delete the model PERMANENTLY.\n\nThis includes all image or text files.");
                             let deleted = false;
                             if (confirmation === affirmation) {
                                 const container = this.elements.info;
                                 const path = encodeURIComponent(container.dataset.path);
-                                deleted = await request(
+                                deleted = await comfyRequest(
                                     `/model-manager/model/delete?path=${path}`,
                                     {
                                         method: "POST",
@@ -1855,17 +2226,21 @@ class ModelInfoView {
                                 });
                             }
                             if (!deleted) {
-                                buttonAlert(e.target, false);
+                                comfyButtonAlert(e.target, false);
                             }
+                            button.disabled = false;
                         },
-                    }),
-                    $el("div.search-models", [
+                    }).element,
+                    $el("div.search-models.input-dropdown-container", [ // TODO: magic class
                         moveDestinationInput,
                         searchDropdown.element,
                     ]),
-                    $el("button", {
-                        textContent: "Move",
-                        onclick: async(e) => {
+                    new ComfyButton({
+                        icon: "file-move-outline",
+                        tooltip: "Move file",
+                        action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
                             const confirmation = window.confirm("Move this file?");
                             let moved = false;
                             if (confirmation) {
@@ -1877,7 +2252,7 @@ class ModelInfoView {
                                     modelData.searchSeparator + 
                                     oldFileName
                                 );
-                                moved = await request(
+                                moved = await comfyRequest(
                                     `/model-manager/model/move`,
                                     {
                                         method: "POST",
@@ -1906,15 +2281,23 @@ class ModelInfoView {
                                     return false;
                                 });
                             }
-                            buttonAlert(e.target, moved);
+                            comfyButtonAlert(e.target, moved);
+                            button.disabled = false;
                         },
-                    }),
+                    }).element,
                 ]),
             ]),
             $el("div.model-info-container", {
                 $: (el) => (this.elements.info = el),
                 "data-path": "",
             }),
+        ]);
+        
+        [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
+            { name: "Overview", icon: "information-box-outline", tabContent: this.element },
+            { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
+            { name: "Tags", icon: "tag-outline", tabContent: $el("div", ["Tags"]) },
+            { name: "Notes", icon: "pencil-outline", tabContent: $el("div", ["Notes"]) },
         ]);
     }
     
@@ -1925,7 +2308,7 @@ class ModelInfoView {
     }
     
     /**
-     * @param {boolean}
+     * @param {boolean} promptUser
      * @returns {Promise<boolean>}
      */
     async trySave(promptUser) {
@@ -1985,22 +2368,28 @@ class ModelInfoView {
      */
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
-        const info = await request(`/model-manager/model/info?path=${path}`)
-        .then((result) => {
-            const success = result["success"];
-            const message = result["alert"];
-            if (message !== undefined) {
-                window.alert(message);
-            }
-            if (!success) {
+        const [info, metadata, tags, noteText] = await comfyRequest(`/model-manager/model/info?path=${path}`)
+            .then((result) => {
+                const success = result["success"];
+                const message = result["alert"];
+                if (message !== undefined) {
+                    window.alert(message);
+                }
+                if (!success) {
+                    return undefined;
+                }
+                return [
+                    result["info"], 
+                    result["metadata"], 
+                    result["tags"], 
+                    result["notes"]
+                ];
+            })
+            .catch((err) => {
+                console.log(err);
                 return undefined;
             }
-            return result["info"];
-        })
-        .catch((err) => {
-            console.log(err);
-            return undefined;
-        });
+        );
         if (info === undefined || info === null) {
             return;
         }
@@ -2020,9 +2409,13 @@ class ModelInfoView {
                         filename,
                     ]),
                     $el("div", [
-                        $el("button.icon-button", {
-                            textContent: "✎",
-                            onclick: async(e) => {
+                        new ComfyButton({
+                            icon: "pencil",
+                            tooltip: "Change file name",
+                            classList: "comfyui-button icon-button",
+                            action: async(e) => {
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
                                 const container = this.elements.info;
                                 const oldFile = container.dataset.path;
                                 const [oldFilePath, oldFileName] = SearchPath.split(oldFile);
@@ -2036,7 +2429,7 @@ class ModelInfoView {
                                         newName + 
                                         SearchPath.splitExtension(oldFile)[1]
                                     );
-                                    renamed = await request(
+                                    renamed = await comfyRequest(
                                         `/model-manager/model/move`,
                                         {
                                             method: "POST",
@@ -2065,9 +2458,10 @@ class ModelInfoView {
                                         return false;
                                     });
                                 }
-                                buttonAlert(e.target, renamed);
+                                comfyButtonAlert(e.target, renamed);
+                                button.disabled = false;
                             },
-                        }),
+                        }).element,
                     ]),
                 ]),
             );
@@ -2100,6 +2494,16 @@ class ModelInfoView {
         innerHtml.push($el("div", [
             previewSelect.elements.previews,
             $el("div.row.tab-header", [
+                $el("div", [
+                    new ComfyButton({
+                        content: "Load Workflow",
+                        tooltip: "Attempt to load preview image workflow",
+                        action: async () => {
+                            const urlString = previewSelect.elements.defaultPreviews.children[0].src;
+                            await loadWorkflow(urlString);
+                        },
+                    }).element,
+                ]),
                 $el("div.row.tab-header-flex-block", [
                     previewSelect.elements.radioGroup,
                 ]),
@@ -2107,7 +2511,7 @@ class ModelInfoView {
                     setPreviewButton,
                 ]),
             ]),
-            $el("h2", ["Details:"]),
+            $el("h2", ["File Info:"]),
             $el("div", 
                 (() => {
                     const elements = [];
@@ -2117,45 +2521,17 @@ class ModelInfoView {
                         }
                         
                         if (Array.isArray(value)) {
+                            // currently only used for "Bucket Resolutions"
                             if (value.length > 0) {
                                 elements.push($el("h2", [key + ":"]));
-                                
-                                let text = "<p>";
-                                for (let i = 0; i < value.length; i++) {
-                                    const v = value[i];
-                                    const tag = v[0];
-                                    const count = v[1];
-                                    text += tag + "<span class=\"no-select\"> (" + count + ")</span>";
-                                    if (i !== value.length - 1) {
-                                        text += ", ";
-                                    }
-                                }
-                                text += "</p>";
+                                const text = TagCountMapToParagraph(value);
                                 const div = $el("div");
                                 div.innerHTML = text;
                                 elements.push(div);
                             }
                         }
                         else {
-                            if (key === "Notes") {
-                                elements.push($el("h2", [key + ":"]));
-                                const notes = $el("textarea.comfy-multiline-input", {
-                                    name: "model notes",
-                                    value: value, 
-                                    rows: 12,
-                                });
-                                this.elements.notes = notes;
-                                this.#savedNotesValue = value;
-                                elements.push($el("button", {
-                                    textContent: "Save Notes",
-                                    onclick: async (e) => {
-                                        const saved = await this.trySave(false);
-                                        buttonAlert(e.target, saved);
-                                    },
-                                }));
-                                elements.push(notes);
-                            }
-                            else if (key === "Description") {
+                            if (key === "Description") {
                                 if (value !== "") {
                                     elements.push($el("h2", [key + ":"]));
                                     elements.push($el("p", [value]));
@@ -2177,6 +2553,251 @@ class ModelInfoView {
         ]));
         infoHtml.append.apply(infoHtml, innerHtml);
         // TODO: set default value of dropdown and value to model type?
+        
+        /** @type {HTMLDivElement} */
+        const metadataElement = this.elements.tabContents[1]; // TODO: remove magic value
+        const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
+        metadataElement.innerHTML = "";
+        metadataElement.append.apply(metadataElement, [
+            $el("h1", ["Metadata"]),
+            $el("div", (() => {
+                    const tableRows = [];
+                    if (isMetadata) {
+                        for (const [key, value] of Object.entries(metadata)) {
+                            if (value === undefined || value === null) {
+                                continue;
+                            }
+                            if (value !== "") {
+                                tableRows.push($el("tr", [
+                                    $el("th.model-metadata-key", [key]),
+                                    $el("th.model-metadata-value", [value]),
+                                ]));
+                            }
+                        }
+                    }
+                    return $el("table.model-metadata", tableRows);
+                })(),
+            ),
+        ]);
+        const metadataButton = this.elements.tabButtons[1]; // TODO: remove magic value
+        metadataButton.style.display = isMetadata ? "" : "none";
+        
+        /** @type {HTMLDivElement} */
+        const tagsElement = this.elements.tabContents[2]; // TODO: remove magic value
+        const isTags = Array.isArray(tags) && tags.length > 0;
+        const tagsParagraph = $el("div", (() => {
+                const elements = [];
+                if (isTags) {
+                    let text = TagCountMapToParagraph(tags);
+                    const div = $el("div");
+                    div.innerHTML = text;
+                    elements.push(div);
+                }
+                return elements;
+            })(),
+        );
+        const tagGeneratorRandomizedOutput = $el("textarea.comfy-multiline-input", {
+            name: "random tag generator output",
+            rows: 4,
+        });
+        const TAG_GENERATOR_SAMPLER_NAME = "model manager tag generator sampler";
+        const tagGenerationCount = $el("input", {
+            type: "number",
+            name: "tag generator count",
+            step: 1,
+            min: 1,
+            value: this.#settingsElements["tag-generator-count"].value,
+        });
+        const tagGenerationThreshold = $el("input", {
+            type: "number",
+            name: "tag generator threshold",
+            step: 1,
+            min: 1,
+            value: this.#settingsElements["tag-generator-threshold"].value,
+        });
+        const selectedSamplerOption = this.#settingsElements["tag-generator-sampler-method"].value;
+        const samplerOptions = ["Frequency", "Uniform"];
+        const samplerRadioGroup = $radioGroup({
+            name: TAG_GENERATOR_SAMPLER_NAME,
+            onchange: (value) => {},
+            options: samplerOptions.map(option => { return { value: option }; }),
+        });
+        const samplerOptionInputs = samplerRadioGroup.getElementsByTagName("input");
+        for (let i = 0; i < samplerOptionInputs.length; i++) {
+            const samplerOptionInput = samplerOptionInputs[i];
+            if (samplerOptionInput.value === selectedSamplerOption) {
+                samplerOptionInput.click();
+                break;
+            }
+        }
+        tagsElement.innerHTML = "";
+        tagsElement.append.apply(tagsElement, [
+            $el("h1", ["Tags"]),
+            $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
+            $el("div", [
+                $el("details.tag-generator-settings", {
+                    style: { margin: "10px 0", display: "none" },
+                    open: false,
+                }, [
+                    $el("summary", ["Settings"]),
+                    $el("div", [
+                        "Sampling Method",
+                        samplerRadioGroup,
+                    ]),
+                    $el("label", [
+                        "Count",
+                        tagGenerationCount,
+                    ]),
+                    $el("label", [
+                        "Threshold",
+                        tagGenerationThreshold,
+                    ]),
+                ]),
+                tagGeneratorRandomizedOutput,
+                new ComfyButton({
+                    content: "Randomize",
+                    tooltip: "Randomly generate subset of tags",
+                    action: () => {
+                        const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
+                        const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
+                        const sampleCount = tagGenerationCount.value;
+                        const frequencyThreshold = tagGenerationThreshold.value;
+                        const tags = ParseTagParagraph(tagsParagraph.innerText);
+                        const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
+                        tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
+                    },
+                }).element,
+            ]),
+            $el("h2", {style: { margin: "24px 0px 8px 0px" } }, ["Training Tags"]),
+            tagsParagraph,
+        ]);
+        const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
+        tagButton.style.display = isTags ? "" : "none";
+        
+        const saveIcon = "content-save";
+        const savingIcon = "cloud-upload-outline";
+        
+        const saveNotesButton = new ComfyButton({
+            icon: saveIcon,
+            tooltip: "Save note",
+            classList: "comfyui-button icon-button",
+            action: async (e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const saved = await this.trySave(false);
+                comfyButtonAlert(e.target, saved);
+                button.disabled = false;
+            },
+        }).element;
+        
+        const saveDebounce = debounce(async() => {
+            const saveIconClass = "mdi-" + saveIcon;
+            const savingIconClass = "mdi-" + savingIcon;
+            const iconElement = saveNotesButton.getElementsByTagName("i")[0];
+            iconElement.classList.remove(saveIconClass);
+            iconElement.classList.add(savingIconClass);
+            const saved = await this.trySave(false);
+            iconElement.classList.remove(savingIconClass);
+            iconElement.classList.add(saveIconClass);
+        }, 1000);
+        
+        /** @type {HTMLDivElement} */
+        const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
+        notesElement.innerHTML = "";
+        notesElement.append.apply(notesElement,
+            (() => {
+                const notes = $el("textarea.comfy-multiline-input", {
+                    name: "model notes",
+                    value: noteText, 
+                    oninput: (e) => {
+                        if (this.#settingsElements["model-info-autosave-notes"].checked) {
+                            saveDebounce();
+                        }
+                    },
+                });
+                
+                if (navigator.userAgent.includes("Mac")) {
+                    new KeyComboListener(
+                        ["MetaLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["MetaRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
+                else {
+                    new KeyComboListener(
+                        ["ControlLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["ControlRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
+                
+                this.elements.notes = notes;
+                this.#savedNotesValue = noteText;
+                return [
+                    $el("div.row", {
+                        style: { "align-items": "center" },
+                    }, [
+                        $el("h1", ["Notes"]),
+                        saveNotesButton,
+                    ]),
+                    $el("div", {
+                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
+                    }, notes),
+                ];
+            })()
+        );
+    }
+    
+    static UniformTagSampling(tagsAndCounts, sampleCount, frequencyThreshold = 0) {
+        const data = tagsAndCounts.filter(x => x[1] >= frequencyThreshold);
+        let count = data.length;
+        const samples = [];
+        for (let i = 0; i < sampleCount; i++) {
+            if (count === 0) { break; }
+            const index = Math.floor(Math.random() * count);
+            const pair = data.splice(index, 1)[0];
+            samples.push(pair);
+            count -= 1;
+        }
+        const sortedSamples = samples.sort((x1, x2) => { return parseInt(x2[1]) - parseInt(x1[1]) });
+        return sortedSamples.map(x => x[0]);
+    }
+    
+    static ProbabilisticTagSampling(tagsAndCounts, sampleCount, frequencyThreshold = 0) {
+        const data = tagsAndCounts.filter(x => x[1] >= frequencyThreshold);
+        let tagFrequenciesSum = data.reduce((accumulator, x) => accumulator + x[1], 0);
+        let count = data.length;
+        const samples = [];
+        for (let i = 0; i < sampleCount; i++) {
+            if (count === 0) { break; }
+            const index = (() => {
+                let frequencyIndex = Math.floor(Math.random() * tagFrequenciesSum);
+                return data.findIndex(x => {
+                    const frequency = x[1];
+                    if (frequency > frequencyIndex) {
+                        return true;
+                    }
+                    frequencyIndex = frequencyIndex - frequency;
+                    return false;
+                });
+            })();
+            const pair = data.splice(index, 1)[0];
+            samples.push(pair);
+            tagFrequenciesSum -= pair[1];
+            count -= 1;
+        }
+        const sortedSamples = samples.sort((x1, x2) => { return parseInt(x2[1]) - parseInt(x1[1]) });
+        return sortedSamples.map(x => x[0]);
     }
 }
 
@@ -2192,7 +2813,9 @@ class Civitai {
     static async requestInfo(id, apiPath) {
         const url = "https://civitai.com/api/v1/" + apiPath +  "/" + id;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get model info from Civitai!", error);
@@ -2250,7 +2873,8 @@ class Civitai {
                 return image["url"];
             }),
             "name": modelVersionInfo["name"],
-            "description": modelVersionInfo["description"] ?? "",
+            "description": modelVersionInfo["description"],
+            "tags": modelVersionInfo["trainedWords"],
         };
     }
     
@@ -2286,7 +2910,8 @@ class Civitai {
             return {
                 "name": modelVersionInfo["model"]["name"],
                 "type": modelVersionInfo["model"]["type"],
-                "description": modelVersionInfo["description"] ?? "",
+                "description": modelVersionInfo["description"],
+                "tags": modelVersionInfo["trainedWords"],
                 "versions": [filesInfo]
             }
         }
@@ -2318,7 +2943,7 @@ class Civitai {
             return {
                 "name": modelInfo["name"],
                 "type": modelInfo["type"],
-                "description": modelInfo["description"] ?? "",
+                "description": modelInfo["description"],
                 "versions": modelVersions,
             }
         }
@@ -2354,7 +2979,9 @@ class Civitai {
         const id = stringUrl.substring(imagePostUrlPrefix.length).match(/^\d+/)[0];
         const url = `https://civitai.com/api/v1/images?imageId=${id}`;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get image info from Civitai!", error);
@@ -2380,7 +3007,8 @@ class Civitai {
         const id = parseInt(stringUrl.substring(i0 + 1, i1)).toString();
         const url = `https://civitai.com/api/v1/images?imageId=${id}`;
         try {
-            const imageInfo = await request(url);
+            const response = await fetch(url);
+            const imageInfo = await response.json();
             const items = imageInfo["items"];
             if (items.length === 0) {
                 console.warn("Civitai /api/v1/images returned 0 items.");
@@ -2407,7 +3035,9 @@ class HuggingFace {
     static async requestInfo(id, apiPath = "models") {
         const url = "https://huggingface.co/api/" + apiPath + "/" + id;
         try {
-            return await request(url);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data;
         }
         catch (error) {
             console.error("Failed to get model info from HuggingFace!", error);
@@ -2525,11 +3155,41 @@ async function getModelInfos(urlText) {
             const name = civitaiInfo["name"];
             const infos = [];
             const type = civitaiInfo["type"];
-            const modelInfo = civitaiInfo["description"]?? "";
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
-                const versionDescription = version["description"]??"";
-                const description = (versionDescription + "\n\n" + modelInfo).trim().replace(/<[^>]+>/g, ""); // quick hack
+                const tags = version["tags"]?.map((tag) => tag.trim().replace(/,$/, ""));
+                const description = [
+                        tags !== undefined ? "# Trigger Words" : undefined,
+                        tags?.join(tags.some((tag) => { return tag.includes(","); }) ? "\n" : ", "),
+                        version["description"] !== undefined ? "# About this version " : undefined,
+                        version["description"],
+                        civitaiInfo["description"] !== undefined ? "# " + name  : undefined,
+                        civitaiInfo["description"],
+                    ].filter(x => x !== undefined).join("\n\n")
+                    .replaceAll("</p><p>", "\n\n")
+                    .replaceAll("<strong>", "**").replaceAll("</strong>", "**")
+                    .replaceAll("<ol>", "\n").replaceAll("</ol>", "\n") // wrong
+                    .replaceAll("<ul>", "\n").replaceAll("</ul>", "\n")
+                    .replaceAll("<li>", "- ").replaceAll("</li>", "\n")
+                    .replaceAll("<em>", "*").replaceAll("</em>", "*")
+                    .replaceAll("<code>", "`").replaceAll("</code>", "`")
+                    .replaceAll("<blockquote", "\n<blockquote").replaceAll("</blockquote>", "\n")
+                    .replaceAll("<br", "\n<br")
+                    .replaceAll("<hr>", "\n\n---\n\n")
+                    .replaceAll("<h1", "\n# <h1").replaceAll("</h1>", "\n")
+                    .replaceAll("<h2", "\n## <h2").replaceAll("</h2>", "\n")
+                    .replaceAll("<h3", "\n### <h3").replaceAll("</h3>", "\n")
+                    .replaceAll("<h4", "\n#### <h4").replaceAll("</h4>", "\n")
+                    .replaceAll("<h5", "\n##### <h5").replaceAll("</h5>", "\n")
+                    .replaceAll("<h6", "\n###### <h6").replaceAll("</h6>", "\n")
+                    .replace(/href="(\S*)">/g, 'href=""> $1 <a href="">')
+                    .replace(/src="(\S*)">/g, 'src=""> $1 <img src="">')
+                    // <script></script>
+                    // <span></span>
+                    .replace(/<[^>]+>/g, "") // quick hack
+                    .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
+                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=")
+                    .replaceAll("&amp;", "&");
                 version["files"].forEach((file) => {
                     infos.push({
                         "images": images,
@@ -2579,13 +3239,22 @@ async function getModelInfos(urlText) {
             return [name, infos];
         }
         if (urlText.endsWith(".json")) {
-            const indexInfo = await request(urlText).catch(() => []);
+            const indexInfo = await (async() => {
+                try {
+                    const response = await fetch(url);
+                    const data = await response.json();
+                    return data;
+                }
+                catch {
+                    return [];
+                }
+            })();
             const name = urlText.substring(math.max(urlText.lastIndexOf("/"), 0));
             const infos = indexInfo.map((file) => {
                 return {
                     "images": [],
                     "fileName": file["name"],
-                    "modelType": DownloadTab.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
+                    "modelType": DownloadView.modelTypeToComfyUiDirectory(file["type"], "") ?? "",
                     "downloadUrl": file["download"],
                     "downloadFilePath": "",
                     "description": file["description"],
@@ -2598,7 +3267,7 @@ async function getModelInfos(urlText) {
     })();
 }
 
-class DownloadTab {
+class DownloadView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -2606,23 +3275,78 @@ class DownloadTab {
         /** @type {HTMLInputElement} */ url: null,
         /** @type {HTMLDivElement} */ infos: null,
         /** @type {HTMLInputElement} */ overwrite: null,
+        /** @type {HTMLInputElement} */ downloadNotes: null,
+        /** @type {HTMLButtonElement} */ searchButton: null,
+        /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
     
     /** @type {DOMParser} */
     #domParser = null;
+    
+    /** @type {Object.<string, HTMLElement>} */
+    #settings = null;
     
     /** @type {() => Promise<void>} */
     #updateModels = () => {};
     
     /**
      * @param {ModelData} modelData
-     * @param {any} settings
+     * @param {Object.<string, HTMLElement>} settings
      * @param {() => Promise<void>} updateModels
      */
     constructor(modelData, settings, updateModels) {
         this.#domParser = new DOMParser();
         this.#updateModels = updateModels;
         const update = async() => { await this.#update(modelData, settings); };
+        const reset = () => {
+            this.elements.infos.innerHTML = "";
+            this.elements.infos.appendChild(
+                $el("h1", ["Input a URL to select a model to download."])
+            );
+        };
+        
+        const searchButton = new ComfyButton({
+            icon: "magnify",
+            tooltip: "Search url",
+            classList: "comfyui-button icon-button",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                if (this.elements.url.value === "") {
+                    reset();
+                }
+                else {
+                    await update();
+                }
+                button.disabled = false;
+            },
+        }).element;
+        settings["model-real-time-search"].addEventListener("change", () => {
+            const hideSearchButton = settings["text-input-always-hide-search-button"].checked;
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        settings["text-input-always-hide-search-button"].addEventListener("change", () => {
+            const hideSearchButton = settings["text-input-always-hide-search-button"].checked;
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        this.elements.searchButton = searchButton;
+        
+        const clearSearchButton = new ComfyButton({
+            icon: "close",
+            tooltip: "Clear search",
+            classList: "comfyui-button icon-button",
+            action: async(e) => {
+                e.stopPropagation();
+                this.elements.url.value = "";
+                reset();
+            },
+        }).element;
+        settings["text-input-always-hide-clear-button"].addEventListener("change", () => {
+            const hideClearButton = settings["text-input-always-hide-clear-button"].checked;
+            clearSearchButton.style.display = hideClearButton ? "none" : "";
+        });
+        this.elements.clearSearchButton = clearSearchButton;
+        
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -2632,19 +3356,22 @@ class DownloadTab {
                     type: "text",
                     name: "model download url",
                     autocomplete: "off",
-                    placeholder: "Search URL...",
+                    placeholder: "Search URL",
                     onkeydown: async (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
-                            await update();
+                            if (this.elements.url.value === "") {
+                                reset();
+                            }
+                            else {
+                                await update();
+                            }
                             e.target.blur();
                         }
                     },
                 }),
-                $el("button.icon-button", {
-                    onclick: async () => { await update(); },
-                    textContent: "🔍︎",
-                }),
+                clearSearchButton,
+                searchButton,
             ]),
             $el("div.download-model-infos", {
                 $: (el) => (this.elements.infos = el),
@@ -2696,6 +3423,28 @@ class DownloadTab {
     }
     
     /**
+     * Returns empty string on failure
+     * @param {float | undefined} fileSizeKB 
+     * @returns {string}
+     */
+    static #fileSizeToFormattedString(fileSizeKB) {
+        if (fileSizeKB === undefined) { return ""; }
+        const sizes = ["KB", "MB", "GB", "TB", "PB"];
+        let fileSizeString = fileSizeKB.toString();
+        const index = fileSizeString.indexOf(".");
+        const indexMove = index % 3 === 0 ? 3 : index % 3;
+        const sizeIndex = Math.floor((index - indexMove) / 3);
+        if (sizeIndex >= sizes.length || sizeIndex < 0) {
+            fileSizeString = fileSizeString.substring(0, fileSizeString.indexOf(".") + 3);
+            return `(${fileSizeString} ${sizes[0]})`;
+        }
+        const split = fileSizeString.split(".");
+        fileSizeString = split[0].substring(0, indexMove) + "." + split[0].substring(indexMove) + split[1];
+        fileSizeString = fileSizeString.substring(0, fileSizeString.indexOf(".") + 3);
+        return `(${fileSizeString} ${sizes[sizeIndex]})`;
+    }
+    
+    /**
      * @param {Object} info
      * @param {ModelData} modelData
      * @param {int} id
@@ -2709,8 +3458,8 @@ class DownloadTab {
         );
         
         const comfyUIModelType = (
-            DownloadTab.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
-            DownloadTab.modelTypeToComfyUiDirectory(info["modelType"]) ??
+            DownloadView.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
+            DownloadView.modelTypeToComfyUiDirectory(info["modelType"]) ??
             ""
         );
         const searchSeparator = modelData.searchSeparator;
@@ -2749,6 +3498,14 @@ class DownloadTab {
             },
         });
         
+        const infoNotes = $el("textarea.comfy-multiline-input.model-info-notes", {
+            name: "model info notes",
+            value: info["description"]??"",
+            rows: 6,
+            disabled: true,
+            style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
+        });
+        
         const filepath = info["downloadFilePath"];
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
@@ -2756,9 +3513,12 @@ class DownloadTab {
                 downloadPreviewSelect.elements.previews,
                 $el("div.download-settings-wrapper", [
                     $el("div.download-settings", [
-                        $el("button.icon-button", {
-                            textContent: "📥︎",
-                            onclick: async (e) => {
+                        new ComfyButton({
+                            icon: "arrow-collapse-down",
+                            tooltip: "Download model",
+                            content: "Download " + DownloadView.#fileSizeToFormattedString(info["details"]["fileSizeKB"]),
+                            classList: "comfyui-button download-button",
+                            action: async (e) => {
                                 const pathDirectory = el_saveDirectoryPath.value;
                                 const modelName = (() => {
                                     const filename = info["fileName"];
@@ -2778,8 +3538,9 @@ class DownloadTab {
                                 const image = await downloadPreviewSelect.getImage();
                                 formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);
-                                e.target.disabled = true;
-                                const [success, resultText] = await request(
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
+                                const [success, resultText] = await comfyRequest(
                                     "/model-manager/model/download",
                                     {
                                         method: "POST",
@@ -2796,21 +3557,21 @@ class DownloadTab {
                                     return [false, "📥︎"];
                                 });
                                 if (success) {
-                                    const description = info["description"];
-                                    if (settings["download-save-description-as-text-file"].checked && description !== "") {
+                                    const description = infoNotes.value;
+                                    if (this.elements.downloadNotes.checked && description !== "") {
                                         const modelPath = pathDirectory + searchSeparator + modelName;
                                         const saved = await saveNotes(modelPath, description);
                                         if (!saved) {
-                                            console.warn("Description was note saved as notes!");
+                                            console.warn("Model description was not saved!");
                                         }
                                     }
                                     this.#updateModels();
                                 }
-                                buttonAlert(e.target, success, "✔", "✖", resultText);
-                                e.target.disabled = success;
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick", success);
+                                button.disabled = success;
                             },
-                        }),
-                        $el("div.row.tab-header-flex-block", [
+                        }).element,
+                        $el("div.row.tab-header-flex-block.input-dropdown-container", [ // TODO: magic class
                             el_saveDirectoryPath,
                             searchDropdown.element,
                         ]),
@@ -2818,6 +3579,7 @@ class DownloadTab {
                             el_filename,
                         ]),
                         downloadPreviewSelect.elements.radioGroup,
+                        infoNotes,
                     ]),
                 ]),
             ]),
@@ -2855,11 +3617,18 @@ class DownloadTab {
             
             const header = $el("div", [
                 $el("h1", [name]),
-                $checkbox({
-                    $: (el) => { this.elements.overwrite = el; },
-                    textContent: "Overwrite Existing Files.",
-                    checked: false,
-                }),
+                $el("div.model-manager-settings", [
+                    $checkbox({
+                        $: (el) => { this.elements.overwrite = el; },
+                        textContent: "Overwrite Existing Files.",
+                        checked: false,
+                    }),
+                    $checkbox({
+                        $: (el) => { this.elements.downloadNotes = el; },
+                        textContent: "Save Notes.",
+                        checked: false,
+                    }),
+                ])
             ]);
             modelInfosHtml.unshift(header);
         }
@@ -2867,10 +3636,29 @@ class DownloadTab {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
+        
+        const downloadNotes = this.elements.downloadNotes;
+        if (downloadNotes !== undefined && downloadNotes !== null) {
+            downloadNotes.addEventListener("change", (e) => {
+                const modelInfoNotes = infosHtml.querySelectorAll(`textarea.model-info-notes`);
+                const disabled = !e.currentTarget.checked;
+                for (let i = 0; i < modelInfoNotes.length; i++) {
+                    modelInfoNotes[i].disabled = disabled;
+                }
+            });
+            downloadNotes.checked = settings["download-save-description-as-text-file"].checked;
+            downloadNotes.dispatchEvent(new Event('change'));
+        }
+        
+        const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
+        this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+        
+        const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
+        this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
     }
 }
 
-class ModelTab {
+class BrowseView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -2879,6 +3667,8 @@ class ModelTab {
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
         /** @type {HTMLSelectElement} */ modelSortSelect: null,
         /** @type {HTMLInputElement} */ modelContentFilter: null,
+        /** @type {HTMLButtonElement} */ searchButton: null,
+        /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
     
     /** @type {Array} */
@@ -2906,9 +3696,10 @@ class ModelTab {
      * @param {() => Promise<void>} updateModels
      * @param {ModelData} modelData
      * @param {(searchPath: string) => Promise<void>} showModelInfo
+     * @param {() => void} updateModelGridCallback
      * @param {any} settingsElements
      */
-    constructor(updateModels, modelData, showModelInfo, settingsElements) {
+    constructor(updateModels, modelData, showModelInfo, updateModelGridCallback, settingsElements) {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
@@ -2922,7 +3713,7 @@ class ModelTab {
             type: "text",
             name: "model search",
             autocomplete: "off",
-            placeholder: "/Search...",
+            placeholder: "/Search",
         });
         
         const updatePreviousModelFilter = () => {
@@ -2947,7 +3738,16 @@ class ModelTab {
                 this.elements.modelContentFilter,
                 showModelInfo,
             );
-            this.element.parentElement.scrollTop = 0;
+            updateModelGridCallback();
+            
+            const hideSearchButtons = (
+                this.#settingsElements["model-real-time-search"].checked |
+                this.#settingsElements["text-input-always-hide-search-button"].checked
+            );
+            this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+            
+            const hideClearSearchButtons = this.#settingsElements["text-input-always-hide-clear-button"].checked;
+            this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
         }
         this.updateModelGrid = updateModelGrid;
         
@@ -2958,27 +3758,91 @@ class ModelTab {
             () => { return this.elements.modelTypeSelect.value; },
             updatePreviousModelFilter,
             updateModelGrid,
+            () => { return this.#settingsElements["model-real-time-search"].checked; },
         );
         this.directoryDropdown = searchDropdown;
+        
+        const searchButton = new ComfyButton({
+            icon: "magnify",
+            tooltip: "Search models",
+            classList: "comfyui-button icon-button",
+            action: (e) => {
+                e.stopPropagation();
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                updateModelGrid();
+                button.disabled = false;
+            },
+        }).element;
+        settingsElements["model-real-time-search"].addEventListener("change", () => {
+            const hideSearchButton = (
+                this.#settingsElements["text-input-always-hide-search-button"].checked ||
+                this.#settingsElements["model-real-time-search"].checked
+            );
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        settingsElements["text-input-always-hide-search-button"].addEventListener("change", () => {
+            const hideSearchButton = (
+                this.#settingsElements["text-input-always-hide-search-button"].checked ||
+                this.#settingsElements["model-real-time-search"].checked
+            );
+            searchButton.style.display = hideSearchButton ? "none" : "";
+        });
+        this.elements.searchButton = searchButton;
+        
+        const clearSearchButton = new ComfyButton({
+            icon: "close",
+            tooltip: "Clear search",
+            classList: "comfyui-button icon-button",
+            action: (e) => {
+                e.stopPropagation();
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                this.elements.modelContentFilter.value = "";
+                updateModelGrid();
+                button.disabled = false;
+            },
+        }).element;
+        settingsElements["text-input-always-hide-clear-button"].addEventListener("change", () => {
+            const hideClearSearchButton = this.#settingsElements["text-input-always-hide-clear-button"].checked;
+            clearSearchButton.style.display = hideClearSearchButton ? "none" : "";
+        });
+        this.elements.clearSearchButton = clearSearchButton;
         
         this.element = $el("div", [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "⟳",
-                        onclick: () => updateModels(),
-                    }),
+                    new ComfyButton({
+                        icon: "reload",
+                        tooltip: "Reload model grid",
+                        classList: "comfyui-button icon-button",
+                        action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
+                            updateModels();
+                            button.disabled = false;
+                        },
+                    }).element,
                     $el("select.model-select-dropdown", {
                         $: (el) => (this.elements.modelTypeSelect = el),
                         name: "model-type",
-                        onchange: () => updateModelGrid(),
+                        onchange: (e) => {
+                            const select = e.target;
+                            select.disabled = true;
+                            updateModelGrid();
+                            select.disabled = false;
+                        },
                     }),
                     $el("select.model-select-dropdown",
                         {
                             $: (el) => (this.elements.modelSortSelect = el),
                             name: "model select dropdown",
-                            onchange: () => updateModelGrid(),
+                            onchange: (e) => {
+                                const select = e.target;
+                                select.disabled = true;
+                                updateModelGrid();
+                                select.disabled = false;
+                            },
                         },
                         [
                             $el("option", { value: MODEL_SORT_DATE_CREATED }, ["Created (newest first)"]),
@@ -2993,15 +3857,12 @@ class ModelTab {
                     ),
                 ]),
                 $el("div.row.tab-header-flex-block", [
-                    $el("div.search-models", [
+                    $el("div.search-models.input-dropdown-container", [ // TODO: magic class
                         searchInput,
                         searchDropdown.element,
                     ]),
-                    $el("button.icon-button", {
-                        type: "button",
-                        textContent: "🔍︎",
-                        onclick: () => updateModelGrid(),
-                    }),
+                    clearSearchButton,
+                    searchButton,
                 ]),
             ]),
             modelGrid,
@@ -3009,7 +3870,7 @@ class ModelTab {
     }
 }
 
-class SettingsTab {
+class SettingsView {
     /** @type {HTMLDivElement} */
     element = null;
     
@@ -3018,20 +3879,36 @@ class SettingsTab {
         /** @type {HTMLButtonElement} */ saveButton: null,
         /** @type {HTMLDivElement} */ setPreviewButton: null,
         settings: {
-            //"sidebar-default-height": null,
-            //"sidebar-default-width": null,
             /** @type {HTMLTextAreaElement} */ "model-search-always-append": null,
+            /** @type {HTMLInputElement} */ "model-default-browser-model-type": null,
+            /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
-            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
-            /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
             
+            /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
+            /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
+            /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
+            /** @type {HTMLInputElement} */ "model-show-load-workflow-button": null,
+            /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
+            
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
             
+            /** @type {HTMLInputElement} */ "model-info-autosave-notes": null,
+            
             /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
+            
+            /** @type {HTMLInputElement} */ "sidebar-default-width": null,
+            /** @type {HTMLInputElement} */ "sidebar-default-height": null,
+            /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
+            /** @type {HTMLInputElement} */ "text-input-always-hide-search-button": null,
+            /** @type {HTMLInputElement} */ "text-input-always-hide-clear-button": null,
+            
+            /** @type {HTMLInputElement} */ "tag-generator-sampler-method": null,
+            /** @type {HTMLInputElement} */ "tag-generator-count": null,
+            /** @type {HTMLInputElement} */ "tag-generator-threshold": null,
         },
     };
     
@@ -3042,7 +3919,7 @@ class SettingsTab {
      * @param {Object} settingsData 
      * @param {boolean} updateModels 
      */
-    #setSettings(settingsData, updateModels) {
+    async #setSettings(settingsData, updateModels) {
         const settings = this.elements.settings;
         for (const [key, value] of Object.entries(settingsData)) {
             const setting = settings[key];
@@ -3055,12 +3932,13 @@ class SettingsTab {
                 case "range": setting.value = parseFloat(value); break;
                 case "textarea": setting.value = value; break;
                 case "number": setting.value = parseInt(value); break;
-                default: console.warn("Unknown settings input type!");
+                case "select-one": setting.value = value; break;
+                default: console.warn(`Unknown settings input type '${type}'!`);
             }
         }
 
         if (updateModels) {
-            this.#updateModels(); // Is this slow?
+            await this.#updateModels(); // Is this slow?
         }
     }
     
@@ -3069,10 +3947,10 @@ class SettingsTab {
      * @returns {Promise<void>}
      */
     async reload(updateModels) {
-        const data = await request("/model-manager/settings/load");
+        const data = await comfyRequest("/model-manager/settings/load");
         const settingsData = data["settings"];
-        this.#setSettings(settingsData, updateModels);
-        buttonAlert(this.elements.reloadButton, true);
+        await this.#setSettings(settingsData, updateModels);
+        comfyButtonAlert(this.elements.reloadButton, true);
     }
     
     /** @returns {Promise<void>} */
@@ -3087,12 +3965,13 @@ class SettingsTab {
                 case "range": value = el.value; break;
                 case "textarea": value = el.value; break;
                 case "number": value = el.value; break;
+                case "select-one": value = el.value; break;
                 default: console.warn("Unknown settings input type!");
             }
             settingsData[setting] = value;
         }
         
-        const data = await request(
+        const data = await comfyRequest(
             "/model-manager/settings/save",
             {
                 method: "POST",
@@ -3104,69 +3983,92 @@ class SettingsTab {
         const success = data["success"];
         if (success) {
             const settingsData = data["settings"];
-            this.#setSettings(settingsData, true);
+            await this.#setSettings(settingsData, true);
         }
-        buttonAlert(this.elements.saveButton, success);
+        comfyButtonAlert(this.elements.saveButton, success);
     }
     
     /**
      * @param {() => Promise<void>} updateModels
+     * @param {() => void} updateSidebarButtons
      */
-    constructor(updateModels) {
+    constructor(updateModels, updateSidebarButtons) {
         this.#updateModels = updateModels;
         const settings = this.elements.settings;
+        
+        const sidebarControl = $checkbox({
+            $: (el) => (settings["sidebar-control-always-compact"] = el),
+            textContent: "Sidebar controls always compact",
+        });
+        sidebarControl.getElementsByTagName('input')[0].addEventListener("change", () => {
+            updateSidebarButtons();
+        });
+        
+        const reloadButton = new ComfyButton({
+            content: "Reload",
+            tooltip: "Reload settings and model manager files",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                await this.reload(true);
+                button.disabled = false;
+            },
+        }).element;
+        this.elements.reloadButton = reloadButton;
+        
+        const saveButton = new ComfyButton({
+            content: "Save",
+            tooltip: "Save settings and reload model manager",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                await this.save();
+                button.disabled = false;
+            },
+        }).element;
+        this.elements.saveButton = saveButton;
+        
+        const correctPreviewsButton = new ComfyButton({
+            content: "Fix Extensions",
+            tooltip: "Correct image file extensions in all model directories",
+            action: async(e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const data = await comfyRequest(
+                    "/model-manager/preview/correct-extensions")
+                .catch((err) => {
+                    return { "success": false };
+                });
+                const success = data["success"];
+                if (success) {
+                    const detectPlural = data["detected"] === 1 ? "" : "s";
+                    const correctPlural = data["corrected"] === 1 ? "" : "s";
+                    const message = `Detected ${data["detected"]} extension${detectPlural}.\nCorrected ${data["corrected"]} extension${correctPlural}.`;
+                    window.alert(message);
+                }
+                comfyButtonAlert(e.target, success);
+                if (data["corrected"] > 0) {
+                    await this.reload(true);
+                }
+                button.disabled = false;
+            },
+        }).element;
+        
         $el("div.model-manager-settings", {
             $: (el) => (this.element = el),
         }, [
             $el("h1", ["Settings"]),
+            $el("div", [
+                reloadButton,
+                saveButton,
+            ]),
             $el("a", {
+                    style: { color: "var(--fg-color)" },
                     href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
                 }, [
                     "File bugs and issues here."
                 ]
             ),
-            $el("div", [
-                $el("button", {
-                    $: (el) => (this.elements.reloadButton = el),
-                    type: "button",
-                    textContent: "Reload", // ⟳
-                    onclick: async () => { await this.reload(true); },
-                }),
-                $el("button", {
-                    $: (el) => (this.elements.saveButton = el),
-                    type: "button",
-                    textContent: "Save", // 💾︎
-                    onclick: async () => { await this.save(); },
-                }),
-            ]),
-            /*
-            $el("h2", ["Window"]),
-            $el("div", [
-                $el("p", ["Default sidebar width"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-width"] = el),
-                    type: "number",
-                    name: "default sidebar width",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            $el("div", [
-                $el("p", ["Default sidebar height"]),
-                $el("input", {
-                    $: (el) => (settings["sidebar-default-height"] = el),
-                    type: "number",
-                    name: "default sidebar height",
-                    textContent: "Default sidebar height",
-                    value: 0.5,
-                    min: 0.0,
-                    max: 1.0,
-                    step: 0.05,
-                }),
-            ]),
-            */
             $el("h2", ["Model Search"]),
             $el("div", [
                 $el("div.search-settings-text", [
@@ -3179,131 +4081,303 @@ class SettingsTab {
                     }),
                 ]),
             ]),
-            $checkbox({
-                $: (el) => (settings["model-persistent-search"] = el),
-                textContent: "Persistent search text across model types",
+            $select({
+                $: (el) => (settings["model-default-browser-model-type"] = el),
+                textContent: "Default model search type (on start up)",
+                options: ["checkpoints", "clip", "clip_vision", "controlnet", "diffusers", "embeddings", "gligen", "hypernetworks", "loras", "photomaker", "style_models", "unet", "vae", "vae_approx"],
             }),
             $checkbox({
-                $: (el) => (settings["model-show-label-extensions"] = el),
-                textContent: "Show model file extension in labels",
+                $: (el) => (settings["model-real-time-search"] = el),
+                textContent: "Real-time search",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-persistent-search"] = el),
+                textContent: "Persistent search text (across model types)",
+            }),
+            $el("h2", ["Model Search Thumbnails"]),
+            $select({
+                $: (el) => (settings["model-preview-thumbnail-type"] = el),
+                textContent: "Preview thumbnail type",
+                options: ["AUTO", "JPEG"], // should use AUTO to avoid artifacts from changing between formats; use JPEG for backward compatibility
             }),
             $checkbox({
                 $: (el) => (settings["model-preview-fallback-search-safetensors-thumbnail"] = el),
-                textContent: "Fallback on embedded thumbnail in safetensors (refresh slow)",
+                textContent: "Fallback to embedded safetensors image (slow)",
             }),
             $checkbox({
-                $: (el) => (settings["model-show-add-button"] = el),
-                textContent: "Show add button",
+                $: (el) => (settings["model-show-label-extensions"] = el),
+                textContent: "Show file extension",
             }),
             $checkbox({
                 $: (el) => (settings["model-show-copy-button"] = el),
-                textContent: "Show copy button",
+                textContent: "Show \"Copy\" button",
             }),
-            $el("h2", ["Model Add"]),
+            $checkbox({
+                $: (el) => (settings["model-show-add-button"] = el),
+                textContent: "Show \"Add\" button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-show-load-workflow-button"] = el),
+                textContent: "Show \"Load Workflow\" button",
+            }),
+            $checkbox({
+                $: (el) => (settings["model-info-button-on-left"] = el),
+                textContent: "\"Model Info\" button on left",
+            }),
+            $el("h2", ["Node Graph"]),
             $checkbox({
                 $: (el) => (settings["model-add-embedding-extension"] = el),
-                textContent: "Add extension to embedding",
+                textContent: "Add embedding with extension",
             }),
             $checkbox({
-                $: (el) => (settings["model-add-drag-strict-on-field"] = el),
-                textContent: "Strict dragging model onto a node's model field to add",
+                $: (el) => (settings["model-add-drag-strict-on-field"] = el), // true -> must drag on field; false -> can drag on node when unambiguous
+                textContent: "Must always drag thumbnail onto node's input field",
             }),
-            $el("div", [
+            $el("label", [
+                "Add offset", // if a node already was added to the same spot, add the next one with an offset
                 $el("input", {
                     $: (el) => (settings["model-add-offset"] = el),
                     type: "number",
                     name: "model add offset",
                     step: 5,
                 }),
-                $el("p", ["Add model offset"]),
             ]),
+            $el("h2", ["Model Info"]),
+            $checkbox({
+                $: (el) => (settings["model-info-autosave-notes"] = el), // note history deleted on model info close
+                textContent: "Autosave notes",
+            }),
             $el("h2", ["Download"]),
             $checkbox({
                 $: (el) => (settings["download-save-description-as-text-file"] = el),
-                textContent: "Save descriptions as notes (in .txt file).",
+                textContent: "Save notes by default.",
             }),
+            $el("h2", ["Window"]),
+            sidebarControl,
+            $el("label", [
+                "Sidebar width  (on start up)",
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-width"] = el),
+                    type: "range",
+                    name: "default sidebar width",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            $el("label", [
+                "Sidebar height (on start up)",
+                $el("input", {
+                    $: (el) => (settings["sidebar-default-height"] = el),
+                    type: "range",
+                    name: "default sidebar height",
+                    value: 0.5,
+                    min: 0.0,
+                    max: 1.0,
+                    step: 0.05,
+                }),
+            ]),
+            $checkbox({
+                $: (el) => (settings["text-input-always-hide-search-button"] = el),
+                textContent: "Always hide \"Search\" buttons.",
+            }),
+            $checkbox({
+                $: (el) => (settings["text-input-always-hide-clear-button"] = el),
+                textContent: "Always hide \"Clear Search\" buttons.",
+            }),
+            $el("h2", ["Model Preview Images"]),
+            $el("div", [
+                correctPreviewsButton,
+            ]),
+            $el("h2", ["Random Tag Generator"]),
+            $select({
+                $: (el) => (settings["tag-generator-sampler-method"] = el),
+                textContent: "Default sampling method",
+                options: ["Frequency", "Uniform"],
+            }),
+            $el("label", [
+                "Default count",
+                $el("input", {
+                    $: (el) => (settings["tag-generator-count"] = el),
+                    type: "number",
+                    name: "tag generator count",
+                    step: 1,
+                    min: 1,
+                }),
+            ]),
+            $el("label", [
+                "Default minimum threshold",
+                $el("input", {
+                    $: (el) => (settings["tag-generator-threshold"] = el),
+                    type: "number",
+                    name: "tag generator threshold",
+                    step: 1,
+                    min: 1,
+                }),
+            ]),
         ]);
     }
 }
 
-class SidebarButtons {
-    /** @type {HTMLDivElement} */
-    element = null;
-    
-    /** @type {ModelManager} */
-    #modelManager = null;
-    
-    /**
-     * @param {Event} e
-     */
-    #setSidebar(e) {
-        // TODO: settings["sidebar-default-width"]
-        // TODO: settings["sidebar-default-height"]
-        // TODO: draggable resize?
-        const button = e.target;
-        const modelManager = this.#modelManager.element;
-        const sidebarButtons = this.element.children;
-
-        const buttonActiveState = "sidebar-button-active";
-        for (let i = 0; i < sidebarButtons.length; i++) {
-            sidebarButtons[i].classList.remove(buttonActiveState);
-        }
-
-        let buttonIndex;
-        for (buttonIndex = 0; buttonIndex < sidebarButtons.length; buttonIndex++) {
-            const sidebarButton = sidebarButtons[buttonIndex];
-            if (sidebarButton === button) {
-                break;
-            }
-        }
-
-        const sidebarStates = ["sidebar-right", "sidebar-top", "sidebar-bottom", "sidebar-left"]; // TODO: magic numbers
-        let stateIndex;
-        for (stateIndex = 0; stateIndex < sidebarStates.length; stateIndex++) {
-            const state = sidebarStates[stateIndex];
-            if (modelManager.classList.contains(state)) {
-                modelManager.classList.remove(state);
-                break;
-            }
-        }
-
-        if (stateIndex != buttonIndex) {
-            const newSidebarState = sidebarStates[buttonIndex];
-            modelManager.classList.add(newSidebarState);
-            const sidebarButton = sidebarButtons[buttonIndex];
-            sidebarButton.classList.add(buttonActiveState);
-        }
+/**
+ * @param {String[]} labels
+ * @param {[(event: Event) => Promise<void>]} callbacks
+ * @returns {HTMLDivElement}
+ */
+function GenerateRadioButtonGroup(labels, callbacks = []) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const callback = callbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const targetIsActive = event.target.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    if (targetIsActive) {
+                        return;
+                    }
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    event.target.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                    callback(event);
+                },
+            })
+        );
     }
-    
-    /**
-     * @param {ModelManager} modelManager
-     */
-    constructor(modelManager) {
-        this.#modelManager = modelManager;
-        $el("div.sidebar-buttons",
-        {
-            $: (el) => (this.element = el),
-        },
-        [
-            
-            $el("button.icon-button", {
-                textContent: "◨",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬒",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "⬓",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-            $el("button.icon-button", {
-                textContent: "◧",
-                onclick: (event) => this.#setSidebar(event),
-            }),
-        ]);
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    buttons[0]?.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+    return radioButtonGroup;
+}
+
+/**
+ * @param {String[]} labels
+ * @param {[(event: Event) => Promise<void>]} activationCallbacks
+ * @param {(event: Event) => Promise<void>} deactivationCallback
+ * @returns {HTMLDivElement}
+ */
+function GenerateToggleRadioButtonGroup(labels, activationCallbacks = [], deactivationCallback = () => {}) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const activationCallback = activationCallbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const targetIsActive = event.target.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    if (targetIsActive) {
+                        deactivationCallback(event);
+                    }
+                    else {
+                        event.target.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallback(event);
+                    }
+                },
+            })
+        );
     }
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    return radioButtonGroup;
+}
+
+/**
+ * Coupled-state select and radio buttons (hidden first radio button)
+ * @param {String[]} labels
+ * @param {[(button: HTMLButtonElement) => Promise<void>]} activationCallbacks
+ * @returns {[HTMLDivElement, HTMLSelectElement]}
+ */
+function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
+    const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
+    const radioButtonGroup = $el("div.radio-button-group", []);
+    const buttons = [];
+    
+    const select = $el("select", {
+            name: "sidebar-select",
+            onchange: (event) => {
+                const select = event.target;
+                const children = select.children;
+                let value = undefined;
+                for (let i = 0; i < children.length; i++) {
+                    const child = children[i];
+                    if (child.selected) {
+                        value = child.value;
+                    }
+                }
+                for (let i = 0; i < buttons.length; i++) {
+                    const button = buttons[i];
+                    if (button.textContent === value) {
+                        for (let i = 0; i < buttons.length; i++) {
+                            buttons[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                        }
+                        button.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallbacks[i](button);
+                        break;
+                    }
+                }
+            },
+        }, labels.map((option) => {
+            return $el("option", {
+                value: option,
+            }, option);
+        })
+    );
+    
+    for (let i = 0; i < labels.length; i++) {
+        const text = labels[i];
+        const activationCallback = activationCallbacks[i] ?? (() => {});
+        buttons.push(
+            $el("button.radio-button", {
+                textContent: text,
+                onclick: (event) => {
+                    const button = event.target;
+                    let textContent = button.textContent;
+                    const targetIsActive = button.classList.contains(RADIO_BUTTON_GROUP_ACTIVE);
+                    if (button === buttons[0] && buttons[0].classList.contains(RADIO_BUTTON_GROUP_ACTIVE)) {
+                        // do not deactivate 0
+                        return;
+                    }
+                    // update button
+                    const children = radioButtonGroup.children;
+                    for (let i = 0; i < children.length; i++) {
+                        children[i].classList.remove(RADIO_BUTTON_GROUP_ACTIVE);
+                    }
+                    if (targetIsActive) {
+                        // return to 0
+                        textContent = labels[0];
+                        buttons[0].classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallbacks[0](buttons[0]);
+                    }
+                    else {
+                        // move to >0
+                        button.classList.add(RADIO_BUTTON_GROUP_ACTIVE);
+                        activationCallback(button);
+                    }
+                    // update selection
+                    for (let i = 0; i < select.children.length; i++) {
+                        const option = select.children[i];
+                        option.selected = option.value === textContent;
+                    }
+                },
+            })
+        );
+    }
+    radioButtonGroup.append.apply(radioButtonGroup, buttons);
+    buttons[0].click();
+    buttons[0].style.display = "none";
+    
+    return [radioButtonGroup, select];
 }
 
 class ModelManager extends ComfyDialog {
@@ -3313,198 +4387,409 @@ class ModelManager extends ComfyDialog {
     /** @type {ModelData} */
     #modelData = null;
     
-    /** @type {ModelInfoView} */
-    #modelInfoView = null;
+    /** @type {ModelInfo} */
+    #modelInfo = null;
     
-    /** @type {DownloadTab} */
-    #downloadTab = null;
+    /** @type {DownloadView} */
+    #downloadView = null;
     
-    /** @type {ModelTab} */
-    #modelTab = null;
+    /** @type {BrowseView} */
+    #browseView = null;
     
-    /** @type {SettingsTab} */
-    #settingsTab = null;
-    
-    /** @type {HTMLDivElement} */
-    #tabs = null;
+    /** @type {SettingsView} */
+    #settingsView = null;
     
     /** @type {HTMLDivElement} */
-    #tabContents = null;
+    #topbarRight = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabManagerButtons = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabManagerContents = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabInfoButtons = null;
+    
+    /** @type {HTMLDivElement} */
+    #tabInfoContents = null;
+    
+    /** @type {HTMLButtonElement} */
+    #sidebarButtonGroup = null;
+    
+    /** @type {HTMLButtonElement} */
+    #sidebarSelect = null;
     
     /** @type {HTMLButtonElement} */
     #closeModelInfoButton = null;
+    
+    /** @type {String} */
+    #dragSidebarState = "";
     
     constructor() {
         super();
         
         this.#modelData = new ModelData();
         
-        const modelInfoView = new ModelInfoView(
+        this.#settingsView = new SettingsView(
+            this.#refreshModels,
+            () => this.#updateSidebarButtons(),
+        );
+        
+        this.#modelInfo = new ModelInfo(
             this.#modelData,
             this.#refreshModels,
+            this.#settingsView.elements.settings,
         );
-        this.#modelInfoView = modelInfoView;
         
-        const settingsTab = new SettingsTab(
+        this.#browseView = new BrowseView(
+            this.#refreshModels,
+            this.#modelData,
+            this.#showModelInfo,
+            this.#resetManagerContentsScroll,
+            this.#settingsView.elements.settings, // TODO: decouple settingsData from elements?
+        );
+        
+        this.#downloadView = new DownloadView(
+            this.#modelData,
+            this.#settingsView.elements.settings,
             this.#refreshModels,
         );
-        this.#settingsTab = settingsTab;
         
-        const ACTIVE_TAB_CLASS = "active";
+        const [tabManagerButtons, tabManagerContents] = GenerateTabGroup([
+            { name: "Download", icon: "arrow-collapse-down", tabContent: this.#downloadView.element },
+            { name: "Models", icon: "folder-search-outline", tabContent: this.#browseView.element },
+            { name: "Settings", icon: "cog-outline", tabContent: this.#settingsView.element },
+        ]);
+        tabManagerButtons[0]?.click();
         
-        /**
-         * @param {searchPath: string}
-         * @return {Promise<void>}
-         */
-        const showModelInfo = async(searchPath) => {
-            await this.#modelInfoView.update(
-                searchPath, 
-                this.#refreshModels, 
-                this.#modelData.searchSeparator
-            ).then(() => {
-                this.#tabs.style.display = "none";
-                this.#tabContents.style.display = "none";
-                this.#closeModelInfoButton.style.display = "";
-                this.#modelInfoView.show();
-            });
+        const tabInfoButtons = this.#modelInfo.elements.tabButtons;
+        const tabInfoContents = this.#modelInfo.elements.tabContents;
+        
+        const [sidebarButtonGroup, sidebarSelect] = GenerateSidebarToggleRadioAndSelect(
+            ["◼", "◨", "⬒", "⬓", "◧"],
+            [
+                () => { 
+                    const element = this.element;
+                    if (element) { // callback on initialization as default state
+                        element.dataset["sidebarState"] = "none";
+                    }
+                },
+                () => { this.element.dataset["sidebarState"] = "right"; },
+                () => { this.element.dataset["sidebarState"] = "top"; },
+                () => { this.element.dataset["sidebarState"] = "bottom"; },
+                () => { this.element.dataset["sidebarState"] = "left"; },
+            ],
+        );
+        this.#sidebarButtonGroup = sidebarButtonGroup;
+        this.#sidebarSelect = sidebarSelect;
+        sidebarButtonGroup.classList.add("sidebar-buttons");
+        const sidebarButtonGroupChildren = sidebarButtonGroup.children;
+        for (let i = 0; i < sidebarButtonGroupChildren.length; i++) {
+            sidebarButtonGroupChildren[i].classList.add("icon-button");
         }
         
-        const modelTab = new ModelTab(
-            this.#refreshModels,
-            this.#modelData,
-            showModelInfo,
-            this.#settingsTab.elements.settings, // TODO: decouple settingsData from elements?
-        );
-        this.#modelTab = modelTab;
-        
-        const downloadTab = new DownloadTab(
-            this.#modelData,
-            this.#settingsTab.elements.settings,
-            this.#refreshModels,
-        );
-        this.#downloadTab = downloadTab;
-        
-        const sidebarButtons = new SidebarButtons(this);
-        
-        /** @type {Record<string, HTMLDivElement>} */
-        const head = {};
-        
-        /** @type {Record<string, HTMLDivElement>} */
-        const body = {};
-        
-        /** @type {HTMLDivElement[]} */
-        const contents = [
-            $el("div", { dataset: { name: "Download" } }, [downloadTab.element]),
-            $el("div", { dataset: { name: "Models" } }, [modelTab.element]),
-            $el("div", { dataset: { name: "Settings" } }, [settingsTab.element]),
-        ];
-        
-        const tabs = contents.map((content) => {
-            const name = content.getAttribute("data-name");
-            /** @type {HTMLDivElement} */
-            const tab = $el("div.head-item", {
-                    onclick: () => {
-                        Object.keys(head).forEach((key) => {
-                            if (name === key) {
-                                head[key].classList.add(ACTIVE_TAB_CLASS);
-                                body[key].style.display = "";
-                            } else {
-                                head[key].classList.remove(ACTIVE_TAB_CLASS);
-                                body[key].style.display = "none";
-                            }
-                        });
-                    },
-                },
-                [name],
-            );
-            head[name] = tab;
-            body[name] = content;
-            return tab;
-        });
-        tabs[0]?.click();
-        
-        const closeManagerButton = $el("button.icon-button", {
-            textContent: "✖",
-            onclick: async() => {
-                const saved = await modelInfoView.trySave(true);
-                if (saved) {
-                    this.close();
-                }
-            }
-        });
-        
-        const closeModelInfoButton = $el("button.icon-button", {
-            $: (el) => (this.#closeModelInfoButton = el),
-            style: { display: "none" },
-            textContent: "⬅",
-            onclick: async() => { await this.#tryHideModelInfo(true); },
-        });
+        const closeModelInfoButton = new ComfyButton({
+            icon: "arrow-u-left-bottom",
+            tooltip: "Return to model search",
+            classList: "comfyui-button icon-button",
+            action: async() => await this.#tryHideModelInfo(true),
+        }).element;
+        this.#closeModelInfoButton = closeModelInfoButton;
+        closeModelInfoButton.style.display = "none";
         
         const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
                 $: (el) => (this.element = el),
                 parent: document.body,
+                dataset: {
+                    "sidebarState": "none",
+                    "sidebarLeftWidthDecimal": "",
+                    "sidebarRightWidthDecimal": "",
+                    "sidebarTopHeightDecimal": "",
+                    "sidebarBottomHeightDecimal": "",
+                },
             },
             [
                 $el("div.comfy-modal-content", [ // TODO: settings.top_bar_left_to_right or settings.top_bar_right_to_left
                     $el("div.model-manager-panel", [
                         $el("div.model-manager-head", [
-                            $el("div.topbar-right", [
-                                closeManagerButton,
+                            $el("div.topbar-right", {
+                                $: (el) => (this.#topbarRight = el),
+                            }, [
+                                new ComfyButton({
+                                    icon: "window-close",
+                                    tooltip: "Close model manager",
+                                    classList: "comfyui-button icon-button",
+                                    action: async() => {
+                                        const saved = await this.#modelInfo.trySave(true);
+                                        if (saved) {
+                                            this.close();
+                                        }
+                                    },
+                                }).element,
                                 closeModelInfoButton,
-                                sidebarButtons.element,
+                                sidebarSelect,
+                                sidebarButtonGroup,
                             ]),
                             $el("div.topbar-left", [
-                                $el("div.model-manager-tabs", {
-                                    $: (el) => (this.#tabs = el),
-                                }, tabs),
+                                $el("div", [
+                                    $el("div.model-tab-group.no-highlight", {
+                                        $: (el) => (this.#tabManagerButtons = el),
+                                    }, tabManagerButtons),
+                                    $el("div.model-tab-group.no-highlight", {
+                                        $: (el) => (this.#tabInfoButtons = el),
+                                        style: { display: "none"},
+                                    }, tabInfoButtons),
+                                ]),
                             ]),
                         ]),
                         $el("div.model-manager-body", [
-                            $el("div.model-manager-tab-contents", {
-                                $: (el) => (this.#tabContents = el),
-                            }, contents),
-                            modelInfoView.element,
+                            $el("div.tab-contents", {
+                                $: (el) => (this.#tabManagerContents = el),
+                            }, tabManagerContents),
+                            $el("div.tab-contents", {
+                                $: (el) => (this.#tabInfoContents = el),
+                                style: { display: "none"},
+                            }, tabInfoContents),
                         ]),
                     ]),
                 ]),
             ]
         );
         
-        new ResizeObserver(() => {
-            if (modelManager.style.display === "none") {
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 704)).observe(modelManager);
+        new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
+        new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
+        window.addEventListener('resize', () => {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            const leftDecimal = modelManager.dataset["sidebarLeftWidthDecimal"];
+            const rightDecimal = modelManager.dataset["sidebarRightWidthDecimal"];
+            const topDecimal = modelManager.dataset["sidebarTopHeightDecimal"];
+            const bottomDecimal = modelManager.dataset["sidebarBottomHeightDecimal"];
+            
+            // restore decimal after resize
+            modelManager.style.setProperty("--model-manager-sidebar-width-left", (leftDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
+            modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
+        });
+        
+        const EDGE_DELTA = 8;
+        
+        const endDragSidebar = (e) => {
+            this.#dragSidebarState = "";
+            
+            modelManager.classList.remove("cursor-drag-left");
+            modelManager.classList.remove("cursor-drag-top");
+            modelManager.classList.remove("cursor-drag-right");
+            modelManager.classList.remove("cursor-drag-bottom");
+            
+            // cache for window resize
+            modelManager.dataset["sidebarLeftWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-left")) / window.innerWidth;
+            modelManager.dataset["sidebarRightWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-right")) / window.innerWidth;
+            modelManager.dataset["sidebarTopHeightDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-height-top")) / window.innerHeight;
+            modelManager.dataset["sidebarBottomHeightDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-height-bottom")) / window.innerHeight;
+        };
+        document.addEventListener("mouseup", (e) => endDragSidebar(e));
+        document.addEventListener("touchend", (e) => endDragSidebar(e));
+        
+        const detectDragSidebar = (e, x, y) => {
+            const left = modelManager.offsetLeft;
+            const top = modelManager.offsetTop;
+            const width = modelManager.offsetWidth;
+            const height = modelManager.offsetHeight;
+            const right = left + width;
+            const bottom = top + height;
+            
+            if (!(x >= left && x <= right && y >= top && y <= bottom)) {
+                // click was not in model manager
                 return;
             }
-            const minWidth = 768; // magic value (could easily break)
-            const managerRect = modelManager.getBoundingClientRect();
-            const isNarrow = managerRect.width < minWidth;
-            let texts = isNarrow ? ["⬇️", "📁", "⚙️"] : ["Download", "Models", "Settings"]; // magic values
-            texts.forEach((text, i) => {
-                tabs[i].innerText = text;
-            });
-        }).observe(modelManager);
+            
+            const isOnEdgeLeft = x - left <= EDGE_DELTA;
+            const isOnEdgeRight = right - x <= EDGE_DELTA;
+            const isOnEdgeTop = y - top <= EDGE_DELTA;
+            const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
+            
+            const sidebarState = this.element.dataset["sidebarState"];
+            if (sidebarState === "left" && isOnEdgeRight) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "right" && isOnEdgeLeft) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "top" && isOnEdgeBottom) {
+                this.#dragSidebarState = sidebarState;
+            }
+            else if (sidebarState === "bottom" && isOnEdgeTop) {
+                this.#dragSidebarState = sidebarState;
+            }
+            
+            if (this.#dragSidebarState !== "") {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+        };
+        modelManager.addEventListener("mousedown", (e) => detectDragSidebar(e, e.clientX, e.clientY));
+        modelManager.addEventListener("touchstart", (e) => detectDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
+        
+        const updateSidebarCursor = (e, x, y) => {
+            if (this.#dragSidebarState !== "") {
+                // do not update cursor style while dragging
+                return;
+            }
+            
+            const left = modelManager.offsetLeft;
+            const top = modelManager.offsetTop;
+            const width = modelManager.offsetWidth;
+            const height = modelManager.offsetHeight;
+            const right = left + width;
+            const bottom = top + height;
+            
+            const isOnEdgeLeft = x - left <= EDGE_DELTA;
+            const isOnEdgeRight = right - x <= EDGE_DELTA;
+            const isOnEdgeTop = y - top <= EDGE_DELTA;
+            const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
+            
+            const updateClass = (add, className) => {
+                if (add) {
+                    modelManager.classList.add(className);
+                }
+                else {
+                    modelManager.classList.remove(className);
+                }
+            };
+            
+            const sidebarState = this.element.dataset["sidebarState"];
+            updateClass(sidebarState === "right" && isOnEdgeLeft, "cursor-drag-left");
+            updateClass(sidebarState === "bottom" && isOnEdgeTop, "cursor-drag-top");
+            updateClass(sidebarState === "left" && isOnEdgeRight, "cursor-drag-right");
+            updateClass(sidebarState === "top" && isOnEdgeBottom, "cursor-drag-bottom");
+        };
+        modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e, e.clientX, e.clientY));
+        modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e, e.touches[0].clientX, e.touches[0].clientY));
+        
+        const updateDragSidebar = (e, x, y) => {
+            const sidebarState = this.#dragSidebarState;
+            if (sidebarState === "") {
+                return;
+            }
+            
+            e.preventDefault();
+            
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            if (sidebarState === "left") {
+                const pixels = clamp(x, 0, width).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-width-left", pixels);
+            }
+            else if (sidebarState === "right") {
+                const pixels = clamp(width - x, 0, width).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-width-right", pixels);
+            }
+            else if (sidebarState === "top") {
+                const pixels = clamp(y, 0, height).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-height-top", pixels);
+            }
+            else if (sidebarState === "bottom") {
+                const pixels = clamp(height - y, 0, height).toString() + "px";
+                modelManager.style.setProperty("--model-manager-sidebar-height-bottom", pixels);
+            }
+        };
+        document.addEventListener("mousemove", (e) => updateDragSidebar(e, e.clientX, e.clientY));
+        document.addEventListener("touchmove", (e) => updateDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
         
         this.#init();
     }
     
-    #init() {
-        this.#settingsTab.reload(false);
-        this.#refreshModels();
+    async #init() {
+        await this.#settingsView.reload(false);
+        await this.#refreshModels();
+        
+        const settings = this.#settingsView.elements.settings;
+        
+        {
+            // initialize buttons' visibility state
+            const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
+            const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
+            this.#downloadView.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
+            this.#downloadView.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
+        }
+        
+        {
+            // set initial sidebar widths & heights
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            
+            const xDecimal = settings["sidebar-default-width"].value;
+            const yDecimal = settings["sidebar-default-height"].value;
+            
+            this.element.dataset["sidebarLeftWidthDecimal"] = xDecimal;
+            this.element.dataset["sidebarRightWidthDecimal"] = xDecimal;
+            this.element.dataset["sidebarTopHeightDecimal"] = yDecimal;
+            this.element.dataset["sidebarBottomHeightDecimal"] = yDecimal;
+            
+            const x = Math.floor(width * xDecimal);
+            const y = Math.floor(height * yDecimal);
+            
+            const leftPixels = x.toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
+            
+            const rightPixels = x.toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
+            
+            const topPixels = y.toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
+            
+            const bottomPixels = y.toString() + "px";
+            this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
+        }
+    }
+    
+    #resetManagerContentsScroll = () => {
+        this.#tabManagerContents.scrollTop = 0;
     }
     
     #refreshModels = async() => {
         const modelData = this.#modelData;
-        modelData.systemSeparator = await request("/model-manager/system-separator");
-        const newModels = await request("/model-manager/models/list");
+        modelData.systemSeparator = await comfyRequest("/model-manager/system-separator");
+        const newModels = await comfyRequest("/model-manager/models/list");
         Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
-        const newModelDirectories = await request("/model-manager/models/directory-list");
+        const newModelDirectories = await comfyRequest("/model-manager/models/directory-list");
         modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
         
-        this.#modelTab.updateModelGrid();
+        this.#browseView.updateModelGrid();
         await this.#tryHideModelInfo(false);
         
         document.getElementById("comfy-refresh-button")?.click();
+    }
+    
+    /**
+     * @param {searchPath: string}
+     * @return {Promise<void>}
+     */
+    #showModelInfo = async(searchPath) => {
+        await this.#modelInfo.update(
+            searchPath, 
+            this.#refreshModels, 
+            this.#modelData.searchSeparator, 
+        ).then(() => {
+            this.#tabManagerButtons.style.display = "none";
+            this.#tabManagerContents.style.display = "none";
+            
+            this.#closeModelInfoButton.style.display = "";
+            this.#tabInfoButtons.style.display = "";
+            this.#tabInfoContents.style.display = "";
+            
+            this.#tabInfoButtons.children[0]?.click();
+            this.#modelInfo.show();
+            this.#tabInfoContents.scrollTop = 0;
+        });
     }
     
     /**
@@ -3512,15 +4797,33 @@ class ModelManager extends ComfyDialog {
      * @returns {Promise<boolean>}
      */
     #tryHideModelInfo = async(promptSave) => {
-        if (this.#tabContents.style.display === "none") {
-            if (!await this.#modelInfoView.tryHide(promptSave)) {
+        if (this.#tabInfoContents.style.display !== "none") {
+            if (!await this.#modelInfo.tryHide(promptSave)) {
                 return false;
             }
+            
             this.#closeModelInfoButton.style.display = "none";
-            this.#tabs.style.display = "";
-            this.#tabContents.style.display = "";
+            this.#tabInfoButtons.style.display = "none";
+            this.#tabInfoContents.style.display = "none";
+            
+            this.#tabManagerButtons.style.display = "";
+            this.#tabManagerContents.style.display = "";
         }
         return true;
+    }
+    
+    #updateSidebarButtons = () => {
+        const managerRect = this.element.getBoundingClientRect();
+        const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
+        const alwaysShowCompactSidebarControls = this.#settingsView.elements.settings["sidebar-control-always-compact"].checked;
+        if (isNarrow || alwaysShowCompactSidebarControls) {
+            this.#sidebarButtonGroup.style.display = "none";
+            this.#sidebarSelect.style.display = "";
+        }
+        else {
+            this.#sidebarButtonGroup.style.display = "";
+            this.#sidebarSelect.style.display = "none";
+        }
     }
 }
 
@@ -3537,6 +4840,17 @@ function getInstance() {
     return instance;
 }
 
+const toggleModelManager = () => {
+    const modelManager = getInstance();
+    const style = modelManager.element.style;
+    if (style.display === "" || style.display === "none") {
+        modelManager.show();
+    }
+    else {
+        modelManager.close();
+    }
+};
+
 app.registerExtension({
     name: "Comfy.ModelManager",
     init() {
@@ -3548,22 +4862,22 @@ app.registerExtension({
             href: "./extensions/ComfyUI-Model-Manager/model-manager.css",
         });
         
-        app.ui.menuContainer.appendChild(
+        app.ui?.menuContainer?.appendChild(
             $el("button", {
                 id: "comfyui-model-manager-button",
                 parent: document.querySelector(".comfy-menu"),
                 textContent: "Models",
-                onclick: () => {
-                    const modelManager = getInstance();
-                    const style = modelManager.element.style;
-                    if (style.display === "" || style.display === "none") {
-                        modelManager.show();
-                    }
-                    else {
-                        modelManager.close();
-                    }
-                },
+                onclick: () => toggleModelManager(),
             })
         );
+        
+        // [Beta] mobile menu
+        app.menu?.settingsGroup?.append(new ComfyButton({
+            icon: "folder-search",
+            tooltip: "Opens model manager",
+            action: () => toggleModelManager(),
+            content: "Model Manager",
+            popup: getInstance(),
+        }));
     },
 });

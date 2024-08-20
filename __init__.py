@@ -18,6 +18,7 @@ import json
 import requests
 requests.packages.urllib3.disable_warnings()
 
+import comfy.utils
 import folder_paths
 
 comfyui_model_uri = folder_paths.models_dir
@@ -33,12 +34,14 @@ no_preview_image = os.path.join(extension_uri, "no-preview.png")
 ui_settings_uri = os.path.join(extension_uri, "ui_settings.yaml")
 server_settings_uri = os.path.join(extension_uri, "server_settings.yaml")
 
-fallback_model_extensions = set([".bin", ".ckpt", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
+fallback_model_extensions = set([".bin", ".ckpt", ".gguf", ".onnx", ".pt", ".pth", ".safetensors"]) # TODO: magic values
+jpeg_format_names = ["JPG", "JPEG", "JFIF"]
 image_extensions = (
     ".png", # order matters
     ".webp", 
     ".jpeg", 
     ".jpg", 
+    ".jfif", 
     ".gif", 
     ".apng", 
 )
@@ -47,6 +50,7 @@ stable_diffusion_webui_civitai_helper_image_extensions = (
     ".preview.webp", 
     ".preview.jpeg", 
     ".preview.jpg", 
+    ".preview.jfif", 
     ".preview.gif", 
     ".preview.apng", 
 )
@@ -139,11 +143,9 @@ def search_path_to_system_path(model_path):
 
 def get_safetensor_header(path):
     try:
-        with open(path, "rb") as f:
-            length_of_header = struct.unpack("<Q", f.read(8))[0]
-            header_bytes = f.read(length_of_header)
-            header_json = json.loads(header_bytes)
-            return header_json
+        header_bytes = comfy.utils.safetensors_header(path)
+        header_json = json.loads(header_bytes)
+        return header_json if header_json is not None else {}
     except:
         return {}
 
@@ -174,18 +176,36 @@ def model_type_to_dir_name(model_type):
 def ui_rules():
     Rule = config_loader.Rule
     return [
-        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
-        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
         Rule("model-search-always-append", "", str),
+        Rule("model-default-browser-model-type", "checkpoints", str),
+        Rule("model-real-time-search", True, bool),
         Rule("model-persistent-search", True, bool),
-        Rule("model-show-label-extensions", False, bool),
+        
+        Rule("model-preview-thumbnail-type", "AUTO", str),
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
+        Rule("model-show-label-extensions", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),
+        Rule("model-show-load-workflow-button", True, bool),
+        Rule("model-info-button-on-left", False, bool),
+        
         Rule("model-add-embedding-extension", False, bool),
         Rule("model-add-drag-strict-on-field", False, bool),
         Rule("model-add-offset", 25, int),
-        Rule("download-save-description-as-text-file", False, bool),
+        
+        Rule("model-info-autosave-notes", False, bool),
+        
+        Rule("download-save-description-as-text-file", True, bool),
+        
+        Rule("sidebar-control-always-compact", False, bool),
+        Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
+        Rule("text-input-always-hide-search-button", False, bool),
+        Rule("text-input-always-hide-clear-button", False, bool),
+        
+        Rule("tag-generator-sampler-method", "Frequency", str),
+        Rule("tag-generator-count", 10, int),
+        Rule("tag-generator-threshold", 2, int),
     ]
 
 
@@ -217,6 +237,11 @@ def get_def_headers(url=""):
             def_headers["Authorization"] = f"Bearer {api_key}"
     
     return def_headers
+
+
+@server.PromptServer.instance.routes.get("/model-manager/timestamp")
+async def get_timestamp(request):
+    return web.json_response({ "timestamp": datetime.now().timestamp() })
 
 
 @server.PromptServer.instance.routes.get("/model-manager/settings/load")
@@ -272,11 +297,41 @@ def get_safetensors_image_bytes(path):
     return base64.b64decode(image_data)
 
 
+def get_image_info(image):
+    metadata = None
+    if len(image.info) > 0:
+        metadata = PngInfo()
+        for (key, value) in image.info.items():
+            value_str = str(PIL_cast_serializable(value)) # not sure if this is correct (sometimes includes exif)
+            metadata.add_text(key, value_str)
+    return metadata
+
+
+def image_format_is_equal(f1, f2):
+    if not isinstance(f1, str) or not isinstance(f2, str):
+        return False
+    if f1[0] == ".": f1 = f1[1:]
+    if f2[0] == ".": f2 = f2[1:]
+    f1 = f1.upper()
+    f2 = f2.upper()
+    return f1 == f2 or (f1 in jpeg_format_names and f2 in jpeg_format_names)
+
+
+def get_auto_thumbnail_format(original_format):
+    if original_format in ["JPEG", "WEBP", "JPG"]: # JFIF?
+        return original_format
+    return "JPEG" # default fallback
+
+
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri")
+    quality = 75
+    response_image_format = request.query.get("image-format", None)
+    if isinstance(response_image_format, str):
+        response_image_format = response_image_format.upper()
+
     image_path = no_preview_image
-    image_type = "png"
     file_name = os.path.split(no_preview_image)[1]
     if uri != "no-preview":
         sep = os.path.sep
@@ -285,12 +340,10 @@ async def get_model_preview(request):
         head, extension = split_valid_ext(path, preview_extensions)
         if os.path.exists(path):
             image_path = path
-            image_type = extension.rsplit(".", 1)[1]
-            file_name = os.path.split(head)[1] + "." + image_type
+            file_name = os.path.split(head)[1] + extension
         elif os.path.exists(head) and head.endswith(".safetensors"):
             image_path = head
-            image_type = extension.rsplit(".", 1)[1]
-            file_name = os.path.splitext(os.path.split(head)[1])[0] + "." + image_type
+            file_name = os.path.splitext(os.path.split(head)[1])[0] + extension
 
     w = request.query.get("width")
     h = request.query.get("height")
@@ -314,6 +367,22 @@ async def get_model_preview(request):
         else:
             with open(image_path, "rb") as image:
                 image_data = image.read()
+        fp = io.BytesIO(image_data)
+        with Image.open(fp) as image:
+            image_format = image.format
+            if response_image_format is None:
+                response_image_format = image_format
+            elif response_image_format == "AUTO":
+                response_image_format = get_auto_thumbnail_format(image_format)
+
+            if not image_format_is_equal(response_image_format, image_format):
+                exif = image.getexif()
+                metadata = get_image_info(image)
+                if response_image_format in jpeg_format_names:
+                    image = image.convert('RGB')
+                image_bytes = io.BytesIO()
+                image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
+                image_data = image_bytes.getvalue()
     else:
         if image_path.endswith(".safetensors"):
             image_data = get_safetensors_image_bytes(image_path)
@@ -322,6 +391,12 @@ async def get_model_preview(request):
             fp = image_path
 
         with Image.open(fp) as image:
+            image_format = image.format
+            if response_image_format is None:
+                response_image_format = image_format
+            elif response_image_format == "AUTO":
+                response_image_format = get_auto_thumbnail_format(image_format)
+
             w0, h0 = image.size
             if w is None:
                 w = (h * w0) // h0
@@ -329,26 +404,41 @@ async def get_model_preview(request):
                 h = (w * h0) // w0
 
             exif = image.getexif()
+            metadata = get_image_info(image)
 
-            metadata = None
-            if len(image.info) > 0:
-                metadata = PngInfo()
-                for (key, value) in image.info.items():
-                    value_str = str(PIL_cast_serializable(value)) # not sure if this is correct (sometimes includes exif)
-                    metadata.add_text(key, value_str)
+            ratio_original = w0 / h0
+            ratio_thumbnail = w / h
+            if abs(ratio_original - ratio_thumbnail) < 0.01:
+                crop_box = (0, 0, w0, h0)
+            elif ratio_original > ratio_thumbnail:
+                crop_width_fp = h0 * w / h
+                x0 = int((w0 - crop_width_fp) / 2)
+                crop_box = (x0, 0, x0 + int(crop_width_fp), h0)
+            else:
+                crop_height_fp = w0 * h / w
+                y0 = int((h0 - crop_height_fp) / 2)
+                crop_box = (0, y0, w0, y0 + int(crop_height_fp))
+            image = image.crop(crop_box)
 
-            image.thumbnail((w, h))
+            if w < w0 and h < h0:
+                resampling_method = Image.Resampling.BOX
+            else:
+                resampling_method = Image.Resampling.BICUBIC
+            image.thumbnail((w, h), resample=resampling_method)
 
+            if not image_format_is_equal(image_format, response_image_format) and response_image_format in jpeg_format_names:
+                image = image.convert('RGB')
             image_bytes = io.BytesIO()
-            image.save(image_bytes, format=image.format, exif=exif, pnginfo=metadata)
+            image.save(image_bytes, format=response_image_format, exif=exif, pnginfo=metadata, quality=quality)
             image_data = image_bytes.getvalue()
 
+    response_file_name = os.path.splitext(file_name)[0] + '.' + response_image_format.lower()
     return web.Response(
         headers={
-            "Content-Disposition": f"inline; filename={file_name}",
+            "Content-Disposition": f"inline; filename={response_file_name}",
         },
         body=image_data,
-        content_type="image/" + image_type,
+        content_type="image/" + response_image_format.lower(),
     )
 
 
@@ -360,7 +450,7 @@ async def get_image_extensions(request):
 def download_model_preview(formdata):
     path = formdata.get("path", None)
     if type(path) is not str:
-        raise ("Invalid path!")
+        raise ValueError("Invalid path!")
     path, model_type = search_path_to_system_path(path)
     model_type_extensions = folder_paths_get_supported_pt_extensions(model_type)
     path_without_extension, _ = split_valid_ext(path, model_type_extensions)
@@ -401,20 +491,37 @@ def download_model_preview(formdata):
     else:
         content_type = image.content_type
         if not content_type.startswith("image/"):
-            raise ("Invalid content type!")
+            raise RuntimeError("Invalid content type!")
         image_extension = "." + content_type[len("image/"):]
         if image_extension not in image_extensions:
-            raise ("Invalid extension!")
+            raise RuntimeError("Invalid extension!")
 
         image_path = path_without_extension + image_extension
         if not overwrite and os.path.isfile(image_path):
-            raise ("Image already exists!")
+            raise RuntimeError("Image already exists!")
         file: io.IOBase = image.file
         image_data = file.read()
         with open(image_path, "wb") as f:
             f.write(image_data)
+        print("Saved file: " + image_path)
 
-    delete_same_name_files(path_without_extension, preview_extensions, image_extension)
+    if overwrite:
+        delete_same_name_files(path_without_extension, preview_extensions, image_extension)
+
+    # detect (and try to fix) wrong file extension
+    image_format = None
+    with Image.open(image_path) as image:
+        image_format = image.format
+    image_dir_and_name, image_ext = os.path.splitext(image_path)
+    if not image_format_is_equal(image_format, image_ext):
+        corrected_image_path = image_dir_and_name + "." + image_format.lower()
+        if os.path.exists(corrected_image_path) and not overwrite:
+            print("WARNING: '" + image_path + "' has wrong extension!")
+        else:
+            os.rename(image_path, corrected_image_path)
+            print("Saved file: " + corrected_image_path)
+            image_path = corrected_image_path
+    return image_path # return in-case need corrected path
 
 
 @server.PromptServer.instance.routes.post("/model-manager/preview/set")
@@ -447,6 +554,63 @@ async def delete_model_preview(request):
     delete_same_name_files(path_and_name, preview_extensions)
 
     result["success"] = True
+    return web.json_response(result)
+
+
+def correct_image_extensions(root_dir):
+    detected_image_count = 0
+    corrected_image_count = 0
+    for root, dirs, files in os.walk(root_dir):
+        for file_name in files:
+            file_path = root + os.path.sep + file_name
+            image_format = None
+            try:
+                with Image.open(file_path) as image:
+                    image_format = image.format
+            except:
+                continue
+            image_path = file_path
+            image_dir_and_name, image_ext = os.path.splitext(image_path)
+            if not image_format_is_equal(image_format, image_ext):
+                detected_image_count += 1
+                corrected_image_path = image_dir_and_name + "." + image_format.lower()
+                if os.path.exists(corrected_image_path):
+                    print("WARNING: '" + image_path + "' has wrong extension!")
+                else:
+                    try:
+                        os.rename(image_path, corrected_image_path)
+                    except:
+                        print("WARNING: Unable to rename '" + image_path + "'!")
+                        continue
+                    ext0 = os.path.splitext(image_path)[1]
+                    ext1 = os.path.splitext(corrected_image_path)[1]
+                    print(f"({ext0} -> {ext1}): {corrected_image_path}")
+                    corrected_image_count += 1
+    return (detected_image_count, corrected_image_count)
+
+
+@server.PromptServer.instance.routes.get("/model-manager/preview/correct-extensions")
+async def correct_preview_extensions(request):
+    result = { "success": False }
+
+    detected = 0
+    corrected = 0
+
+    model_types = os.listdir(comfyui_model_uri)
+    model_types.remove("configs")
+    model_types.sort()
+
+    for model_type in model_types:
+        for base_path_index, model_base_path in enumerate(folder_paths_get_folder_paths(model_type)):
+            if not os.path.exists(model_base_path): # TODO: Bug in main code? ("ComfyUI\output\checkpoints", "ComfyUI\output\clip", "ComfyUI\models\t2i_adapter", "ComfyUI\output\vae")
+                continue
+            d, c = correct_image_extensions(model_base_path)
+            detected += d
+            corrected += c
+
+    result["success"] = True
+    result["detected"] = detected
+    result["corrected"] = corrected
     return web.json_response(result)
 
 
@@ -740,8 +904,8 @@ async def get_model_info(request):
     stats = pathlib.Path(abs_path).stat()
     date_format = "%Y-%m-%d %H:%M:%S"
     date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
-    info["Date Modified"] = date_modified
-    info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
+    #info["Date Modified"] = date_modified
+    #info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
 
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     abs_name , _ = split_valid_ext(abs_path, model_extensions)
@@ -759,8 +923,6 @@ async def get_model_info(request):
 
     header = get_safetensor_header(abs_path)
     metadata = header.get("__metadata__", None)
-    #json.dump(metadata, sys.stdout, indent=4)
-    #print()
 
     if metadata is not None and info.get("Preview", None) is None:
         thumbnail = metadata.get("modelspec.thumbnail")
@@ -775,41 +937,10 @@ async def get_model_info(request):
                 }
 
     if metadata is not None:
-        train_end = metadata.get("modelspec.date", "").replace("T", " ")
-        train_start = metadata.get("ss_training_started_at", "")
-        if train_start != "":
-            try:
-                train_start = float(train_start)
-                train_start = datetime.fromtimestamp(train_start).strftime(date_format)
-            except:
-                train_start = ""
-        info["Date Trained"] = (
-            train_start + 
-            (" ... " if train_start != "" and train_end != "" else "") + 
-            train_end
-        )
-
         info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
-        info["Base Model"] = metadata.get("ss_base_model_version", "")
-        info["Architecture"] = metadata.get("modelspec.architecture", "")
-        info["Network Dimension"] = metadata.get("ss_network_dim", "") # features trained
-        info["Network Alpha"] = metadata.get("ss_network_alpha", "") # trained features applied
-        info["Model Sampling Type"] = metadata.get("modelspec.prediction_type", "")
-        clip_skip = metadata.get("ss_clip_skip", "")
-        if clip_skip == "None" or clip_skip == "1": # assume 1 means no clip skip
-            clip_skip = ""
-        info["Clip Skip"] = clip_skip
-
-        # it is unclear what these are
-        #info["Hash SHA256"] = metadata.get("modelspec.hash_sha256", "")
-        #info["SSHS Model Hash"] = metadata.get("sshs_model_hash", "")
-        #info["SSHS Legacy Hash"] = metadata.get("sshs_legacy_hash", "")
-        #info["New SD Model Hash"] = metadata.get("ss_new_sd_model_hash", "")
-
-        #info["Output Name"] = metadata.get("ss_output_name", "")
-        #info["Title"] = metadata.get("modelspec.title", "")
-        info["Author"] = metadata.get("modelspec.author", "")
-        info["License"] = metadata.get("modelspec.license", "")
+        info["Base Model Version"] = metadata.get("ss_base_model_version", "")
+        info["Network Dimension"] = metadata.get("ss_network_dim", "")
+        info["Network Alpha"] = metadata.get("ss_network_alpha", "")
 
     if metadata is not None:
         training_comment = metadata.get("ss_training_comment", "")
@@ -826,12 +957,18 @@ async def get_model_info(request):
     if os.path.isfile(info_text_file):
         with open(info_text_file, 'r', encoding="utf-8") as f:
             notes = f.read()
-    info["Notes"] = notes
 
     if metadata is not None:
-        img_buckets = metadata.get("ss_bucket_info", "{}")
+        img_buckets = metadata.get("ss_bucket_info", None)
+        datasets = metadata.get("ss_datasets", None)
+
         if type(img_buckets) is str:
             img_buckets = json.loads(img_buckets)
+        elif type(datasets) is str:
+                datasets = json.loads(datasets)
+                if isinstance(datasets, list):
+                    datasets = datasets[0]
+                    img_buckets = datasets.get("bucket_info", None)
         resolutions = {}
         if img_buckets is not None:
             buckets = img_buckets.get("buckets", {})
@@ -844,6 +981,8 @@ async def get_model_info(request):
         resolutions.sort(key=lambda x: x[1], reverse=True)
         info["Bucket Resolutions"] = resolutions
 
+    tags = None
+    if metadata is not None:
         dir_tags = metadata.get("ss_tag_frequency", "{}")
         if type(dir_tags) is str:
             dir_tags = json.loads(dir_tags)
@@ -853,10 +992,14 @@ async def get_model_info(request):
                 tags[tag] = tags.get(tag, 0) + count
         tags = list(tags.items())
         tags.sort(key=lambda x: x[1], reverse=True)
-        info["Tags"] = tags
 
     result["success"] = True
     result["info"] = info
+    if metadata is not None:
+        result["metadata"] = metadata
+    if tags is not None:
+        result["tags"] = tags
+    result["notes"] = notes
     return web.json_response(result)
 
 
@@ -1039,6 +1182,8 @@ async def set_notes(request):
     body = await request.json()
     result = { "success": False }
 
+    dt_epoch = body.get("timestamp", None)
+
     text = body.get("notes", None)
     if type(text) is not str:
         result["alert"] = "Invalid note!"
@@ -1052,15 +1197,23 @@ async def set_notes(request):
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     file_path_without_extension, _ = split_valid_ext(model_path, model_extensions)
     filename = os.path.normpath(file_path_without_extension + model_info_extension)
+    
+    if dt_epoch is not None and os.path.exists(filename) and os.path.getmtime(filename) > dt_epoch:
+        # discard late save
+        result["success"] = True
+        return web.json_response(result)
+    
     if text.isspace() or text == "":
         if os.path.exists(filename):
             os.remove(filename)
-            print("Deleted file: " + filename)
+            #print("Deleted file: " + filename)  # autosave -> too verbose
     else:
         try:
             with open(filename, "w", encoding="utf-8") as f:
                 f.write(text)
-            print("Saved file: " + filename)
+            if dt_epoch is not None:
+                os.utime(filename, (dt_epoch, dt_epoch))
+            #print("Saved file: " + filename)  # autosave -> too verbose
         except ValueError as e:
             print(e, file=sys.stderr, flush=True)
             result["alert"] = "Failed to save notes!\n\n" + str(e)
