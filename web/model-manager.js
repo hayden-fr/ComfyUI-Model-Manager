@@ -2,6 +2,7 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 import { ComfyButton } from "../../scripts/ui/components/button.js";
+import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
 
 function clamp(x, min, max) {
     return Math.min(Math.max(x, min), max);
@@ -2330,6 +2331,7 @@ class ModelInfo {
                 return false;
             }
             this.#savedNotesValue = noteValue;
+            this.elements.markdown.innerHTML = marked.parse(noteValue); 
         }
         else {
             const discardChanges = window.confirm("Discard changes?");
@@ -2704,6 +2706,9 @@ class ModelInfo {
         /** @type {HTMLDivElement} */
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
         notesElement.innerHTML = "";
+        const markdown =  $el("div", {}, "");
+        markdown.innerHTML = marked.parse(noteText); 
+
         notesElement.append.apply(notesElement,
             (() => {
                 const notes = $el("textarea.comfy-multiline-input", {
@@ -2742,6 +2747,7 @@ class ModelInfo {
                 }
                 
                 this.elements.notes = notes;
+                this.elements.markdown = markdown;
                 this.#savedNotesValue = noteText;
                 return [
                     $el("div.row", {
@@ -2751,8 +2757,11 @@ class ModelInfo {
                         saveNotesButton,
                     ]),
                     $el("div", {
-                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
+                        style: { "display": "block", "height": "20%", "min-height": "120px", "z-index": "1" },
                     }, notes),
+                    $el("div", {
+                        style: { "display": "block", "height": "70%", "min-height": "60px", "overflow": "scroll" },
+                    }, markdown),
                 ];
             })()
         );
@@ -3155,6 +3164,7 @@ async function getModelInfos(urlText) {
             const name = civitaiInfo["name"];
             const infos = [];
             const type = civitaiInfo["type"];
+
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
                 const tags = version["tags"]?.map((tag) => tag.trim().replace(/,$/, ""));
