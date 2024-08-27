@@ -606,7 +606,7 @@ class ImageSelect {
         const value = document.querySelector(`input[name="${name}"]:checked`).value;
         const elements = this.elements;
         switch (value) {
-            case this.#PREVIEW_DEFAULT:
+            case this.#PREVIEW_DEFAULT: {
                 const children = elements.defaultPreviews.children;
                 const noImage = PREVIEW_NONE_URI;
                 let url = "";
@@ -626,7 +626,8 @@ class ImageSelect {
                     });
                 }
                 return url;
-            case this.#PREVIEW_URL:
+            }
+            case this.#PREVIEW_URL: {
                 const value = elements.customUrl.value;
                 if (value.startsWith(Civitai.imagePostUrlPrefix())) {
                     try {
@@ -644,6 +645,7 @@ class ImageSelect {
                     }
                 }
                 return value;
+            }
             case this.#PREVIEW_UPLOAD:
                 return elements.uploadFile.files[0] ?? "";
             case this.#PREVIEW_NONE:
@@ -2112,7 +2114,7 @@ class ModelInfo {
         previewSelect.elements.previews.style.display = "flex";
 
         const setPreviewButton = new ComfyButton({
-            tooltip: "Overwrite currrent preview with selected image",
+            tooltip: "Overwrite current preview with selected image",
             content: "Set as Preview",
             action: async(e) => {
                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
