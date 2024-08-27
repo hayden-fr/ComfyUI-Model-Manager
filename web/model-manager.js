@@ -2716,7 +2716,7 @@ class ModelInfo {
             (() => {
                 const notes = $el("textarea.comfy-multiline-input", {
                     name: "model notes",
-                    value: noteText, 
+                    value: noteText,
                     oninput: (e) => {
                         if (this.#settingsElements["model-info-autosave-notes"].checked) {
                             saveDebounce();
@@ -2752,19 +2752,51 @@ class ModelInfo {
                 this.elements.notes = notes;
                 this.elements.markdown = markdown;
                 this.#savedNotesValue = noteText;
+
+                const notes_editor = $el(
+                    "div",
+                    {
+                        style: {
+                            "display": noteText == "" ? "flex" : "none",
+                            "height": "100%",
+                            "min-height": "60px"
+                        },
+                    },
+                    notes
+                );
+                const notes_viewer = $el(
+                    "div",
+                    {
+                        style: {
+                            "display": noteText == "" ? "none" : "flex",
+                            "height": "100%",
+                            "min-height": "60px",
+                            "overflow": "scroll"
+                        },
+                    },
+                    markdown
+                );
+
+                const editNotesButton = new ComfyButton({
+                    icon: "pencil",
+                    tooltip: "Change file name",
+                    classList: "comfyui-button icon-button",
+                    action: async () => {
+                        notes_editor.style.display = notes_editor.style.display == "flex" ? "none" : "flex";
+                        notes_viewer.style.display = notes_viewer.style.display == "none" ? "flex" : "none";
+                    },
+                }).element;
+
                 return [
                     $el("div.row", {
                         style: { "align-items": "center" },
                     }, [
                         $el("h1", ["Notes"]),
                         saveNotesButton,
+                        editNotesButton,
                     ]),
-                    $el("div", {
-                        style: { "display": "block", "height": "20%", "min-height": "120px", "z-index": "1" },
-                    }, notes),
-                    $el("div", {
-                        style: { "display": "block", "height": "70%", "min-height": "60px", "overflow": "scroll" },
-                    }, markdown),
+                    notes_editor,
+                    notes_viewer,
                 ];
             })()
         );
