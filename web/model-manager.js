@@ -2,7 +2,8 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 import { ComfyButton } from "../../scripts/ui/components/button.js";
-import { marked } from "https://cdn.jsdelivr.net/npm/marked/lib/marked.esm.js";
+import { marked } from "./marked.js";
+import("./downshow.js");
 
 function clamp(x, min, max) {
     return Math.min(Math.max(x, min), max);
@@ -2707,7 +2708,7 @@ class ModelInfo {
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
         notesElement.innerHTML = "";
         const markdown =  $el("div", {}, "");
-        markdown.innerHTML = marked.parse(noteText); 
+        markdown.innerHTML = marked.parse(noteText);
 
         notesElement.append.apply(notesElement,
             (() => {
@@ -3175,31 +3176,7 @@ async function getModelInfos(urlText) {
                         version["description"],
                         civitaiInfo["description"] !== undefined ? "# " + name  : undefined,
                         civitaiInfo["description"],
-                    ].filter(x => x !== undefined).join("\n\n")
-                    .replaceAll("</p><p>", "\n\n")
-                    .replaceAll("<strong>", "**").replaceAll("</strong>", "**")
-                    .replaceAll("<ol>", "\n").replaceAll("</ol>", "\n") // wrong
-                    .replaceAll("<ul>", "\n").replaceAll("</ul>", "\n")
-                    .replaceAll("<li>", "- ").replaceAll("</li>", "\n")
-                    .replaceAll("<em>", "*").replaceAll("</em>", "*")
-                    .replaceAll("<code>", "`").replaceAll("</code>", "`")
-                    .replaceAll("<blockquote", "\n<blockquote").replaceAll("</blockquote>", "\n")
-                    .replaceAll("<br", "\n<br")
-                    .replaceAll("<hr>", "\n\n---\n\n")
-                    .replaceAll("<h1", "\n# <h1").replaceAll("</h1>", "\n")
-                    .replaceAll("<h2", "\n## <h2").replaceAll("</h2>", "\n")
-                    .replaceAll("<h3", "\n### <h3").replaceAll("</h3>", "\n")
-                    .replaceAll("<h4", "\n#### <h4").replaceAll("</h4>", "\n")
-                    .replaceAll("<h5", "\n##### <h5").replaceAll("</h5>", "\n")
-                    .replaceAll("<h6", "\n###### <h6").replaceAll("</h6>", "\n")
-                    .replace(/href="(\S*)">/g, 'href=""> $1 <a href="">')
-                    .replace(/src="(\S*)">/g, 'src=""> $1 <img src="">')
-                    // <script></script>
-                    // <span></span>
-                    .replace(/<[^>]+>/g, "") // quick hack
-                    .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
-                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=")
-                    .replaceAll("&amp;", "&");
+                    ].filter(x => x !== undefined).join("\n\n");
                 version["files"].forEach((file) => {
                     infos.push({
                         "images": images,
@@ -3207,7 +3184,7 @@ async function getModelInfos(urlText) {
                         "modelType": type,
                         "downloadUrl": file["downloadUrl"],
                         "downloadFilePath": "",
-                        "description": description,
+                        "description": downshow(description),
                         "details": {
                             "fileSizeKB": file["sizeKB"],
                             "fileType": file["type"],
