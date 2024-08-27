@@ -2635,46 +2635,57 @@ class ModelInfo {
                 break;
             }
         }
+        const tagGenerator = $el(
+            "div", [
+                $el("h1", ["Tags"]),
+                $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
+                $el("div", [
+                    $el("details.tag-generator-settings", {
+                        style: { margin: "10px 0", display: "none" },
+                        open: false,
+                    }, [
+                        $el("summary", ["Settings"]),
+                        $el("div", [
+                            "Sampling Method",
+                            samplerRadioGroup,
+                        ]),
+                        $el("label", [
+                            "Count",
+                            tagGenerationCount,
+                        ]),
+                        $el("label", [
+                            "Threshold",
+                            tagGenerationThreshold,
+                        ]),
+                    ]),
+                    tagGeneratorRandomizedOutput,
+                    new ComfyButton({
+                        content: "Randomize",
+                        tooltip: "Randomly generate subset of tags",
+                        action: () => {
+                            const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
+                            const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
+                            const sampleCount = tagGenerationCount.value;
+                            const frequencyThreshold = tagGenerationThreshold.value;
+                            const tags = ParseTagParagraph(tagsParagraph.innerText);
+                            const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
+                            tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
+                        },
+                    }).element,
+                ]),
+            ]
+        )
         tagsElement.innerHTML = "";
         tagsElement.append.apply(tagsElement, [
-            $el("h1", ["Tags"]),
-            $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
+            tagGenerator,
             $el("div", [
-                $el("details.tag-generator-settings", {
-                    style: { margin: "10px 0", display: "none" },
-                    open: false,
-                }, [
-                    $el("summary", ["Settings"]),
-                    $el("div", [
-                        "Sampling Method",
-                        samplerRadioGroup,
-                    ]),
-                    $el("label", [
-                        "Count",
-                        tagGenerationCount,
-                    ]),
-                    $el("label", [
-                        "Threshold",
-                        tagGenerationThreshold,
-                    ]),
-                ]),
-                tagGeneratorRandomizedOutput,
-                new ComfyButton({
-                    content: "Randomize",
-                    tooltip: "Randomly generate subset of tags",
-                    action: () => {
-                        const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
-                        const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
-                        const sampleCount = tagGenerationCount.value;
-                        const frequencyThreshold = tagGenerationThreshold.value;
-                        const tags = ParseTagParagraph(tagsParagraph.innerText);
-                        const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
-                        tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
-                    },
-                }).element,
+                $el("h2", {
+                    style: {
+                        margin: "24px 0px 8px 0px"
+                    }
+                }, ["Tags"]),
+                tagsParagraph,
             ]),
-            $el("h2", {style: { margin: "24px 0px 8px 0px" } }, ["Training Tags"]),
-            tagsParagraph,
         ]);
         const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
         tagButton.style.display = isTags ? "" : "none";
