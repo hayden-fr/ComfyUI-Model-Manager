@@ -2782,7 +2782,8 @@ class ModelInfo {
                             "display": noteText == "" ? "none" : "flex",
                             "height": "100%",
                             "min-height": "60px",
-                            "overflow": "scroll"
+                            "overflow": "scroll",
+                            "overflow-wrap": "anywhere"
                         },
                     },
                     markdown
