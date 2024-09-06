@@ -228,6 +228,7 @@ def get_def_headers(url=""):
     if url.startswith("https://civitai.com/"):
         api_key = server_settings["civitai_api_key"]
         if (api_key != ""):
+            def_headers["Content-Type"] = f"application/json"
             def_headers["Authorization"] = f"Bearer {api_key}"
             url += "&" if "?" in url else "?" # not the most robust solution
             url += f"token={api_key}" # TODO: Authorization didn't work in the header
