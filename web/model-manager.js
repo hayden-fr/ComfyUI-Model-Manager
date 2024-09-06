@@ -2036,10 +2036,11 @@ class ModelGrid {
         }
 
         let modelTypeOptions = [];
-        for (const [key, value] of Object.entries(models)) {
+        for (const key of Object.keys(models)) {
             const el = $el("option", [key]);
             modelTypeOptions.push(el);
         }
+        modelTypeOptions.sort((a, b) => a.innerText.localeCompare(b.innerText, undefined, {sensitivity: 'base'}));
         modelSelect.innerHTML = "";
         modelTypeOptions.forEach(option => modelSelect.add(option));
         modelSelect.value = modelType;
@@ -3280,9 +3281,6 @@ class DownloadView {
         /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
     
-    /** @type {DOMParser} */
-    #domParser = null;
-    
     /** @type {Object.<string, HTMLElement>} */
     #settings = null;
     
@@ -3295,7 +3293,6 @@ class DownloadView {
      * @param {() => Promise<void>} updateModels
      */
     constructor(modelData, settings, updateModels) {
-        this.#domParser = new DOMParser();
         this.#updateModels = updateModels;
         const update = async() => { await this.#update(modelData, settings); };
         const reset = () => {
@@ -3360,12 +3357,7 @@ class DownloadView {
                     onkeydown: async (e) => {
                         if (e.key === "Enter") {
                             e.stopPropagation();
-                            if (this.elements.url.value === "") {
-                                reset();
-                            }
-                            else {
-                                await update();
-                            }
+                            searchButton.click();
                             e.target.blur();
                         }
                     },
