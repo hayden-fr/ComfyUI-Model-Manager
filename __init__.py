@@ -417,6 +417,8 @@ def get_auto_thumbnail_format(original_format):
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri")
+    if uri is None:
+        raise ValueError("Missing uri path!")
     quality = 75
     response_image_format = request.query.get("image-format", None)
     if isinstance(response_image_format, str):
