@@ -277,6 +277,7 @@ function imageUri(imageSearchPath = undefined, dateImageModified = undefined, wi
     return uri;
 }
 const PREVIEW_NONE_URI = imageUri();
+console.log(PREVIEW_NONE_URI);
 const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
