@@ -1999,7 +1999,12 @@ class ModelGrid {
                         icon: "information-outline",
                         tooltip: "View model information",
                         classList: "comfyui-button icon-button model-button",
-                        action: async() => { await showModelInfo(searchPath) },
+                        action: async(e) => {
+                            const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                            button.disabled = true;
+                            await showModelInfo(searchPath);
+                            button.disabled = false;
+                        },
                     }).element,
                 ];
                 const dragAdd = (e) => ModelGrid.#dragAddModel(
