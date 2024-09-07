@@ -139,6 +139,22 @@ async function loadWorkflow(url) {
     app.handleFile(file);
 }
 
+/**
+ * @param {string} modelPath
+ * @returns {Promise<boolean>}
+ */
+async function tryOpenModelUrl(modelPath) {
+    const webUrlResponse = await comfyRequest(`/model-manager/model/info/web-url?path=${modelPath}`);
+    try {
+        const modelUrl = new URL(webUrlResponse["url"]);
+        window.open(modelUrl, '_blank').focus();
+    }
+    catch (exception) {
+        return false;
+    }
+    return true;
+}
+
 const modelNodeType = {
     "checkpoints": "CheckpointLoaderSimple",
     "clip": "CLIPLoader",
@@ -1885,6 +1901,7 @@ class ModelGrid {
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
         const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
         const showLoadWorkflowButton = canShowButtons && settingsElements["model-show-load-workflow-button"].checked;
+        const shouldShowTryOpenModelUrl = canShowButtons && settingsElements["model-show-open-model-url-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
@@ -1955,6 +1972,22 @@ class ModelGrid {
                                 await loadWorkflow(urlFull);
                             },
                         }).element,
+                    );
+                }
+                if (shouldShowTryOpenModelUrl) {
+                    actionButtons.push(
+                        new ComfyButton({
+                            icon: "open-in-new",
+                            tooltip: "Attempt to open model url page in a new tab.",
+                            classList: "comfyui-button icon-button model-button",
+                            action: async (e) => {
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
+                                const success = await tryOpenModelUrl(searchPath);
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                                button.disabled = false;
+                            },
+                        }).element
                     );
                 }
                 const infoButtons = [
@@ -2494,17 +2527,30 @@ class ModelInfo {
         
         innerHtml.push($el("div", [
             previewSelect.elements.previews,
+            $el("div.row.tab-header", { style: { "flex-direction": "row" } }, [
+                new ComfyButton({
+                    icon: "arrow-bottom-left-bold-box-outline",
+                    tooltip: "Attempt to load preview image workflow",
+                    classList: "comfyui-button icon-button",
+                    action: async () => {
+                        const urlString = previewSelect.elements.defaultPreviews.children[0].src;
+                        await loadWorkflow(urlString);
+                    },
+                }).element,
+                new ComfyButton({
+                    icon: "open-in-new",
+                    tooltip: "Attempt to open model url page in a new tab.",
+                    classList: "comfyui-button icon-button",
+                    action: async (e) => {
+                        const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                        button.disabled = true;
+                        const success = await tryOpenModelUrl(path);
+                        comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                        button.disabled = false;
+                    },
+                }).element,
+            ]),
             $el("div.row.tab-header", [
-                $el("div", [
-                    new ComfyButton({
-                        content: "Load Workflow",
-                        tooltip: "Attempt to load preview image workflow",
-                        action: async () => {
-                            const urlString = previewSelect.elements.defaultPreviews.children[0].src;
-                            await loadWorkflow(urlString);
-                        },
-                    }).element,
-                ]),
                 $el("div.row.tab-header-flex-block", [
                     previewSelect.elements.radioGroup,
                 ]),
@@ -2691,6 +2737,46 @@ class ModelInfo {
             },
         }).element;
         
+        const downloadNotesButton = new ComfyButton({
+            icon: "earth-arrow-down",
+            tooltip: "Attempt to download model info from the internet.",
+            classList: "comfyui-button icon-button",
+            action: async (e) => {
+                if (this.#savedNotesValue !== "") {
+                    const overwriteNoteConfirmation = window.confirm("Overwrite note?");
+                    if (!overwriteNoteConfirmation) {
+                        comfyButtonAlert(e.target, false, "mdi-check-bold", "mdi-close-thick");
+                        return;
+                    }
+                }
+                
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const [success, downloadedNotesValue] = await comfyRequest(
+                    `/model-manager/notes/download?path=${path}&overwrite=True`,
+                    {
+                        method: "POST",
+                        body: {},
+                    }
+                ).then((data) => {
+                    const success = data["success"];
+                    const message = data["alert"];
+                    if (message !== undefined) {
+                        window.alert(message);
+                    }
+                    return [success, data["notes"]];
+                }).catch((err) => {
+                    return [false, ""];
+                });
+                if (success) {
+                    this.#savedNotesValue = downloadedNotesValue;
+                    this.elements.notes.value = downloadedNotesValue;
+                }
+                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                button.disabled = false;
+            },
+        }).element;
+        
         const saveDebounce = debounce(async() => {
             const saveIconClass = "mdi-" + saveIcon;
             const savingIconClass = "mdi-" + savingIcon;
@@ -2750,6 +2836,7 @@ class ModelInfo {
                     }, [
                         $el("h1", ["Notes"]),
                         saveNotesButton,
+                        downloadNotesButton,
                     ]),
                     $el("div", {
                         style: { "display": "flex", "height": "100%", "min-height": "60px" },
@@ -3162,7 +3249,7 @@ async function getModelInfos(urlText) {
                 const description = [
                         tags !== undefined ? "# Trigger Words" : undefined,
                         tags?.join(tags.some((tag) => { return tag.includes(","); }) ? "\n" : ", "),
-                        version["description"] !== undefined ? "# About this version " : undefined,
+                        version["description"] !== undefined ? "# About this version" : undefined,
                         version["description"],
                         civitaiInfo["description"] !== undefined ? "# " + name  : undefined,
                         civitaiInfo["description"],
@@ -3882,6 +3969,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "model-show-add-button": null,
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
             /** @type {HTMLInputElement} */ "model-show-load-workflow-button": null,
+            /** @type {HTMLInputElement} */ "model-show-open-model-url-button": null,
             /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
             
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
@@ -4111,6 +4199,9 @@ class SettingsView {
             $checkbox({
                 $: (el) => (settings["model-show-load-workflow-button"] = el),
                 textContent: "Show \"Load Workflow\" button",
+            }),$checkbox({
+                $: (el) => (settings["model-show-open-model-url-button"] = el),
+                textContent: "Show \"Open Model Url\" button",
             }),
             $checkbox({
                 $: (el) => (settings["model-info-button-on-left"] = el),
