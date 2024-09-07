@@ -140,11 +140,13 @@ async function loadWorkflow(url) {
 }
 
 /**
- * @param {string} modelPath
+ * @param {string} modelSearchPath
  * @returns {Promise<boolean>}
  */
-async function tryOpenModelUrl(modelPath) {
-    const webUrlResponse = await comfyRequest(`/model-manager/model/info/web-url?path=${modelPath}`);
+async function tryOpenModelUrl(modelSearchPath) {
+    const encodedPath = encodeURIComponent(modelSearchPath);
+    const requestUrl = `/model-manager/model/info/web-url?path=${encodedPath}`;
+    const webUrlResponse = await comfyRequest(requestUrl);
     try {
         const modelUrl = new URL(webUrlResponse["url"]);
         window.open(modelUrl, '_blank').focus();
@@ -2546,7 +2548,7 @@ class ModelInfo {
                     action: async (e) => {
                         const [button, icon, span] = comfyButtonDisambiguate(e.target);
                         button.disabled = true;
-                        const success = await tryOpenModelUrl(path);
+                        const success = await tryOpenModelUrl(searchPath);
                         comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
                         button.disabled = false;
                     },
