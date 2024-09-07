@@ -1755,12 +1755,13 @@ class ModelGrid {
                 const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
                 const target = selectedNode?.widgets[widgetIndex]?.element;
                 if (target && target.type === "textarea") {
+                    // TODO: If the node has >1 textareas, the textarea element must be selected
                     target.value = ModelGrid.insertEmbeddingIntoText(target.value, embeddingFile, removeEmbeddingExtension);
                     success = true;
                 }
             }
             if (!success) {
-                console.warn("Try selecting a node before adding the embedding.");
+                window.alert("No selected nodes have a text area!");
             }
             event.stopPropagation();
         }
@@ -1898,10 +1899,10 @@ class ModelGrid {
         // TODO: separate text and model logic; getting too messy
         // TODO: fallback on button failure to copy text?
         const canShowButtons = modelNodeType[modelType] !== undefined;
+        const shouldShowTryOpenModelUrl = canShowButtons && settingsElements["model-show-open-model-url-button"].checked;
+        const showLoadWorkflowButton = canShowButtons && settingsElements["model-show-load-workflow-button"].checked;
         const showAddButton = canShowButtons && settingsElements["model-show-add-button"].checked;
         const showCopyButton = canShowButtons && settingsElements["model-show-copy-button"].checked;
-        const showLoadWorkflowButton = canShowButtons && settingsElements["model-show-load-workflow-button"].checked;
-        const shouldShowTryOpenModelUrl = canShowButtons && settingsElements["model-show-open-model-url-button"].checked;
         const strictDragToAdd = settingsElements["model-add-drag-strict-on-field"].checked;
         const addOffset = parseInt(settingsElements["model-add-offset"].value);
         const showModelExtension = settingsElements["model-show-label-extensions"].checked;
@@ -1925,35 +1926,20 @@ class ModelGrid {
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let actionButtons = [];
-                if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
+                if (shouldShowTryOpenModelUrl) {
                     actionButtons.push(
                         new ComfyButton({
-                            icon: "content-copy",
-                            tooltip: "Copy model to clipboard",
+                            icon: "open-in-new",
+                            tooltip: "Attempt to open model url page in a new tab.",
                             classList: "comfyui-button icon-button model-button",
-                            action: (e) => ModelGrid.#copyModelToClipboard(
-                                e, 
-                                modelType, 
-                                path, 
-                                removeEmbeddingExtension,
-                            ),
-                        }).element,
-                    );
-                }
-                if (showCopyButton) {
-                    actionButtons.push(
-                        new ComfyButton({
-                            icon: "plus-box-outline",
-                            tooltip: "Add model to node grid",
-                            classList: "comfyui-button icon-button model-button",
-                            action: (e) => ModelGrid.#addModel(
-                                e, 
-                                modelType, 
-                                path, 
-                                removeEmbeddingExtension, 
-                                addOffset, 
-                            ),
-                        }).element,
+                            action: async (e) => {
+                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                                button.disabled = true;
+                                const success = await tryOpenModelUrl(searchPath);
+                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                                button.disabled = false;
+                            },
+                        }).element
                     );
                 }
                 if (showLoadWorkflowButton) {
@@ -1974,20 +1960,35 @@ class ModelGrid {
                         }).element,
                     );
                 }
-                if (shouldShowTryOpenModelUrl) {
+                if (showAddButton) {
                     actionButtons.push(
                         new ComfyButton({
-                            icon: "open-in-new",
-                            tooltip: "Attempt to open model url page in a new tab.",
+                            icon: "plus-box-outline",
+                            tooltip: "Add model to node grid",
                             classList: "comfyui-button icon-button model-button",
-                            action: async (e) => {
-                                const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                                button.disabled = true;
-                                const success = await tryOpenModelUrl(searchPath);
-                                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
-                                button.disabled = false;
-                            },
-                        }).element
+                            action: (e) => ModelGrid.#addModel(
+                                e, 
+                                modelType, 
+                                path, 
+                                removeEmbeddingExtension, 
+                                addOffset, 
+                            ),
+                        }).element,
+                    );
+                }
+                if (showCopyButton && !(modelType === "embeddings" && !navigator.clipboard)) {
+                    actionButtons.push(
+                        new ComfyButton({
+                            icon: "content-copy",
+                            tooltip: "Copy model to clipboard",
+                            classList: "comfyui-button icon-button model-button",
+                            action: (e) => ModelGrid.#copyModelToClipboard(
+                                e, 
+                                modelType, 
+                                path, 
+                                removeEmbeddingExtension,
+                            ),
+                        }).element,
                     );
                 }
                 const infoButtons = [
