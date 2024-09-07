@@ -301,7 +301,7 @@ def search_web_for_model_notes(sha256_hash):
                 if ',' in s:
                     join_separator = '\n'
                     break
-            if join_separator == '\n' and len(model_trigger_words) > 1:
+            if join_separator == '\n':
                 model_trigger_words = ["* " + s for s in model_trigger_words]
             notes += join_separator.join(model_trigger_words)
         if model_version_description != "":
