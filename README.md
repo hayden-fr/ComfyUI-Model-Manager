@@ -25,6 +25,7 @@ Designed to support desktop, mobile and multi-screen devices.
 - Press the "copy" button to copy a model to ComfyUI's clipboard or copy the embedding to the system clipboard. (Copying the embedding to the system clipboard requires a secure http connection.)
 - Press the "add" button to add the model to the ComfyUI graph or append the embedding to one or more selected nodes.
 - Press the "load workflow" button to try and load a workflow embedded in a model's preview image.
+- Press the "open model url" button to try and search the web and open a model's webpage.
 
 ### Download Tab
 
@@ -55,6 +56,7 @@ Designed to support desktop, mobile and multi-screen devices.
 - Read, edit and save notes. (Saved as a `.txt` file beside the model).
   - `Ctrl+s` or `⌘+S` to save a note when the textarea is in focus.
   - Autosave can be enabled in settings. (Note: Once the model info view is closed, the undo history is lost.)
+  - Automatically search the web for model info and save as notes with a single button.
 - Change or remove a model's preview image.
 - View training tags and use the random tag generator to generate prompt ideas. (Inspired by the one in A1111.)
 
