@@ -243,7 +243,7 @@ def get_def_headers(url=""):
     return def_headers
 
 
-def civitai_get_model_info(sha256_hash: str):
+def civitai_get_model_info(sha256_hash):
     url_api_hash = r"https://civitai.com/api/v1/model-versions/by-hash/" + sha256_hash
     hash_response = requests.get(url_api_hash)
     if hash_response.status_code != 200:
