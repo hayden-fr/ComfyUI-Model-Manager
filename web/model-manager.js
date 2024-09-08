@@ -1926,7 +1926,7 @@ class ModelGrid {
                     ),
                     draggable: false,
                 });
-                const searchPath = item.path;
+                const searchPath = item.path.slice(); // shallow copy
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let actionButtons = [];
                 if (shouldShowTryOpenModelUrl) {
