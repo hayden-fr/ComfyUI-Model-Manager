@@ -414,16 +414,11 @@ def get_auto_thumbnail_format(original_format):
     return "JPEG" # default fallback
 
 
-invalid_url_tracker = False
-
-
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri", None)
     if uri is None: # BUG: this should never happen
-        if not invalid_url_tracker:
-            print(f"Invalid uri! Request url: {request.url}")
-            invalid_url_tracker = True
+        #print(f"Invalid uri! Request url: {request.url}")
         uri = "no-preview"
     quality = 75
     response_image_format = request.query.get("image-format", None)
