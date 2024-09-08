@@ -418,7 +418,7 @@ def get_auto_thumbnail_format(original_format):
 async def get_model_preview(request):
     uri = request.query.get("uri", None)
     if uri is None: # BUG: this should never happen
-        #print(f"Invalid uri! Request url: {request.url}")
+        print(f"Invalid uri! Request url: {request.url}")
         uri = "no-preview"
     quality = 75
     response_image_format = request.query.get("image-format", None)
