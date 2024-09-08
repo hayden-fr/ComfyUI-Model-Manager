@@ -1101,12 +1101,12 @@ async def get_model_info(request):
 async def get_model_web_url(request):
     model_path = request.query.get("path", None)
     if model_path is None:
-        web.json_response({ "url": "" })
+        raise ValueError("Missing model path!")
     model_path = urllib.parse.unquote(model_path)
 
     abs_path, model_type = search_path_to_system_path(model_path)
     if abs_path is None:
-        web.json_response({ "url": "" })
+        raise ValueError("Invalid model path!")
 
     sha256_hash = hash_file(abs_path)
     url = search_web_for_model_url(sha256_hash)
