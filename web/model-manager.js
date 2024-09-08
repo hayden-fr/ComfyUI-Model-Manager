@@ -665,7 +665,8 @@ class ImageSelect {
             case this.#PREVIEW_NONE:
                 return PREVIEW_NONE_URI;
         }
-        return "";
+        console.warn(`Invalid preview select type: ${value}`);
+        return PREVIEW_NONE_URI;
     }
     
     /** @returns {void} */

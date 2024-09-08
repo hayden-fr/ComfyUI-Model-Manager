@@ -25,7 +25,7 @@ import folder_paths
 
 comfyui_model_uri = folder_paths.models_dir
 
-extension_uri = os.path.dirname(__file__)
+extension_uri = os.path.dirname(os.path.abspath(__file__))
 
 config_loader_path = os.path.join(extension_uri, 'config_loader.py')
 config_loader_spec = importlib.util.spec_from_file_location('config_loader', config_loader_path)
@@ -414,11 +414,16 @@ def get_auto_thumbnail_format(original_format):
     return "JPEG" # default fallback
 
 
+invalid_url_tracker = False
+
+
 @server.PromptServer.instance.routes.get("/model-manager/preview/get")
 async def get_model_preview(request):
     uri = request.query.get("uri", None)
-    if uri is None: # This should never happen
-        print(f"Invalid uri! Request url: {request.url}")
+    if uri is None: # BUG: this should never happen
+        if not invalid_url_tracker:
+            print(f"Invalid uri! Request url: {request.url}")
+            invalid_url_tracker = True
         uri = "no-preview"
     quality = 75
     response_image_format = request.query.get("image-format", None)
