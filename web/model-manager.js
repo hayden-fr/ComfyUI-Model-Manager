@@ -164,9 +164,9 @@ async function tryOpenModelUrl(modelSearchPath) {
     try {
         window.open(modelUrl, '_blank').focus();
     }
-    catch (exception) {
+    catch (exception) {        
         // browser or ad-blocker blocking opening new window
-        app.ui.dialog.show($el("span",
+        modelManagerDialog.show($el("span",
             [
                 $el("p", {
                     style: { color: "var(--input-text)" },
@@ -4951,12 +4951,19 @@ class ModelManager extends ComfyDialog {
 /** @type {ModelManager | undefined} */
 let instance;
 
+/** @type {ComfyDialog | undefined} */
+let modelManagerDialog;
+
 /**
  * @returns {ModelManager}
  */
 function getInstance() {
     if (!instance) {
         instance = new ModelManager();
+        
+        modelManagerDialog = new ComfyDialog();
+        modelManagerDialog.element.classList.add("model-manager-dialog");
+        instance.element.appendChild(modelManagerDialog.element);
     }
     return instance;
 }

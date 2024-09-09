@@ -10,7 +10,7 @@
     position: fixed;
     overflow: hidden;
     width: 100%;
-    z-index: 99; /*needs to be below dialog modal*/
+    z-index: 2000; /*needs to be below the dialog modal element*/
     
     /*override comfy-modal settings*/
     border-radius: 0;
@@ -21,6 +21,10 @@
     transform: none;
     /*disable double-tap zoom on model manager*/
     touch-action: manipulation;
+}
+
+.model-manager .model-manager-dialog {
+    z-index: 2001; /*needs to be above the model manager element*/
 }
 
 .model-manager .comfy-modal-content {
