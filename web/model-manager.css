@@ -10,7 +10,7 @@
     position: fixed;
     overflow: hidden;
     width: 100%;
-    z-index: 2000;
+    z-index: 99; /*needs to be below dialog modal*/
     
     /*override comfy-modal settings*/
     border-radius: 0;

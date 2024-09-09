@@ -15,9 +15,16 @@ function clamp(x, min, max) {
 function comfyRequest(url, options = undefined) {
     return new Promise((resolve, reject) => {
         api.fetchApi(url, options)
-            .then((response) => response.json())
-            .then(resolve)
-            .catch(reject);
+            .then((response) => {
+                if (!response.ok) {
+                    reject(new Error(`HTTP error ${response.status}: ${response.statusText}`));
+                } else {
+                    response.json()
+                        .then(resolve)
+                        .catch(error => reject(new Error(`Failed to parse JSON: ${error.message}`)));
+                }
+            })
+            .catch(error => reject(new Error(`Request error: ${error.message}`)));
     });
 }
 
@@ -147,12 +154,34 @@ async function tryOpenModelUrl(modelSearchPath) {
     const encodedPath = encodeURIComponent(modelSearchPath);
     const requestUrl = `/model-manager/model/info/web-url?path=${encodedPath}`;
     const webUrlResponse = await comfyRequest(requestUrl);
+    let modelUrl;
     try {
-        const modelUrl = new URL(webUrlResponse["url"]);
-        window.open(modelUrl, '_blank').focus();
+        modelUrl = new URL(webUrlResponse["url"]);
     }
     catch (exception) {
         return false;
+    }
+    try {
+        window.open(modelUrl, '_blank').focus();
+    }
+    catch (exception) {
+        // browser or ad-blocker blocking opening new window
+        app.ui.dialog.show($el("span",
+            [
+                $el("p", {
+                    style: { color: "var(--input-text)" },
+                }, [modelSearchPath]),
+                $el("a", {
+                    href: modelUrl,
+                    target: "_blank",
+                }, [
+                    $el("span", [
+                        modelUrl,
+                        $el("i.mdi.mdi-open-in-new"),
+                    ])
+                ]),
+            ]
+        ));
     }
     return true;
 }
