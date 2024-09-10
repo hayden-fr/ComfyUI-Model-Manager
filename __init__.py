@@ -414,9 +414,9 @@ def get_auto_thumbnail_format(original_format):
     return "JPEG" # default fallback
 
 
-@server.PromptServer.instance.routes.get("/model-manager/preview/get")
+@server.PromptServer.instance.routes.get("/model-manager/preview/get/{uri}")
 async def get_model_preview(request):
-    uri = request.query.get("uri", None)
+    uri = request.match_info["uri"]
     if uri is None: # BUG: this should never happen
         print(f"Invalid uri! Request url: {request.url}")
         uri = "no-preview"
@@ -800,8 +800,8 @@ async def get_model_list(request):
             if image is not None:
                 raw_post = os.path.join(model_type, str(base_path_index), rel_path, image)
                 item["preview"] = {
-                    "path": urllib.parse.quote_plus(raw_post),
-                    "dateModified": urllib.parse.quote_plus(str(image_modified)),
+                    "path": raw_post,
+                    "dateModified": str(image_modified),
                 }
             model_items.append(item)
 
@@ -975,13 +975,13 @@ def bytes_to_size(total_bytes):
     return "{:.2f}".format(total_bytes / (1 << (i * 10))) + " " + units[i]
 
 
-@server.PromptServer.instance.routes.get("/model-manager/model/info")
+@server.PromptServer.instance.routes.get("/model-manager/model/info/{path}")
 async def get_model_info(request):
     result = { "success": False }
 
-    model_path = request.query.get("path", None)
+    model_path = request.match_info["path"]
     if model_path is None:
-        result["alert"] = "Missing model path!"
+        result["alert"] = "Invalid model path!"
         return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
@@ -1010,8 +1010,8 @@ async def get_model_info(request):
             preview_path, _ = split_valid_ext(model_path, model_extensions)
             preview_modified = pathlib.Path(maybe_preview).stat().st_mtime_ns
             info["Preview"] = {
-                "path": urllib.parse.quote_plus(preview_path + extension),
-                "dateModified": urllib.parse.quote_plus(str(preview_modified)),
+                "path": preview_path + extension,
+                "dateModified": str(preview_modified),
             }
             break
 
@@ -1096,22 +1096,25 @@ async def get_model_info(request):
     result["notes"] = notes
     return web.json_response(result)
 
+@server.PromptServer.instance.routes.get("/model-manager/model/web-url")
+async def get_model_info(request):
+    result = { "success": False }
 
-@server.PromptServer.instance.routes.get("/model-manager/model/info/web-url")
-async def get_model_web_url(request):
     model_path = request.query.get("path", None)
     if model_path is None:
-        raise ValueError("Missing model path!")
+        result["alert"] = "Invalid model path!"
+        return web.json_response(result)
     model_path = urllib.parse.unquote(model_path)
 
     abs_path, model_type = search_path_to_system_path(model_path)
     if abs_path is None:
-        raise ValueError("Invalid model path!")
+        result["alert"] = "Invalid model path!"
+        return web.json_response(result)
 
     sha256_hash = hash_file(abs_path)
-    url = search_web_for_model_url(sha256_hash)
+    web_url = search_web_for_model_url(sha256_hash)
 
-    return web.json_response({ "url": url })
+    return web.json_response({ "url": web_url })
 
 
 @server.PromptServer.instance.routes.get("/model-manager/system-separator")

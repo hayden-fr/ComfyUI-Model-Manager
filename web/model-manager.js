@@ -137,9 +137,8 @@ function elementFromDragEvent(event) {
  * @param {string} url
  */
 async function loadWorkflow(url) {
-    const uri = (new URL(url)).searchParams.get("uri");
-    const fileNameIndex = Math.max(uri.lastIndexOf("/"), uri.lastIndexOf("\\")) + 1;
-    const fileName = uri.substring(fileNameIndex);
+    const fileNameIndex = Math.max(url.lastIndexOf("/"), url.lastIndexOf("\\")) + 1;
+    const fileName = url.substring(fileNameIndex);
     const response = await fetch(url);
     const data = await response.blob();
     const file = new File([data],  fileName, { type: data.type });
@@ -152,7 +151,7 @@ async function loadWorkflow(url) {
  */
 async function tryOpenModelUrl(modelSearchPath) {
     const encodedPath = encodeURIComponent(modelSearchPath);
-    const requestUrl = `/model-manager/model/info/web-url?path=${encodedPath}`;
+    const requestUrl = `/model-manager/model/web-url?path=${encodedPath}`;
     const webUrlResponse = await comfyRequest(requestUrl);
     let modelUrl;
     try {
@@ -282,28 +281,32 @@ class SearchPath {
 }
 
 /**
- * @param {string | undefined} [searchPath=undefined]
+ * @param {string | undefined} [imageUriSearchPath=undefined]
  * @param {string | undefined} [dateImageModified=undefined]
  * @param {string | undefined} [width=undefined]
  * @param {string | undefined} [height=undefined]
  * @param {string | undefined} [imageFormat=undefined]
  * @returns {string}
  */
-function imageUri(imageSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined, imageFormat = undefined) {
-    const path = imageSearchPath ?? "no-preview";
-    const date = dateImageModified;
-    let uri = `/model-manager/preview/get?uri=${path}`;
+function imageUri(imageUriSearchPath = undefined, dateImageModified = undefined, width = undefined, height = undefined, imageFormat = undefined) {
+    const params = [];
     if (width !== undefined && width !== null) {
-        uri += `&width=${width}`;
+        params.push(`width=${width}`);
     }
     if (height !== undefined && height !== null) {
-        uri += `&height=${height}`;
+        params.push(`height=${height}`);
     }
-    if (date !== undefined && date !== null) {
-        uri += `&v=${date}`;
+    if (dateImageModified !== undefined && dateImageModified !== null) {
+        params.push(`v=${dateImageModified}`);
     }
     if (imageFormat !== undefined && imageFormat !== null) {
-        uri += `&image-format=${imageFormat}`;
+        params.push(`image-format=${imageFormat}`);
+    }
+    
+    const path = imageUriSearchPath ?? "no-preview";
+    const uri = `/model-manager/preview/get/${path}`;
+    if (params.length > 0) {
+        return uri + '?' + params.join('&');
     }
     return uri;
 }
@@ -1947,8 +1950,8 @@ class ModelGrid {
                 const previewThumbnail = $el("img.model-preview", {
                     loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
                     src: imageUri(
-                        previewInfo?.path, 
-                        previewInfo?.dateModified, 
+                        previewInfo?.path ? encodeURIComponent(previewInfo.path) : undefined, 
+                        previewInfo?.dateModified ? encodeURIComponent(previewInfo.dateModified) : undefined, 
                         PREVIEW_THUMBNAIL_WIDTH, 
                         PREVIEW_THUMBNAIL_HEIGHT, 
                         previewThumbnailFormat, 
@@ -2440,7 +2443,7 @@ class ModelInfo {
      */
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
-        const [info, metadata, tags, noteText] = await comfyRequest(`/model-manager/model/info?path=${path}`)
+        const [info, metadata, tags, noteText] = await comfyRequest(`/model-manager/model/info/${path}`)
             .then((result) => {
                 const success = result["success"];
                 const message = result["alert"];
@@ -2552,8 +2555,8 @@ class ModelInfo {
         const previewSelect = this.previewSelect;
         const defaultUrl = previewSelect.elements.defaultUrl;
         if (info["Preview"]) {
-            const imagePath = info["Preview"]["path"];
-            const imageDateModified = info["Preview"]["dateModified"];
+            const imagePath = encodeURIComponent(info["Preview"]["path"]);
+            const imageDateModified = encodeURIComponent(info["Preview"]["dateModified"]);
             defaultUrl.dataset.noimage = imageUri(imagePath, imageDateModified);
         }
         else {
