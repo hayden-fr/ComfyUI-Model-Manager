@@ -244,16 +244,14 @@ def get_def_headers(url=""):
     return def_headers
 
 
-def civitai_get_model_info(sha256_hash):
+def civitai_get_model_version_info_by_hash(sha256_hash):
     url_api_hash = r"https://civitai.com/api/v1/model-versions/by-hash/" + sha256_hash
     hash_response = requests.get(url_api_hash)
     if hash_response.status_code != 200:
         return {}
-    hash_info = hash_response.json()
-    if len(hash_info) == 0:
-        return {}
-    model_id = hash_info["modelId"]
+    return hash_response.json()
 
+def civitai_get_model_info_by_model_id(model_id):
     url_api_model = r"https://civitai.com/api/v1/models/" + str(model_id)
     model_response = requests.get(url_api_model)
     if model_response.status_code != 200:
@@ -262,7 +260,7 @@ def civitai_get_model_info(sha256_hash):
 
 
 def search_web_for_model_info(sha256_hash):
-    model_info = civitai_get_model_info(sha256_hash)
+    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
     if len(model_info) > 0: return model_info
 
     # TODO: search other websites
@@ -271,16 +269,10 @@ def search_web_for_model_info(sha256_hash):
 
 
 def search_web_for_model_url(sha256_hash):
-    model_info = civitai_get_model_info(sha256_hash)
+    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
     if len(model_info) > 0:
-        model_id = model_info["id"]
-        version_id = None
-        for model_version in model_info["modelVersions"]:
-            for files in model_version["files"]:
-                if files["hashes"]["SHA256"].lower() == sha256_hash.lower():
-                    version_id = model_version["id"]
-                    break
-            if version_id is not None: break
+        model_id = model_info["modelId"]
+        version_id = model_info["id"]
         return f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
 
     # TODO: search other websites
@@ -289,7 +281,8 @@ def search_web_for_model_url(sha256_hash):
 
 
 def search_web_for_model_notes(sha256_hash):
-    model_info = civitai_get_model_info(sha256_hash)
+    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
+    model_info = civitai_get_model_info_by_model_id(model_info["modelId"])
     if len(model_info) > 0:
         model_description = model_info.get("description", "")
         model_version_description = ""
