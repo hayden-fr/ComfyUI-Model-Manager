@@ -60,7 +60,8 @@ preview_extensions = ( # TODO: JavaScript does not know about this (x2 states)
     image_extensions + # order matters
     stable_diffusion_webui_civitai_helper_image_extensions
 )
-model_info_extension = ".txt"
+model_notes_extension = ".txt"
+model_info_extension = ".json"
 #video_extensions = (".avi", ".mp4", ".webm") # TODO: Requires ffmpeg or cv2. Cache preview frame?
 
 def split_valid_ext(s, *arg_exts):
@@ -258,6 +259,15 @@ def civitai_get_model_info(sha256_hash):
     if model_response.status_code != 200:
         return {}
     return model_response.json()
+
+
+def search_web_for_model_info(sha256_hash):
+    model_info = civitai_get_model_info(sha256_hash)
+    if len(model_info) > 0: return model_info
+
+    # TODO: search other websites
+
+    return {}
 
 
 def search_web_for_model_url(sha256_hash):
@@ -1046,10 +1056,10 @@ async def get_model_info(request):
             training_comment if training_comment != "None" else ""
         ).strip()
 
-    info_text_file = abs_name + model_info_extension
+    notes_file = abs_name + model_notes_extension
     notes = ""
-    if os.path.isfile(info_text_file):
-        with open(info_text_file, 'r', encoding="utf-8") as f:
+    if os.path.isfile(notes_file):
+        with open(notes_file, 'r', encoding="utf-8") as f:
             notes = f.read()
 
     if metadata is not None:
@@ -1136,6 +1146,7 @@ async def download_model(request):
         result["alert"] = "Invalid save path!"
         return web.json_response(result)
 
+    # download model
     download_uri = formdata.get("download")
     if download_uri is None:
         result["alert"] = "Invalid download url!"
@@ -1159,6 +1170,21 @@ async def download_model(request):
         result["alert"] = "Failed to download model!\n\n" + str(e)
         return web.json_response(result)
 
+    # download model info
+    sha256_hash = formdata.get("sha256", None)
+    if sha256_hash is not None:
+        model_info = search_web_for_model_info(sha256_hash)
+        if len(model_info) > 0:
+            info_path = os.path.splitext(file_name)[0] + ".json"
+            try:
+                with open(info_path, "w", encoding="utf-8") as f:
+                    json.dump(model_info, f, indent=4)
+                print("Saved file: " + info_path)
+            except ValueError as e:
+                print(e, file=sys.stderr, flush=True)
+                result["alert"] = "Failed to save model info!\n\n" + str(e) # TODO: >1 alert? concat?
+
+    # save image as model preview
     image = formdata.get("image")
     if image is not None and image != "":
         try:
@@ -1232,7 +1258,7 @@ async def move_model(request):
         return web.json_response(result)
 
     # TODO: this could overwrite existing files in destination; do a check beforehand?
-    for extension in preview_extensions + (model_info_extension,):
+    for extension in preview_extensions + (model_notes_extension,) + (model_info_extension,):
         old_file = old_file_without_extension + extension
         if os.path.isfile(old_file):
             new_file = new_file_without_extension + extension
@@ -1286,6 +1312,7 @@ async def delete_model(request):
         print("Deleted file: " + model_path)
 
         delete_same_name_files(path_and_name, preview_extensions)
+        delete_same_name_files(path_and_name, (model_notes_extension,))
         delete_same_name_files(path_and_name, (model_info_extension,))
 
     return web.json_response(result)
@@ -1310,7 +1337,7 @@ async def set_notes(request):
     model_path, model_type = search_path_to_system_path(model_path)
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     file_path_without_extension, _ = split_valid_ext(model_path, model_extensions)
-    filename = os.path.normpath(file_path_without_extension + model_info_extension)
+    filename = os.path.normpath(file_path_without_extension + model_notes_extension)
     
     if dt_epoch is not None and os.path.exists(filename) and os.path.getmtime(filename) > dt_epoch:
         # discard late save

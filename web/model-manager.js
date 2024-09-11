@@ -3333,6 +3333,7 @@ async function getModelInfos(urlText) {
                             "fp": file["fp"],
                             "quant": file["size"],
                             "fileFormat": file["format"],
+                            "sha256": file["hashes"]["SHA256"],
                         },
                     });
                 });
@@ -3353,6 +3354,7 @@ async function getModelInfos(urlText) {
             const infos = hfInfo["modelFiles"].map((file) => {
                 const indexSep = file.lastIndexOf("/");
                 const filename = file.substring(indexSep + 1);
+                // TODO: get sha256 of each HuggingFace model file
                 return {
                     "images": hfInfo["images"],
                     "fileName": filename,
@@ -3655,6 +3657,7 @@ class DownloadView {
                                 formData.append("download", info["downloadUrl"]);
                                 formData.append("path", pathDirectory);
                                 formData.append("name", modelName);
+                                formData.append("sha256", info["details"]["sha256"]);
                                 const image = await downloadPreviewSelect.getImage();
                                 formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);
