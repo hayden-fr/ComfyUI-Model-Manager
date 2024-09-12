@@ -1261,7 +1261,7 @@ async def download_model(request):
 
     # save url
     url_file_path = os.path.splitext(file_name)[0] + ".url"
-    url = ModelInfo.get_url(url)
+    url = ModelInfo.get_url(model_info)
     if url != "" and url is not None:
         save_web_url(url_file_path, url)
 
