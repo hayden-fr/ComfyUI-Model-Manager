@@ -1257,11 +1257,12 @@ async def download_model(request):
         return web.json_response(result)
 
     # download model info
-    _ = ModelInfo.search_info(file_name, cache=True) # save json
+    model_info = ModelInfo.search_info(file_name, cache=True) # save json
 
     # save url
     url_file_path = os.path.splitext(file_name)[0] + ".url"
-    save_web_url(url_file_path, download_uri)
+    url = ModelInfo.get_url(url)
+    save_web_url(url_file_path, url)
 
     # save image as model preview
     image = formdata.get("image")
