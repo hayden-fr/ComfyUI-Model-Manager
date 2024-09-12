@@ -2370,9 +2370,9 @@ class ModelInfo {
         
         [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
             { name: "Overview", icon: "information-box-outline", tabContent: this.element },
-            { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
-            { name: "Tags", icon: "tag-outline", tabContent: $el("div", ["Tags"]) },
             { name: "Notes", icon: "pencil-outline", tabContent: $el("div", ["Notes"]) },
+            { name: "Tags", icon: "tag-outline", tabContent: $el("div", ["Tags"]) },
+            { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
         ]);
     }
     
@@ -2457,7 +2457,7 @@ class ModelInfo {
                     result["info"], 
                     result["metadata"], 
                     result["tags"], 
-                    result["notes"]
+                    result["notes"], 
                 ];
             })
             .catch((err) => {
@@ -2642,33 +2642,137 @@ class ModelInfo {
         infoHtml.append.apply(infoHtml, innerHtml);
         // TODO: set default value of dropdown and value to model type?
         
-        /** @type {HTMLDivElement} */
-        const metadataElement = this.elements.tabContents[1]; // TODO: remove magic value
-        const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
-        metadataElement.innerHTML = "";
-        metadataElement.append.apply(metadataElement, [
-            $el("h1", ["Metadata"]),
-            $el("div", (() => {
-                    const tableRows = [];
-                    if (isMetadata) {
-                        for (const [key, value] of Object.entries(metadata)) {
-                            if (value === undefined || value === null) {
-                                continue;
-                            }
-                            if (value !== "") {
-                                tableRows.push($el("tr", [
-                                    $el("th.model-metadata-key", [key]),
-                                    $el("th.model-metadata-value", [value]),
-                                ]));
-                            }
-                        }
+        //
+        // NOTES
+        //
+        
+        const saveIcon = "content-save";
+        const savingIcon = "cloud-upload-outline";
+        
+        const saveNotesButton = new ComfyButton({
+            icon: saveIcon,
+            tooltip: "Save note",
+            classList: "comfyui-button icon-button",
+            action: async (e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const saved = await this.trySave(false);
+                comfyButtonAlert(e.target, saved);
+                button.disabled = false;
+            },
+        }).element;
+        
+        const downloadNotesButton = new ComfyButton({
+            icon: "earth-arrow-down",
+            tooltip: "Attempt to download model info from the internet.",
+            classList: "comfyui-button icon-button",
+            action: async (e) => {
+                if (this.#savedNotesValue !== "") {
+                    const overwriteNoteConfirmation = window.confirm("Overwrite note?");
+                    if (!overwriteNoteConfirmation) {
+                        comfyButtonAlert(e.target, false, "mdi-check-bold", "mdi-close-thick");
+                        return;
                     }
-                    return $el("table.model-metadata", tableRows);
-                })(),
-            ),
-        ]);
-        const metadataButton = this.elements.tabButtons[1]; // TODO: remove magic value
-        metadataButton.style.display = isMetadata ? "" : "none";
+                }
+                
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                const [success, downloadedNotesValue] = await comfyRequest(
+                    `/model-manager/notes/download?path=${path}&overwrite=True`,
+                    {
+                        method: "POST",
+                        body: {},
+                    }
+                ).then((data) => {
+                    const success = data["success"];
+                    const message = data["alert"];
+                    if (message !== undefined) {
+                        window.alert(message);
+                    }
+                    return [success, data["notes"]];
+                }).catch((err) => {
+                    return [false, ""];
+                });
+                if (success) {
+                    this.#savedNotesValue = downloadedNotesValue;
+                    this.elements.notes.value = downloadedNotesValue;
+                }
+                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                button.disabled = false;
+            },
+        }).element;
+        
+        const saveDebounce = debounce(async() => {
+            const saveIconClass = "mdi-" + saveIcon;
+            const savingIconClass = "mdi-" + savingIcon;
+            const iconElement = saveNotesButton.getElementsByTagName("i")[0];
+            iconElement.classList.remove(saveIconClass);
+            iconElement.classList.add(savingIconClass);
+            const saved = await this.trySave(false);
+            iconElement.classList.remove(savingIconClass);
+            iconElement.classList.add(saveIconClass);
+        }, 1000);
+        
+        /** @type {HTMLDivElement} */
+        const notesElement = this.elements.tabContents[1]; // TODO: remove magic value
+        notesElement.innerHTML = "";
+        notesElement.append.apply(notesElement,
+            (() => {
+                const notes = $el("textarea.comfy-multiline-input", {
+                    name: "model notes",
+                    value: noteText, 
+                    oninput: (e) => {
+                        if (this.#settingsElements["model-info-autosave-notes"].checked) {
+                            saveDebounce();
+                        }
+                    },
+                });
+                
+                if (navigator.userAgent.includes("Mac")) {
+                    new KeyComboListener(
+                        ["MetaLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["MetaRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
+                else {
+                    new KeyComboListener(
+                        ["ControlLeft", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                    new KeyComboListener(
+                        ["ControlRight", "KeyS"],
+                        saveDebounce,
+                        notes,
+                    );
+                }
+                
+                this.elements.notes = notes;
+                this.#savedNotesValue = noteText;
+                return [
+                    $el("div.row", {
+                        style: { "align-items": "center" },
+                    }, [
+                        $el("h1", ["Notes"]),
+                        saveNotesButton,
+                        downloadNotesButton,
+                    ]),
+                    $el("div", {
+                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
+                    }, notes),
+                ];
+            })()
+        );
+        
+        //
+        // Tags
+        //
         
         /** @type {HTMLDivElement} */
         const tagsElement = this.elements.tabContents[2]; // TODO: remove magic value
@@ -2762,129 +2866,37 @@ class ModelInfo {
         const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
         tagButton.style.display = isTags ? "" : "none";
         
-        const saveIcon = "content-save";
-        const savingIcon = "cloud-upload-outline";
-        
-        const saveNotesButton = new ComfyButton({
-            icon: saveIcon,
-            tooltip: "Save note",
-            classList: "comfyui-button icon-button",
-            action: async (e) => {
-                const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                button.disabled = true;
-                const saved = await this.trySave(false);
-                comfyButtonAlert(e.target, saved);
-                button.disabled = false;
-            },
-        }).element;
-        
-        const downloadNotesButton = new ComfyButton({
-            icon: "earth-arrow-down",
-            tooltip: "Attempt to download model info from the internet.",
-            classList: "comfyui-button icon-button",
-            action: async (e) => {
-                if (this.#savedNotesValue !== "") {
-                    const overwriteNoteConfirmation = window.confirm("Overwrite note?");
-                    if (!overwriteNoteConfirmation) {
-                        comfyButtonAlert(e.target, false, "mdi-check-bold", "mdi-close-thick");
-                        return;
-                    }
-                }
-                
-                const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                button.disabled = true;
-                const [success, downloadedNotesValue] = await comfyRequest(
-                    `/model-manager/notes/download?path=${path}&overwrite=True`,
-                    {
-                        method: "POST",
-                        body: {},
-                    }
-                ).then((data) => {
-                    const success = data["success"];
-                    const message = data["alert"];
-                    if (message !== undefined) {
-                        window.alert(message);
-                    }
-                    return [success, data["notes"]];
-                }).catch((err) => {
-                    return [false, ""];
-                });
-                if (success) {
-                    this.#savedNotesValue = downloadedNotesValue;
-                    this.elements.notes.value = downloadedNotesValue;
-                }
-                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
-                button.disabled = false;
-            },
-        }).element;
-        
-        const saveDebounce = debounce(async() => {
-            const saveIconClass = "mdi-" + saveIcon;
-            const savingIconClass = "mdi-" + savingIcon;
-            const iconElement = saveNotesButton.getElementsByTagName("i")[0];
-            iconElement.classList.remove(saveIconClass);
-            iconElement.classList.add(savingIconClass);
-            const saved = await this.trySave(false);
-            iconElement.classList.remove(savingIconClass);
-            iconElement.classList.add(saveIconClass);
-        }, 1000);
+        //
+        // Metadata
+        //
         
         /** @type {HTMLDivElement} */
-        const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
-        notesElement.innerHTML = "";
-        notesElement.append.apply(notesElement,
-            (() => {
-                const notes = $el("textarea.comfy-multiline-input", {
-                    name: "model notes",
-                    value: noteText, 
-                    oninput: (e) => {
-                        if (this.#settingsElements["model-info-autosave-notes"].checked) {
-                            saveDebounce();
+        const metadataElement = this.elements.tabContents[3]; // TODO: remove magic value
+        const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
+        metadataElement.innerHTML = "";
+        metadataElement.append.apply(metadataElement, [
+            $el("h1", ["Metadata"]),
+            $el("div", (() => {
+                    const tableRows = [];
+                    if (isMetadata) {
+                        for (const [key, value] of Object.entries(metadata)) {
+                            if (value === undefined || value === null) {
+                                continue;
+                            }
+                            if (value !== "") {
+                                tableRows.push($el("tr", [
+                                    $el("th.model-metadata-key", [key]),
+                                    $el("th.model-metadata-value", [value]),
+                                ]));
+                            }
                         }
-                    },
-                });
-                
-                if (navigator.userAgent.includes("Mac")) {
-                    new KeyComboListener(
-                        ["MetaLeft", "KeyS"],
-                        saveDebounce,
-                        notes,
-                    );
-                    new KeyComboListener(
-                        ["MetaRight", "KeyS"],
-                        saveDebounce,
-                        notes,
-                    );
-                }
-                else {
-                    new KeyComboListener(
-                        ["ControlLeft", "KeyS"],
-                        saveDebounce,
-                        notes,
-                    );
-                    new KeyComboListener(
-                        ["ControlRight", "KeyS"],
-                        saveDebounce,
-                        notes,
-                    );
-                }
-                
-                this.elements.notes = notes;
-                this.#savedNotesValue = noteText;
-                return [
-                    $el("div.row", {
-                        style: { "align-items": "center" },
-                    }, [
-                        $el("h1", ["Notes"]),
-                        saveNotesButton,
-                        downloadNotesButton,
-                    ]),
-                    $el("div", {
-                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
-                    }, notes),
-                ];
-            })()
-        );
+                    }
+                    return $el("table.model-metadata", tableRows);
+                })(),
+            ),
+        ]);
+        const metadataButton = this.elements.tabButtons[3]; // TODO: remove magic value
+        metadataButton.style.display = isMetadata ? "" : "none";
     }
     
     static UniformTagSampling(tagsAndCounts, sampleCount, frequencyThreshold = 0) {
@@ -3333,7 +3345,6 @@ async function getModelInfos(urlText) {
                             "fp": file["fp"],
                             "quant": file["size"],
                             "fileFormat": file["format"],
-                            "sha256": file["hashes"]["SHA256"],
                         },
                     });
                 });
@@ -3354,7 +3365,6 @@ async function getModelInfos(urlText) {
             const infos = hfInfo["modelFiles"].map((file) => {
                 const indexSep = file.lastIndexOf("/");
                 const filename = file.substring(indexSep + 1);
-                // TODO: get sha256 of each HuggingFace model file
                 return {
                     "images": hfInfo["images"],
                     "fileName": filename,
@@ -3657,7 +3667,6 @@ class DownloadView {
                                 formData.append("download", info["downloadUrl"]);
                                 formData.append("path", pathDirectory);
                                 formData.append("name", modelName);
-                                formData.append("sha256", info["details"]["sha256"]);
                                 const image = await downloadPreviewSelect.getImage();
                                 formData.append("image", image === PREVIEW_NONE_URI ? "" : image);
                                 formData.append("overwrite", this.elements.overwrite.checked);

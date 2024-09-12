@@ -244,56 +244,63 @@ def get_def_headers(url=""):
     return def_headers
 
 
-def civitai_get_model_version_info_by_hash(sha256_hash):
-    url_api_hash = r"https://civitai.com/api/v1/model-versions/by-hash/" + sha256_hash
-    hash_response = requests.get(url_api_hash)
-    if hash_response.status_code != 200:
-        return {}
-    return hash_response.json()
-
-def civitai_get_model_info_by_model_id(model_id):
-    url_api_model = r"https://civitai.com/api/v1/models/" + str(model_id)
-    model_response = requests.get(url_api_model)
-    if model_response.status_code != 200:
-        return {}
-    return model_response.json()
+def hash_file(path, buffer_size=1024*1024):
+    sha256 = hashlib.sha256()
+    with open(path, 'rb') as f:
+        while True:
+            data = f.read(buffer_size)
+            if not data: break
+            sha256.update(data)
+    return sha256.hexdigest()
 
 
-def search_web_for_model_info(sha256_hash):
-    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
-    if len(model_info) > 0: return model_info
+class Civitai:
+    @staticmethod
+    def search_by_hash(sha256_hash):
+        url_api_hash = r"https://civitai.com/api/v1/model-versions/by-hash/" + sha256_hash
+        hash_response = requests.get(url_api_hash)
+        if hash_response.status_code != 200:
+            return {}
+        return hash_response.json() # model version info
 
-    # TODO: search other websites
+    @staticmethod
+    def search_by_model_id(model_id):
+        url_api_model = r"https://civitai.com/api/v1/models/" + str(model_id)
+        model_response = requests.get(url_api_model)
+        if model_response.status_code != 200:
+            return {}
+        return model_response.json() # model group info
 
-    return {}
+    @staticmethod
+    def get_model_url(model_version_info):
+        if len(model_version_info) == 0: return ""
+        model_id = model_version_info.get("modelId")
+        if model_id is None:
+            # there can be incomplete model info, so don't throw just in case
+            return ""
+        url = f"https://civitai.com/models/{model_id}"
+        version_id = model_version_info.get("id")
+        if version_id is not None:
+            url += f"?modelVersionId={version_id}"
+        return url
 
+    @staticmethod
+    def search_notes(model_version_info):
+        model_id = model_version_info.get("modelId")
+        model_version_id = model_version_info.get("id")
 
-def search_web_for_model_url(sha256_hash):
-    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
-    if len(model_info) > 0:
-        model_id = model_info["modelId"]
-        version_id = model_info["id"]
-        return f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
+        assert(model_id is not None)
+        assert(model_version_id is not None)
 
-    # TODO: search other websites
-
-    return ""
-
-
-def search_web_for_model_notes(sha256_hash):
-    model_info = civitai_get_model_version_info_by_hash(sha256_hash)
-    model_info = civitai_get_model_info_by_model_id(model_info["modelId"])
-    if len(model_info) > 0:
-        model_description = model_info.get("description", "")
         model_version_description = ""
         model_trigger_words = []
+        model_info = Civitai.search_by_model_id(model_id)
+        model_description = model_info.get("description", "")
         for model_version in model_info["modelVersions"]:
-            for files in model_version["files"]:
-                if files["hashes"]["SHA256"].lower() == sha256_hash.lower():
-                    model_version_description = model_version.get("description", "")
-                    model_trigger_words = model_version.get("trainedWords", "")
-                    break
-            if model_version_description != "": break
+            if model_version["id"] == model_version_id:
+                model_version_description = model_version.get("description", "")
+                model_trigger_words = model_version.get("trainedWords", [])
+                break
 
         notes = ""
         if len(model_trigger_words) > 0:
@@ -313,24 +320,76 @@ def search_web_for_model_notes(sha256_hash):
             notes += markdownify.markdownify(model_version_description)
         if model_description != "":
             if len(notes) > 0: notes += "\n\n"
-            notes += "# " + model_info.get("name", str(model_info["id"])) + "\n\n"
+            notes += "# " + model_info.get("name", str(model_id)) + "\n\n"
             notes += markdownify.markdownify(model_description)
-        notes = notes.strip()
+        return notes.strip()
+
+
+class ModelInfo:
+    @staticmethod
+    def search_by_hash(sha256_hash):
+        model_info = Civitai.search_by_hash(sha256_hash)
+        if len(model_info) > 0: return model_info
+        # TODO: search other websites
+        return {}
+
+    @staticmethod
+    def try_load_cached(model_path):
+        model_info_path = os.path.splitext(model_path)[0] + model_info_extension
+        if os.path.isfile(model_info_path):
+            with open(model_info_path, "r", encoding="utf-8") as f:
+                model_info = json.load(f)
+                return model_info
+        return {}
+
+    @staticmethod
+    def get_hash(model_info):
+        model_info = Civitai.get_hash(model_info)
+        if len(model_info) > 0: return model_info
+        # TODO: search other websites
+        return {}
+
+    @staticmethod
+    def search_info(model_path, cache=True, use_cached=True):
+        model_info = ModelInfo.try_load_cached(model_path)
+        if use_cached and len(model_info) > 0:
+            return model_info
+
+        sha256_hash = hash_file(model_path)
+        model_info = ModelInfo.search_by_hash(sha256_hash)
+        if cache and len(model_info) > 0:
+            model_info_path = os.path.splitext(model_path)[0] + model_info_extension
+            with open(model_info_path, "w", encoding="utf-8") as f:
+                json.dump(model_info, f, indent=4)
+                print("Saved file: " + model_info_path)
+
+        return model_info
+
+    @staticmethod
+    def get_url(model_info):
+        if len(model_info) == 0: return ""
+        model_url = Civitai.get_model_url(model_info)
+        if model_url != "": return model_url
+
+        # TODO: huggingface has <user>/<model> formats
+
+        # TODO: support other websites
+        return ""
+
+    @staticmethod
+    def search_notes(model_path):
+        notes = ""
+
+        model_info = ModelInfo.search_info(model_path, cache=True, use_cached=True) # assume cached is correct; re-download elsewhere
+        if len(model_info) > 0:
+            notes = Civitai.search_notes(model_info)
+
+        # TODO: support other websites
         return notes
 
-    # TODO: search other websites
+        # TODO: search other websites
 
-    return ""
-
-
-def hash_file(path, buffer_size=1024*1024):
-    sha256 = hashlib.sha256()
-    with open(path, 'rb') as f:
-        while True:
-            data = f.read(buffer_size)
-            if not data: break
-            sha256.update(data)
-    return sha256.hexdigest()
+        return ""
 
 
 @server.PromptServer.instance.routes.get("/model-manager/timestamp")
@@ -979,7 +1038,7 @@ def bytes_to_size(total_bytes):
 
 
 @server.PromptServer.instance.routes.get("/model-manager/model/info/{path}")
-async def get_model_info(request):
+async def get_model_metadata(request):
     result = { "success": False }
 
     model_path = request.match_info["path"]
@@ -993,16 +1052,16 @@ async def get_model_info(request):
         result["alert"] = "Invalid model path!"
         return web.json_response(result)
 
-    info = {}
+    data = {}
     comfyui_directory, name = os.path.split(model_path)
-    info["File Name"] = name
-    info["File Directory"] = comfyui_directory
-    info["File Size"] = bytes_to_size(os.path.getsize(abs_path))
+    data["File Name"] = name
+    data["File Directory"] = comfyui_directory
+    data["File Size"] = bytes_to_size(os.path.getsize(abs_path))
     stats = pathlib.Path(abs_path).stat()
     date_format = "%Y-%m-%d %H:%M:%S"
     date_modified = datetime.fromtimestamp(stats.st_mtime).strftime(date_format)
-    #info["Date Modified"] = date_modified
-    #info["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
+    #data["Date Modified"] = date_modified
+    #data["Date Created"] = datetime.fromtimestamp(stats.st_ctime).strftime(date_format)
 
     model_extensions = folder_paths_get_supported_pt_extensions(model_type)
     abs_name , _ = split_valid_ext(abs_path, model_extensions)
@@ -1012,7 +1071,7 @@ async def get_model_info(request):
         if os.path.isfile(maybe_preview):
             preview_path, _ = split_valid_ext(model_path, model_extensions)
             preview_modified = pathlib.Path(maybe_preview).stat().st_mtime_ns
-            info["Preview"] = {
+            data["Preview"] = {
                 "path": preview_path + extension,
                 "dateModified": str(preview_modified),
             }
@@ -1021,27 +1080,27 @@ async def get_model_info(request):
     header = get_safetensor_header(abs_path)
     metadata = header.get("__metadata__", None)
 
-    if metadata is not None and info.get("Preview", None) is None:
+    if metadata is not None and data.get("Preview", None) is None:
         thumbnail = metadata.get("modelspec.thumbnail")
         if thumbnail is not None:
             i0 = thumbnail.find("/") + 1
             i1 = thumbnail.find(";", i0)
             thumbnail_extension = "." + thumbnail[i0:i1]
             if thumbnail_extension in image_extensions:
-                info["Preview"] = {
+                data["Preview"] = {
                     "path": request.query["path"] + thumbnail_extension,
                     "dateModified": date_modified,
                 }
 
     if metadata is not None:
-        info["Base Training Model"] = metadata.get("ss_sd_model_name", "")
-        info["Base Model Version"] = metadata.get("ss_base_model_version", "")
-        info["Network Dimension"] = metadata.get("ss_network_dim", "")
-        info["Network Alpha"] = metadata.get("ss_network_alpha", "")
+        data["Base Training Model"] = metadata.get("ss_sd_model_name", "")
+        data["Base Model Version"] = metadata.get("ss_base_model_version", "")
+        data["Network Dimension"] = metadata.get("ss_network_dim", "")
+        data["Network Alpha"] = metadata.get("ss_network_alpha", "")
 
     if metadata is not None:
         training_comment = metadata.get("ss_training_comment", "")
-        info["Description"] = (
+        data["Description"] = (
             metadata.get("modelspec.description", "") + 
             "\n\n" + 
             metadata.get("modelspec.usage_hint", "") + 
@@ -1076,7 +1135,7 @@ async def get_model_info(request):
                 resolutions[str(x) + "x" + str(y)] = count
         resolutions = list(resolutions.items())
         resolutions.sort(key=lambda x: x[1], reverse=True)
-        info["Bucket Resolutions"] = resolutions
+        data["Bucket Resolutions"] = resolutions
 
     tags = None
     if metadata is not None:
@@ -1091,7 +1150,7 @@ async def get_model_info(request):
         tags.sort(key=lambda x: x[1], reverse=True)
 
     result["success"] = True
-    result["info"] = info
+    result["info"] = data
     if metadata is not None:
         result["metadata"] = metadata
     if tags is not None:
@@ -1099,8 +1158,9 @@ async def get_model_info(request):
     result["notes"] = notes
     return web.json_response(result)
 
+
 @server.PromptServer.instance.routes.get("/model-manager/model/web-url")
-async def get_model_info(request):
+async def get_model_web_url(request):
     result = { "success": False }
 
     model_path = request.query.get("path", None)
@@ -1114,9 +1174,14 @@ async def get_model_info(request):
         result["alert"] = "Invalid model path!"
         return web.json_response(result)
 
-    sha256_hash = hash_file(abs_path)
-    web_url = search_web_for_model_url(sha256_hash)
+    model_info = ModelInfo.search_info(abs_path)
+    if len(model_info) == 0:
+        result["alert"] = "Unable to find model info!"
+        return web.json_response(result)
 
+    web_url = ModelInfo.get_url(model_info)
+    if web_url != "":
+        result["success"] = True
     return web.json_response({ "url": web_url })
 
 
@@ -1164,18 +1229,7 @@ async def download_model(request):
         return web.json_response(result)
 
     # download model info
-    sha256_hash = formdata.get("sha256", None)
-    if sha256_hash is not None:
-        model_info = search_web_for_model_info(sha256_hash)
-        if len(model_info) > 0:
-            info_path = os.path.splitext(file_name)[0] + ".json"
-            try:
-                with open(info_path, "w", encoding="utf-8") as f:
-                    json.dump(model_info, f, indent=4)
-                print("Saved file: " + info_path)
-            except ValueError as e:
-                print(e, file=sys.stderr, flush=True)
-                result["alert"] = "Failed to save model info!\n\n" + str(e) # TODO: >1 alert? concat?
+    _ = ModelInfo.search_info(file_name, cache=True) # save json
 
     # save image as model preview
     image = formdata.get("image")
@@ -1379,8 +1433,7 @@ async def try_download_notes(request):
         result["alert"] = "Notes already exist!"
         return web.json_response(result)
 
-    sha256_hash = hash_file(abs_path)
-    notes = search_web_for_model_notes(sha256_hash)
+    notes = ModelInfo.search_notes(abs_path)
     if not notes.isspace() and notes != "":
         try:
             with open(notes_path, "w", encoding="utf-8") as f:
