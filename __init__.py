@@ -244,6 +244,20 @@ def get_def_headers(url=""):
     return def_headers
 
 
+def save_web_url(path, url):
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(f"[InternetShortcut]\nURL={url}\n")
+
+
+def try_load_web_url(path):
+    with open(path, "r", encoding="utf-8") as f:
+        if f.readline() != "[InternetShortcut]\n": return ""
+        url = f.readline()
+        if not url.startswith("URL="): return ""
+        if not url.endswith("\n"): return ""
+        return url[4:len(url)-1]
+
+
 def hash_file(path, buffer_size=1024*1024):
     sha256 = hashlib.sha256()
     with open(path, 'rb') as f:
@@ -1114,6 +1128,11 @@ async def get_model_metadata(request):
         with open(notes_file, 'r', encoding="utf-8") as f:
             notes = f.read()
 
+    web_url_file = abs_name + ".url"
+    web_url = ""
+    if os.path.isfile(web_url_file):
+        web_url = try_load_web_url(web_url_file)
+
     if metadata is not None:
         img_buckets = metadata.get("ss_bucket_info", None)
         datasets = metadata.get("ss_datasets", None)
@@ -1156,6 +1175,7 @@ async def get_model_metadata(request):
     if tags is not None:
         result["tags"] = tags
     result["notes"] = notes
+    result["url"] = web_url
     return web.json_response(result)
 
 
@@ -1174,14 +1194,22 @@ async def get_model_web_url(request):
         result["alert"] = "Invalid model path!"
         return web.json_response(result)
 
+    url_path = os.path.splitext(abs_path)[0] + ".url"
+    if os.path.isfile(url_path):
+        web_url = try_load_web_url(url_path)
+        if web_url != "":
+            result["success"] = True
+            return web.json_response({ "url": web_url })
+
     model_info = ModelInfo.search_info(abs_path)
     if len(model_info) == 0:
         result["alert"] = "Unable to find model info!"
         return web.json_response(result)
-
     web_url = ModelInfo.get_url(model_info)
     if web_url != "":
+        save_web_url(url_path, web_url)
         result["success"] = True
+
     return web.json_response({ "url": web_url })
 
 
@@ -1230,6 +1258,10 @@ async def download_model(request):
 
     # download model info
     _ = ModelInfo.search_info(file_name, cache=True) # save json
+
+    # save url
+    url_file_path = os.path.splitext(file_name)[0] + ".url"
+    save_web_url(url_file_path, download_uri)
 
     # save image as model preview
     image = formdata.get("image")

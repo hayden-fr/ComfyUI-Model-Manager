@@ -147,21 +147,29 @@ async function loadWorkflow(url) {
 
 /**
  * @param {string} modelSearchPath
- * @returns {Promise<boolean>}
+ * @returns {Promise<string|undefined>}
  */
-async function tryOpenModelUrl(modelSearchPath) {
+async function tryGetModelWebUrl(modelSearchPath) {
     const encodedPath = encodeURIComponent(modelSearchPath);
-    const requestUrl = `/model-manager/model/web-url?path=${encodedPath}`;
-    const webUrlResponse = await comfyRequest(requestUrl);
-    let modelUrl;
+    const response = await comfyRequest(`/model-manager/model/web-url?path=${encodedPath}`);
+    const url = response.url;
+    return url !== undefined && url !== "" ? url : undefined;
+}
+
+/**
+ * @param {string} url
+ * @param {string} name
+ * @returns {boolean}
+ */
+function tryOpenUrl(url, name="Url") {
     try {
-        modelUrl = new URL(webUrlResponse["url"]);
+        new URL(url);
     }
     catch (exception) {
         return false;
     }
     try {
-        window.open(modelUrl, '_blank').focus();
+        window.open(url, '_blank').focus();
     }
     catch (exception) {        
         // browser or ad-blocker blocking opening new window
@@ -169,13 +177,13 @@ async function tryOpenModelUrl(modelSearchPath) {
             [
                 $el("p", {
                     style: { color: "var(--input-text)" },
-                }, [modelSearchPath]),
+                }, [name]),
                 $el("a", {
-                    href: modelUrl,
+                    href: url,
                     target: "_blank",
                 }, [
                     $el("span", [
-                        modelUrl,
+                        url,
                         $el("i.mdi.mdi-open-in-new"),
                     ])
                 ]),
@@ -1970,7 +1978,8 @@ class ModelGrid {
                             action: async (e) => {
                                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
                                 button.disabled = true;
-                                const success = await tryOpenModelUrl(searchPath);
+                                const webUrl = await tryGetModelWebUrl(searchPath);
+                                const success = tryOpenUrl(webUrl, searchPath);
                                 comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
                                 button.disabled = false;
                             },
@@ -2443,7 +2452,7 @@ class ModelInfo {
      */
     async update(searchPath, updateModels, searchSeparator) {
         const path = encodeURIComponent(searchPath);
-        const [info, metadata, tags, noteText] = await comfyRequest(`/model-manager/model/info/${path}`)
+        const [info, metadata, tags, noteText, url] = await comfyRequest(`/model-manager/model/info/${path}`)
             .then((result) => {
                 const success = result["success"];
                 const message = result["alert"];
@@ -2458,6 +2467,7 @@ class ModelInfo {
                     result["metadata"], 
                     result["tags"], 
                     result["notes"], 
+                    result["url"], 
                 ];
             })
             .catch((err) => {
@@ -2585,7 +2595,14 @@ class ModelInfo {
                     action: async (e) => {
                         const [button, icon, span] = comfyButtonDisambiguate(e.target);
                         button.disabled = true;
-                        const success = await tryOpenModelUrl(searchPath);
+                        let webUrl;
+                        if (url !== undefined && url !== "") {
+                            webUrl = url;
+                        }
+                        else {
+                            webUrl = await tryGetModelWebUrl(searchPath);
+                        }
+                        const success = tryOpenUrl(webUrl, searchPath);
                         comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
                         button.disabled = false;
                     },
