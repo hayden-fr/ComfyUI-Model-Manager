@@ -1206,7 +1206,7 @@ async def get_model_web_url(request):
         result["alert"] = "Unable to find model info!"
         return web.json_response(result)
     web_url = ModelInfo.get_url(model_info)
-    if web_url != "":
+    if web_url != "" and web_url is not None:
         save_web_url(url_path, web_url)
         result["success"] = True
 
@@ -1262,7 +1262,8 @@ async def download_model(request):
     # save url
     url_file_path = os.path.splitext(file_name)[0] + ".url"
     url = ModelInfo.get_url(url)
-    save_web_url(url_file_path, url)
+    if url != "" and url is not None:
+        save_web_url(url_file_path, url)
 
     # save image as model preview
     image = formdata.get("image")
