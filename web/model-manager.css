@@ -10,7 +10,7 @@
     position: fixed;
     overflow: hidden;
     width: 100%;
-    z-index: 2000;
+    z-index: 1100;
     
     /*override comfy-modal settings*/
     border-radius: 0;
@@ -167,6 +167,11 @@
     cursor: not-allowed;
 }
 
+.model-manager select:hover{
+    filter: brightness(1.2);
+    cursor: pointer;
+}
+
 .model-manager button.block {
     width: 100%;
 }
@@ -247,7 +252,7 @@
 .model-manager .model-tab-group {
     display: flex;
     gap: 4px;
-    height: 40px;
+    height: 44px;
 }
 
 .model-manager .model-tab-group .tab-button {
@@ -689,7 +694,7 @@
 
 .model-manager .model-manager-settings input[type="number"],
 .model-manager .tag-generator-settings input[type="number"]{
-    width: 50px;
+    width: 60px;
 }
 
 .model-manager .search-settings-text {

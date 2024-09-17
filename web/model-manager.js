@@ -1908,7 +1908,7 @@ class ModelGrid {
                 const searchPath = item.path;
                 const path = SearchPath.systemPath(searchPath, searchSeparator, systemSeparator);
                 let actionButtons = [];
-                if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
+                if (showCopyButton) {
                     actionButtons.push(
                         new ComfyButton({
                             icon: "content-copy",
@@ -1923,7 +1923,7 @@ class ModelGrid {
                         }).element,
                     );
                 }
-                if (showCopyButton) {
+                if (showAddButton && !(modelType === "embeddings" && !navigator.clipboard)) {
                     actionButtons.push(
                         new ComfyButton({
                             icon: "plus-box-outline",
@@ -3903,6 +3903,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "sidebar-default-width": null,
             /** @type {HTMLInputElement} */ "sidebar-default-height": null,
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
+            /** @type {HTMLInputElement} */ "sidebar-default-state": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-search-button": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-clear-button": null,
             
@@ -3937,6 +3938,8 @@ class SettingsView {
             }
         }
 
+        if (instance) { instance.setSidebarSizeAndPos(settings); }
+		
         if (updateModels) {
             await this.#updateModels(); // Is this slow?
         }
@@ -4064,7 +4067,8 @@ class SettingsView {
             ]),
             $el("a", {
                     style: { color: "var(--fg-color)" },
-                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/"
+                    href: "https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/",
+                    target: "_blank"
                 }, [
                     "File bugs and issues here."
                 ]
@@ -4086,6 +4090,11 @@ class SettingsView {
                 textContent: "Default model search type (on start up)",
                 options: ["checkpoints", "clip", "clip_vision", "controlnet", "diffusers", "embeddings", "gligen", "hypernetworks", "loras", "photomaker", "style_models", "unet", "vae", "vae_approx"],
             }),
+            $select({
+                $: (el) => (settings["sidebar-default-state"] = el),
+                textContent: "Default model browser position",
+                options: ["left", "right", "top", "bottom", "none"],
+            }),	   
             $checkbox({
                 $: (el) => (settings["model-real-time-search"] = el),
                 textContent: "Real-time search",
@@ -4305,6 +4314,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     
     const select = $el("select", {
             name: "sidebar-select",
+            classList: "icon-button",
             onchange: (event) => {
                 const select = event.target;
                 const children = select.children;
@@ -4720,37 +4730,37 @@ class ModelManager extends ComfyDialog {
             this.#downloadView.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
             this.#downloadView.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
         }
-        
-        {
-            // set initial sidebar widths & heights
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            
-            const xDecimal = settings["sidebar-default-width"].value;
-            const yDecimal = settings["sidebar-default-height"].value;
-            
-            this.element.dataset["sidebarLeftWidthDecimal"] = xDecimal;
-            this.element.dataset["sidebarRightWidthDecimal"] = xDecimal;
-            this.element.dataset["sidebarTopHeightDecimal"] = yDecimal;
-            this.element.dataset["sidebarBottomHeightDecimal"] = yDecimal;
-            
-            const x = Math.floor(width * xDecimal);
-            const y = Math.floor(height * yDecimal);
-            
-            const leftPixels = x.toString() + "px";
-            this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
-            
-            const rightPixels = x.toString() + "px";
-            this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
-            
-            const topPixels = y.toString() + "px";
-            this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
-            
-            const bottomPixels = y.toString() + "px";
-            this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
-        }
     }
     
+    setSidebarSizeAndPos(settings) {
+		const width = window.innerWidth;
+		const height = window.innerHeight;
+
+		const xDecimal = settings["sidebar-default-width"].value;
+		const yDecimal = settings["sidebar-default-height"].value;
+
+		this.element.dataset["sidebarState"] = settings["sidebar-default-state"].value;
+		this.element.dataset["sidebarLeftWidthDecimal"] = xDecimal;
+		this.element.dataset["sidebarRightWidthDecimal"] = xDecimal;
+		this.element.dataset["sidebarTopHeightDecimal"] = yDecimal;
+		this.element.dataset["sidebarBottomHeightDecimal"] = yDecimal;
+
+		const x = Math.floor(width * xDecimal);
+		const y = Math.floor(height * yDecimal);
+
+		const leftPixels = x.toString() + "px";
+		this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
+
+		const rightPixels = x.toString() + "px";
+		this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
+
+		const topPixels = y.toString() + "px";
+		this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
+
+		const bottomPixels = y.toString() + "px";
+		this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
+	}
+	
     #resetManagerContentsScroll = () => {
         this.#tabManagerContents.scrollTop = 0;
     }
