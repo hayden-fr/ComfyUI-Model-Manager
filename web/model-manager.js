@@ -4092,7 +4092,7 @@ class SettingsView {
             }),
             $select({
                 $: (el) => (settings["sidebar-default-state"] = el),
-                textContent: "Default model browser position",
+                textContent: "Default model manager position",
                 options: ["left", "right", "top", "bottom", "none"],
             }),	   
             $checkbox({
