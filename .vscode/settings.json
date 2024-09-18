@@ -15,5 +15,6 @@
         "rfilename",
         "unet",
         "upscaler"
-    ]
+    ],
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
 }
