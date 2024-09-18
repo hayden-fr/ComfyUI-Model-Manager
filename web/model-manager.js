@@ -1426,9 +1426,9 @@ class DirectoryDropdown {
                         const selection = options[iSelection];
                         if (selection !== undefined && selection !== null) {
                             DirectoryDropdown.selectionToInput(
-                                input, 
-                                selection, 
-                                modelData.searchSeparator, 
+                                input,
+                                selection,
+                                modelData.searchSeparator,
                                 DROPDOWN_DIRECTORY_SELECTION_KEY_CLASS
                             );
                             const path = this.#updateOptions();
@@ -5514,10 +5514,12 @@ app.registerExtension({
   name: 'Comfy.ModelManager',
   init() {},
   async setup() {
+    const cssFileUrl = new URL(import.meta.url).pathname.replace('.js', '.css');
+
     $el('link', {
       parent: document.head,
       rel: 'stylesheet',
-      href: './extensions/ComfyUI-Model-Manager/model-manager.css',
+      href: cssFileUrl,
     });
 
     app.ui?.menuContainer?.appendChild(
