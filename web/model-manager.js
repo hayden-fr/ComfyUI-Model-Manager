@@ -2,6 +2,8 @@ import { app } from "../../scripts/app.js";
 import { api } from "../../scripts/api.js";
 import { ComfyDialog, $el } from "../../scripts/ui.js";
 import { ComfyButton } from "../../scripts/ui/components/button.js";
+import { marked } from "./marked.js";
+import("./downshow.js");
 
 function clamp(x, min, max) {
     return Math.min(Math.max(x, min), max);
@@ -39,16 +41,16 @@ function debounce(callback, delay) {
 class KeyComboListener {
     /** @type {string[]} */
     #keyCodes = [];
-    
+
     /** @type {() => Promise<void>} */
     action;
-    
+
     /** @type {Element} */
     element;
-    
+
     /** @type {string[]} */
     #combo = [];
-    
+
     /**
      * @param {string[]} keyCodes
      * @param {() => Promise<void>} action
@@ -58,7 +60,7 @@ class KeyComboListener {
         this.#keyCodes = keyCodes;
         this.action = action;
         this.element = element;
-        
+
         document.addEventListener("keydown", (e) => {
             const code = e.code;
             const keyCodes = this.#keyCodes;
@@ -159,21 +161,21 @@ const modelNodeType = {
 
 const MODEL_EXTENSIONS = [".bin", ".ckpt", "gguf", ".onnx", ".pt", ".pth", ".safetensors"]; // TODO: ask server for?
 const IMAGE_EXTENSIONS = [
-    ".png", 
-    ".webp", 
-    ".jpeg", 
-    ".jpg", 
-    ".jfif", 
-    ".gif", 
-    ".apng", 
+    ".png",
+    ".webp",
+    ".jpeg",
+    ".jpg",
+    ".jfif",
+    ".gif",
+    ".apng",
 
-    ".preview.png", 
-    ".preview.webp", 
-    ".preview.jpeg", 
-    ".preview.jpg", 
-    ".preview.jfif", 
-    ".preview.gif", 
-    ".preview.apng", 
+    ".preview.png",
+    ".preview.webp",
+    ".preview.jpeg",
+    ".preview.jpg",
+    ".preview.jfif",
+    ".preview.gif",
+    ".preview.apng",
 ]; // TODO: /model-manager/image/extensions
 
 /**
@@ -265,7 +267,7 @@ const PREVIEW_THUMBNAIL_WIDTH = 320;
 const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
- * 
+ *
  * @param {HTMLButtonElement} element
  * @returns {[HTMLButtonElement | undefined, HTMLElement | undefined, HTMLSpanElement | undefined]} [button, icon, span]
  */
@@ -302,18 +304,18 @@ function comfyButtonDisambiguate(element) {
  */
 function comfyButtonAlert(element, success, successClassName = undefined, failureClassName = undefined, disableCallback = false) {
     if (element === undefined || element === null) { return; }
-    
+
     const [button, icon, span] = comfyButtonDisambiguate(element);
     if (button === undefined) {
         console.warn("Unable to find button element!");
         console.warn(element);
         return;
     }
-    
+
     // TODO: debounce would be nice, but needs some sort of "global" to avoid creating/destroying many objects
-    
+
     const colorClassName = success ? "comfy-button-success" : "comfy-button-failure";
-    
+
     if (icon) {
         const iconClassName = (success ? successClassName : failureClassName) ?? "";
         if (iconClassName !== "") {
@@ -329,7 +331,7 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
             }, 1000, icon, iconClassName, colorClassName);
         }
     }
-    
+
     button.classList.add(colorClassName);
     if (!disableCallback) {
         window.setTimeout((element, colorClassName) => {
@@ -339,7 +341,7 @@ function comfyButtonAlert(element, success, successClassName = undefined, failur
 }
 
 /**
- * 
+ *
  * @param {string} modelPath
  * @param {string} newValue
  * @returns {Promise<boolean>}
@@ -422,11 +424,11 @@ function $select(x = { $: (el) => {}, textContent: "", options: [""] }) {
  */
 function $radioGroup(attr) {
     const { name = Date.now(), onchange, options = [], $ } = attr;
-    
+
     /** @type {HTMLDivElement[]} */
     const radioGroup = options.map((item, index) => {
         const inputRef = { value: null };
-        
+
         return $el(
             "div.comfy-radio",
             { onclick: () => inputRef.value.click() },
@@ -442,7 +444,7 @@ function $radioGroup(attr) {
             ]
         );
     });
-    
+
     const element = $el("input", {
         name: name + "-group",
         value: options[0]?.value,
@@ -456,7 +458,7 @@ function $radioGroup(attr) {
             onchange?.(selectedValue);
         });
     });
-    
+
     return $el("div.comfy-radio-group", radioGroup);
 }
 
@@ -514,7 +516,7 @@ function GenerateTabGroup(tabData) {
         tabButtons.push(tab);
         tabContents.push(content);
     });
-    
+
     return [tabButtons, tabContents];
 }
 
@@ -576,35 +578,35 @@ class ImageSelect {
     /** @constant {string} */ #PREVIEW_UPLOAD = "Upload";
     /** @constant {string} */ #PREVIEW_URL = "URL";
     /** @constant {string} */ #PREVIEW_NONE = "No Preview";
-    
+
     elements = {
         /** @type {HTMLDivElement} */ radioGroup: null,
         /** @type {HTMLDivElement} */ radioButtons: null,
         /** @type {HTMLDivElement} */ previews: null,
-        
+
         /** @type {HTMLImageElement} */ defaultPreviewNoImage: null,
         /** @type {HTMLDivElement} */ defaultPreviews: null,
         /** @type {HTMLDivElement} */ defaultUrl: null,
-        
+
         /** @type {HTMLImageElement} */ customUrlPreview: null,
         /** @type {HTMLInputElement} */ customUrl: null,
         /** @type {HTMLDivElement} */ custom: null,
-        
+
         /** @type {HTMLImageElement} */ uploadPreview: null,
         /** @type {HTMLInputElement} */ uploadFile: null,
         /** @type {HTMLDivElement} */ upload: null,
     };
-    
+
     /** @type {string} */
     #name = null;
-    
+
     /** @returns {Promise<string> | Promise<File>} */
     async getImage() {
         const name = this.#name;
         const value = document.querySelector(`input[name="${name}"]:checked`).value;
         const elements = this.elements;
         switch (value) {
-            case this.#PREVIEW_DEFAULT:
+            case this.#PREVIEW_DEFAULT: {
                 const children = elements.defaultPreviews.children;
                 const noImage = PREVIEW_NONE_URI;
                 let url = "";
@@ -624,7 +626,8 @@ class ImageSelect {
                     });
                 }
                 return url;
-            case this.#PREVIEW_URL:
+            }
+            case this.#PREVIEW_URL: {
                 const value = elements.customUrl.value;
                 if (value.startsWith(Civitai.imagePostUrlPrefix())) {
                     try {
@@ -642,6 +645,7 @@ class ImageSelect {
                     }
                 }
                 return value;
+            }
             case this.#PREVIEW_UPLOAD:
                 return elements.uploadFile.files[0] ?? "";
             case this.#PREVIEW_NONE:
@@ -649,7 +653,7 @@ class ImageSelect {
         }
         return "";
     }
-    
+
     /** @returns {void} */
     resetModelInfoPreview() {
         let noimage = this.elements.defaultUrl.dataset.noimage;
@@ -678,7 +682,7 @@ class ImageSelect {
         this.elements.upload.style.display = "none";
         this.elements.custom.style.display = "none";
     }
-    
+
     /** @returns {boolean} */
     defaultIsChecked() {
         const children = this.elements.radioButtons.children;
@@ -691,7 +695,7 @@ class ImageSelect {
         };
         return false;
     }
-    
+
     /** @returns {void} */
     checkDefault() {
         const children = this.elements.radioButtons.children;
@@ -705,9 +709,9 @@ class ImageSelect {
             }
         };
     }
-    
+
     /**
-     * @param {1 | -1} step 
+     * @param {1 | -1} step
      */
     stepDefaultPreviews(step) {
         const children = this.elements.defaultPreviews.children;
@@ -728,7 +732,7 @@ class ImageSelect {
         else if (currentIndex < 0) { currentIndex = children.length - 1; }
         children[currentIndex].style.display = "block";
     }
-    
+
     /**
      * @param {string} radioGroupName - Should be unique for every radio group.
      * @param {string[]|undefined} defaultPreviews
@@ -738,20 +742,20 @@ class ImageSelect {
             defaultPreviews = [PREVIEW_NONE_URI];
         }
         this.#name = radioGroupName;
-        
+
         const el_defaultUri = $el("div", {
             $: (el) => (this.elements.defaultUrl = el),
             style: { display: "none" },
             "data-noimage": PREVIEW_NONE_URI,
         });
-        
+
         const el_defaultPreviewNoImage = $el("img", {
             $: (el) => (this.elements.defaultPreviewNoImage = el),
             loading: "lazy", /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */
             src: PREVIEW_NONE_URI,
             style: { display: "none" },
         });
-        
+
         const el_defaultPreviews = $el("div", {
             $: (el) => (this.elements.defaultPreviews = el),
             style: {
@@ -774,7 +778,7 @@ class ImageSelect {
             }
             return imgs;
         })());
-        
+
         const el_uploadPreview = $el("img", {
             $: (el) => (this.elements.uploadPreview = el),
             src: PREVIEW_NONE_URI,
@@ -804,9 +808,9 @@ class ImageSelect {
         }, [
             el_uploadFile,
         ]);
-        
+
         /**
-         * @param {string} url 
+         * @param {string} url
          * @returns {Promise<string>}
          */
         const getCustomPreviewUrl = async (url) => {
@@ -831,7 +835,7 @@ class ImageSelect {
                 return url;
             }
         };
-        
+
         const el_customUrlPreview = $el("img", {
             $: (el) => (this.elements.customUrlPreview = el),
             src: PREVIEW_NONE_URI,
@@ -875,7 +879,7 @@ class ImageSelect {
                 },
             }).element,
         ]);
-        
+
         const el_previewButtons = $el("div.model-preview-overlay", {
             style: {
                 display: el_defaultPreviews.children.length > 1 ? "block" : "none",
@@ -912,20 +916,20 @@ class ImageSelect {
             ),
             el_previewButtons,
         ]);
-        
+
         const el_radioButtons = $radioGroup({
             name: radioGroupName,
             onchange: (value) => {
                 el_custom.style.display = "none";
                 el_upload.style.display = "none";
-                
+
                 el_defaultPreviews.style.display = "none";
                 el_previewButtons.style.display = "none";
-                
+
                 el_defaultPreviewNoImage.style.display = "none";
                 el_uploadPreview.style.display = "none";
                 el_customUrlPreview.style.display = "none";
-                
+
                 switch (value) {
                     case this.#PREVIEW_DEFAULT:
                         el_defaultPreviews.style.display = "block";
@@ -955,7 +959,7 @@ class ImageSelect {
             }),
         });
         this.elements.radioButtons = el_radioButtons;
-        
+
         const children = el_radioButtons.children;
         for (let i = 0; i < children.length; i++) {
             const child = children[i];
@@ -965,7 +969,7 @@ class ImageSelect {
                 break;
             }
         };
-        
+
         const el_radioGroup = $el("div.model-preview-select-radio-container", {
             $: (el) => (this.elements.radioGroup = el),
         }, [
@@ -979,7 +983,7 @@ class ImageSelect {
 }
 
 /**
- * @typedef {Object} DirectoryItem 
+ * @typedef {Object} DirectoryItem
  * @property {String} name
  * @property {number | undefined} childCount
  * @property {number | undefined} childIndex
@@ -1082,7 +1086,7 @@ class ModelDirectories {
         }
         return index + start;
     }
-    
+
     /**
      * Returns a list of matching search results and valid path.
      * @param {string} filter
@@ -1165,16 +1169,16 @@ const DROPDOWN_DIRECTORY_SELECTION_MOUSE_CLASS = "search-directory-dropdown-mous
 class ModelData {
     /** @type {string} */
     searchSeparator = "/"; // TODO: other client or server code may be assuming this to always be "/"
-    
+
     /** @type {string} */
     systemSeparator = null;
-    
+
     /** @type {Object} */
     models = {};
-    
+
     /** @type {ModelDirectories} */
     directories = null;
-    
+
     constructor() {
         this.directories = new ModelDirectories();
     }
@@ -1183,34 +1187,34 @@ class ModelData {
 class DirectoryDropdown {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     /** @type {Boolean} */
     showDirectoriesOnly = false;
-    
+
     /** @type {HTMLInputElement} */
     #input = null;
-    
+
     /** @type {() => string} */
     #getModelType = null;
-    
+
     /** @type {ModelData} */
     #modelData = null; // READ ONLY
-    
+
     /** @type {() => void} */
     #updateCallback = null;
-    
+
     /** @type {() => Promise<void>} */
     #submitCallback = null;
-    
+
     /** @type {string} */
     #deepestPreviousPath = "/";
-    
+
     /** @type {Any} */
     #touchSelectionStart = null;
-    
+
     /** @type {() => Boolean} */
     #isDynamicSearch = () => { return false; };
-    
+
     /**
      * @param {ModelData} modelData
      * @param {HTMLInputElement} input
@@ -1235,7 +1239,7 @@ class DirectoryDropdown {
         this.#submitCallback = submitCallback;
         this.showDirectoriesOnly = showDirectoriesOnly;
         this.#isDynamicSearch = isDynamicSearch;
-        
+
         input.addEventListener("input", async(e) => {
             const path = this.#updateOptions();
             if (path !== undefined) {
@@ -1399,7 +1403,7 @@ class DirectoryDropdown {
             },
         );
     }
-    
+
     /**
      * @param {HTMLInputElement} input
      * @param {HTMLParagraphElement | undefined | null} selection
@@ -1455,7 +1459,7 @@ class DirectoryDropdown {
             if (i1 !== -1) {
                 name = name.substring(0, i1);
             }
-            
+
             const dropdown = this.element;
             const options = dropdown.children;
             let iSelection;
@@ -1613,7 +1617,7 @@ class ModelGrid {
     static modelWidgetIndex(nodeType) {
         return nodeType === undefined ? -1 : 0;
     }
-    
+
     /**
      * @param {string} text
      * @param {string} file
@@ -1628,7 +1632,7 @@ class ModelGrid {
         const sep = text.length === 0 || text.slice(-1).match(/\s/) ? "" : " ";
         return text + sep + "(embedding:" +  name  + ":1.0)";
     }
-    
+
     /**
      * @param {Array} list
      * @param {string} searchString
@@ -1664,7 +1668,7 @@ class ModelGrid {
             }, true);
         });
     }
-    
+
     /**
      * In-place sort. Returns an array alias.
      * @param {Array} list
@@ -1694,7 +1698,7 @@ class ModelGrid {
         const sorted = list.sort(compareFn);
         return reverse ? sorted.reverse() : sorted;
     }
-    
+
     /**
      * @param {Event} event
      * @param {string} modelType
@@ -1773,7 +1777,7 @@ class ModelGrid {
         if (modelType !== "embeddings" && target.id === "graph-canvas") {
             //const pos = app.canvas.convertEventToCanvasOffset(event);
             const pos = app.canvas.convertEventToCanvasOffset({ clientX: clientX, clientY: clientY });
-            
+
             const node = app.graph.getNodeOnPos(pos[0], pos[1], app.canvas.visible_nodes);
 
             let widgetIndex = -1;
@@ -1833,7 +1837,7 @@ class ModelGrid {
             }
         }
     }
-    
+
     /**
      * @param {Event} event
      * @param {string} modelType
@@ -1868,7 +1872,7 @@ class ModelGrid {
         }
         comfyButtonAlert(event.target, success, "mdi-check-bold", "mdi-close-thick");
     }
-    
+
     /**
      * @param {Array} models
      * @param {string} modelType
@@ -1999,7 +2003,7 @@ class ModelGrid {
             return [$el("h2", ["No Models"])];
         }
     }
-    
+
     /**
      * @param {HTMLDivElement} modelGrid
      * @param {ModelData} modelData
@@ -2065,7 +2069,7 @@ class ModelGrid {
 class ModelInfo {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     elements = {
         /** @type {HTMLDivElement[]} */ tabButtons: null,
         /** @type {HTMLDivElement[]} */ tabContents: null,
@@ -2074,16 +2078,16 @@ class ModelInfo {
         /** @type {HTMLButtonElement} */ setPreviewButton: null,
         /** @type {HTMLInputElement} */  moveDestinationInput: null,
     };
-    
+
     /** @type {ImageSelect} */
     previewSelect = null;
-    
+
     /** @type {string} */
     #savedNotesValue = null;
-    
+
     /** @type {[HTMLElement][]} */
     #settingsElements = null;
-    
+
     /**
      * @param {ModelData} modelData
      * @param {() => Promise<void>} updateModels
@@ -2098,19 +2102,19 @@ class ModelInfo {
             value: modelData.searchSeparator,
         });
         this.elements.moveDestinationInput = moveDestinationInput;
-        
+
         const searchDropdown = new DirectoryDropdown(
             modelData,
             moveDestinationInput,
             true,
         );
-        
+
         const previewSelect = new ImageSelect("model-info-preview-model-FYUIKMNVB");
         this.previewSelect = previewSelect;
         previewSelect.elements.previews.style.display = "flex";
-        
+
         const setPreviewButton = new ComfyButton({
-            tooltip: "Overwrite currrent preview with selected image",
+            tooltip: "Overwrite current preview with selected image",
             content: "Set as Preview",
             action: async(e) => {
                 const [button, icon, span] = comfyButtonDisambiguate(e.target);
@@ -2180,7 +2184,7 @@ class ModelInfo {
         previewSelect.elements.radioButtons.addEventListener("change", (e) => {
             setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
         });
-        
+
         this.element = $el("div", {
             style: { display: "none" },
         }, [
@@ -2292,7 +2296,7 @@ class ModelInfo {
                 "data-path": "",
             }),
         ]);
-        
+
         [this.elements.tabButtons, this.elements.tabContents] = GenerateTabGroup([
             { name: "Overview", icon: "information-box-outline", tabContent: this.element },
             { name: "Metadata", icon: "file-document-outline", tabContent: $el("div", ["Metadata"]) },
@@ -2300,13 +2304,13 @@ class ModelInfo {
             { name: "Notes", icon: "pencil-outline", tabContent: $el("div", ["Notes"]) },
         ]);
     }
-    
+
     /** @returns {void} */
     show() {
         this.element.style = "";
         this.element.scrollTop = 0;
     }
-    
+
     /**
      * @param {boolean} promptUser
      * @returns {Promise<boolean>}
@@ -2315,7 +2319,7 @@ class ModelInfo {
         if (this.element.style.display === "none") {
             return true;
         }
-        
+
         const noteValue = this.elements.notes.value;
         const savedNotesValue = this.#savedNotesValue;
         if (noteValue.trim() === savedNotesValue.trim()) {
@@ -2330,6 +2334,7 @@ class ModelInfo {
                 return false;
             }
             this.#savedNotesValue = noteValue;
+            this.elements.markdown.innerHTML = marked.parse(noteValue); 
         }
         else {
             const discardChanges = window.confirm("Discard changes?");
@@ -2342,7 +2347,7 @@ class ModelInfo {
         }
         return true;
     }
-    
+
     /**
      * @param {boolean?} promptSave
      * @returns {Promise<boolean>}
@@ -2360,7 +2365,7 @@ class ModelInfo {
         this.element.style.display = "none";
         return true;
     }
-    
+
     /**
      * @param {string} searchPath
      * @param {() => Promise<void>} updateModels
@@ -2466,7 +2471,7 @@ class ModelInfo {
                 ]),
             );
         }
-        
+
         const fileDirectory = info["File Directory"];
         if (fileDirectory !== undefined && fileDirectory !== null && fileDirectory !== "") {
             this.elements.moveDestinationInput.placeholder = fileDirectory
@@ -2476,7 +2481,7 @@ class ModelInfo {
             this.elements.moveDestinationInput.placeholder = searchSeparator;
             this.elements.moveDestinationInput.value = searchSeparator;
         }
-        
+
         const previewSelect = this.previewSelect;
         const defaultUrl = previewSelect.elements.defaultUrl;
         if (info["Preview"]) {
@@ -2490,7 +2495,7 @@ class ModelInfo {
         previewSelect.resetModelInfoPreview();
         const setPreviewButton = this.elements.setPreviewButton;
         setPreviewButton.style.display = previewSelect.defaultIsChecked() ? "none" : "block";
-        
+
         innerHtml.push($el("div", [
             previewSelect.elements.previews,
             $el("div.row.tab-header", [
@@ -2519,7 +2524,7 @@ class ModelInfo {
                         if (value === undefined || value === null) {
                             continue;
                         }
-                        
+
                         if (Array.isArray(value)) {
                             // currently only used for "Bucket Resolutions"
                             if (value.length > 0) {
@@ -2553,7 +2558,7 @@ class ModelInfo {
         ]));
         infoHtml.append.apply(infoHtml, innerHtml);
         // TODO: set default value of dropdown and value to model type?
-        
+
         /** @type {HTMLDivElement} */
         const metadataElement = this.elements.tabContents[1]; // TODO: remove magic value
         const isMetadata = typeof metadata === 'object' && metadata !== null && Object.keys(metadata).length > 0;
@@ -2581,7 +2586,7 @@ class ModelInfo {
         ]);
         const metadataButton = this.elements.tabButtons[1]; // TODO: remove magic value
         metadataButton.style.display = isMetadata ? "" : "none";
-        
+ 
         /** @type {HTMLDivElement} */
         const tagsElement = this.elements.tabContents[2]; // TODO: remove magic value
         const isTags = Array.isArray(tags) && tags.length > 0;
@@ -2630,53 +2635,64 @@ class ModelInfo {
                 break;
             }
         }
+        const tagGenerator = $el(
+            "div", [
+                $el("h1", ["Tags"]),
+                $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
+                $el("div", [
+                    $el("details.tag-generator-settings", {
+                        style: { margin: "10px 0", display: "none" },
+                        open: false,
+                    }, [
+                        $el("summary", ["Settings"]),
+                        $el("div", [
+                            "Sampling Method",
+                            samplerRadioGroup,
+                        ]),
+                        $el("label", [
+                            "Count",
+                            tagGenerationCount,
+                        ]),
+                        $el("label", [
+                            "Threshold",
+                            tagGenerationThreshold,
+                        ]),
+                    ]),
+                    tagGeneratorRandomizedOutput,
+                    new ComfyButton({
+                        content: "Randomize",
+                        tooltip: "Randomly generate subset of tags",
+                        action: () => {
+                            const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
+                            const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
+                            const sampleCount = tagGenerationCount.value;
+                            const frequencyThreshold = tagGenerationThreshold.value;
+                            const tags = ParseTagParagraph(tagsParagraph.innerText);
+                            const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
+                            tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
+                        },
+                    }).element,
+                ]),
+            ]
+        )
         tagsElement.innerHTML = "";
         tagsElement.append.apply(tagsElement, [
-            $el("h1", ["Tags"]),
-            $el("h2", { style: { margin: "0px 0px 16px 0px" } }, ["Random Tag Generator"]),
+            tagGenerator,
             $el("div", [
-                $el("details.tag-generator-settings", {
-                    style: { margin: "10px 0", display: "none" },
-                    open: false,
-                }, [
-                    $el("summary", ["Settings"]),
-                    $el("div", [
-                        "Sampling Method",
-                        samplerRadioGroup,
-                    ]),
-                    $el("label", [
-                        "Count",
-                        tagGenerationCount,
-                    ]),
-                    $el("label", [
-                        "Threshold",
-                        tagGenerationThreshold,
-                    ]),
-                ]),
-                tagGeneratorRandomizedOutput,
-                new ComfyButton({
-                    content: "Randomize",
-                    tooltip: "Randomly generate subset of tags",
-                    action: () => {
-                        const samplerName = document.querySelector(`input[name="${TAG_GENERATOR_SAMPLER_NAME}"]:checked`).value;
-                        const sampler = samplerName === "Frequency" ? ModelInfo.ProbabilisticTagSampling : ModelInfo.UniformTagSampling;
-                        const sampleCount = tagGenerationCount.value;
-                        const frequencyThreshold = tagGenerationThreshold.value;
-                        const tags = ParseTagParagraph(tagsParagraph.innerText);
-                        const sampledTags = sampler(tags, sampleCount, frequencyThreshold);
-                        tagGeneratorRandomizedOutput.value = sampledTags.join(", ");
-                    },
-                }).element,
+                $el("h2", {
+                    style: {
+                        margin: "24px 0px 8px 0px"
+                    }
+                }, ["Tags"]),
+                tagsParagraph,
             ]),
-            $el("h2", {style: { margin: "24px 0px 8px 0px" } }, ["Training Tags"]),
-            tagsParagraph,
         ]);
         const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
         tagButton.style.display = isTags ? "" : "none";
-        
+
         const saveIcon = "content-save";
         const savingIcon = "cloud-upload-outline";
-        
+
         const saveNotesButton = new ComfyButton({
             icon: saveIcon,
             tooltip: "Save note",
@@ -2689,7 +2705,7 @@ class ModelInfo {
                 button.disabled = false;
             },
         }).element;
-        
+
         const saveDebounce = debounce(async() => {
             const saveIconClass = "mdi-" + saveIcon;
             const savingIconClass = "mdi-" + savingIcon;
@@ -2700,22 +2716,25 @@ class ModelInfo {
             iconElement.classList.remove(savingIconClass);
             iconElement.classList.add(saveIconClass);
         }, 1000);
-        
+
         /** @type {HTMLDivElement} */
         const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
         notesElement.innerHTML = "";
+        const markdown =  $el("div", {}, "");
+        markdown.innerHTML = marked.parse(noteText);
+
         notesElement.append.apply(notesElement,
             (() => {
                 const notes = $el("textarea.comfy-multiline-input", {
                     name: "model notes",
-                    value: noteText, 
+                    value: noteText,
                     oninput: (e) => {
                         if (this.#settingsElements["model-info-autosave-notes"].checked) {
                             saveDebounce();
                         }
                     },
                 });
-                
+
                 if (navigator.userAgent.includes("Mac")) {
                     new KeyComboListener(
                         ["MetaLeft", "KeyS"],
@@ -2740,24 +2759,61 @@ class ModelInfo {
                         notes,
                     );
                 }
-                
+
                 this.elements.notes = notes;
+                this.elements.markdown = markdown;
                 this.#savedNotesValue = noteText;
+
+                const notes_editor = $el(
+                    "div",
+                    {
+                        style: {
+                            "display": noteText == "" ? "flex" : "none",
+                            "height": "100%",
+                            "min-height": "60px"
+                        },
+                    },
+                    notes
+                );
+                const notes_viewer = $el(
+                    "div",
+                    {
+                        style: {
+                            "display": noteText == "" ? "none" : "flex",
+                            "height": "100%",
+                            "min-height": "60px",
+                            "overflow": "scroll",
+                            "overflow-wrap": "anywhere"
+                        },
+                    },
+                    markdown
+                );
+
+                const editNotesButton = new ComfyButton({
+                    icon: "pencil",
+                    tooltip: "Change file name",
+                    classList: "comfyui-button icon-button",
+                    action: async () => {
+                        notes_editor.style.display = notes_editor.style.display == "flex" ? "none" : "flex";
+                        notes_viewer.style.display = notes_viewer.style.display == "none" ? "flex" : "none";
+                    },
+                }).element;
+
                 return [
                     $el("div.row", {
                         style: { "align-items": "center" },
                     }, [
                         $el("h1", ["Notes"]),
                         saveNotesButton,
+                        editNotesButton,
                     ]),
-                    $el("div", {
-                        style: { "display": "flex", "height": "100%", "min-height": "60px" },
-                    }, notes),
+                    notes_editor,
+                    notes_viewer,
                 ];
             })()
         );
     }
-    
+
     static UniformTagSampling(tagsAndCounts, sampleCount, frequencyThreshold = 0) {
         const data = tagsAndCounts.filter(x => x[1] >= frequencyThreshold);
         let count = data.length;
@@ -2772,7 +2828,7 @@ class ModelInfo {
         const sortedSamples = samples.sort((x1, x2) => { return parseInt(x2[1]) - parseInt(x1[1]) });
         return sortedSamples.map(x => x[0]);
     }
-    
+
     static ProbabilisticTagSampling(tagsAndCounts, sampleCount, frequencyThreshold = 0) {
         const data = tagsAndCounts.filter(x => x[1] >= frequencyThreshold);
         let tagFrequenciesSum = data.reduce((accumulator, x) => accumulator + x[1], 0);
@@ -2822,7 +2878,7 @@ class Civitai {
             return {};
         }
     }
-    
+
     /**
      * Extract file information from the given model version information.
      *
@@ -2839,21 +2895,21 @@ class Civitai {
         const modelVersionFiles = modelVersionInfo["files"];
         for (let i = 0; i < modelVersionFiles.length; i++) {
             const modelVersionFile = modelVersionFiles[i];
-            
+
             const fileType = modelVersionFile["type"];
             if (type instanceof String && type != fileType) { continue; }
-            
+
             const fileMeta = modelVersionFile["metadata"];
-            
+
             const fileFp = fileMeta["fp"];
             if (fp instanceof String && fp != fileFp) { continue; }
-            
+
             const fileSize = fileMeta["size"];
             if (size instanceof String && size != fileSize) { continue; }
-            
+
             const fileFormat = fileMeta["format"];
             if (format instanceof String && format != fileFormat) { continue; }
-            
+
             files.push({
                 "downloadUrl": modelVersionFile["downloadUrl"],
                 "format": fileFormat,
@@ -2877,7 +2933,7 @@ class Civitai {
             "tags": modelVersionInfo["trainedWords"],
         };
     }
-    
+
     /**
      * @param {string} stringUrl - Model url.
      *
@@ -2951,21 +3007,21 @@ class Civitai {
             return {};
         }
     }
-    
+
     /**
      * @returns {string}
      */
     static imagePostUrlPrefix() {
         return "https://civitai.com/images/";
     }
-    
+
     /**
      * @returns {string}
      */
     static imageUrlPrefix() {
         return "https://image.civitai.com/";
     }
-    
+
     /**
      * @param {string} stringUrl - https://civitai.com/images/{imageId}.
      *
@@ -2988,7 +3044,7 @@ class Civitai {
             return {};
         }
     }
-    
+
     /**
      * @param {string} stringUrl - https://image.civitai.com/...
      *
@@ -3044,9 +3100,9 @@ class HuggingFace {
             return {};
         }
     }
-    
+
     /**
-     * 
+     *
      *
      * @param {string} stringUrl - Model url.
      *
@@ -3070,13 +3126,13 @@ class HuggingFace {
         }
         const modelId = urlPath.substring(i0, i2);
         const urlPathEnd = urlPath.substring(i2);
-        
+
         const isValidBranch = (
             urlPathEnd.startsWith("/resolve") ||
             urlPathEnd.startsWith("/blob") ||
             urlPathEnd.startsWith("/tree")
         );
-        
+
         let branch = "/main";
         let filePath = "";
         if (isValidBranch) {
@@ -3095,11 +3151,11 @@ class HuggingFace {
                 }
             }
         }
-        
+
         const modelInfo = await HuggingFace.requestInfo(modelId);
         //const modelInfo = await requestInfo(modelId + "/tree" + branch); // this only gives you the files at the given branch path...
         // oid: SHA-1?, lfs.oid: SHA-256
-        
+
         const clippedFilePath = filePath.substring(filePath[0] === "/" ? 1 : 0);
         const modelFiles = modelInfo["siblings"].filter((sib) => {
             const filename = sib["rfilename"];
@@ -3116,9 +3172,9 @@ class HuggingFace {
         if (modelFiles.length === 0) {
             return {};
         }
-        
+
         const baseDownloadUrl = url.origin + urlPath.substring(0, i2) + "/resolve" + branch;
-        
+
         const images = modelInfo["siblings"].filter((sib) => {
             const filename = sib["rfilename"];
             for (let i = 0; i < IMAGE_EXTENSIONS.length; i++) {
@@ -3130,7 +3186,7 @@ class HuggingFace {
         }).map((sib) => {
             return baseDownloadUrl + "/" + sib["rfilename"];
         });
-        
+
         return {
             "baseDownloadUrl": baseDownloadUrl,
             "modelFiles": modelFiles,
@@ -3155,6 +3211,7 @@ async function getModelInfos(urlText) {
             const name = civitaiInfo["name"];
             const infos = [];
             const type = civitaiInfo["type"];
+
             civitaiInfo["versions"].forEach((version) => {
                 const images = version["images"];
                 const tags = version["tags"]?.map((tag) => tag.trim().replace(/,$/, ""));
@@ -3165,31 +3222,7 @@ async function getModelInfos(urlText) {
                         version["description"],
                         civitaiInfo["description"] !== undefined ? "# " + name  : undefined,
                         civitaiInfo["description"],
-                    ].filter(x => x !== undefined).join("\n\n")
-                    .replaceAll("</p><p>", "\n\n")
-                    .replaceAll("<strong>", "**").replaceAll("</strong>", "**")
-                    .replaceAll("<ol>", "\n").replaceAll("</ol>", "\n") // wrong
-                    .replaceAll("<ul>", "\n").replaceAll("</ul>", "\n")
-                    .replaceAll("<li>", "- ").replaceAll("</li>", "\n")
-                    .replaceAll("<em>", "*").replaceAll("</em>", "*")
-                    .replaceAll("<code>", "`").replaceAll("</code>", "`")
-                    .replaceAll("<blockquote", "\n<blockquote").replaceAll("</blockquote>", "\n")
-                    .replaceAll("<br", "\n<br")
-                    .replaceAll("<hr>", "\n\n---\n\n")
-                    .replaceAll("<h1", "\n# <h1").replaceAll("</h1>", "\n")
-                    .replaceAll("<h2", "\n## <h2").replaceAll("</h2>", "\n")
-                    .replaceAll("<h3", "\n### <h3").replaceAll("</h3>", "\n")
-                    .replaceAll("<h4", "\n#### <h4").replaceAll("</h4>", "\n")
-                    .replaceAll("<h5", "\n##### <h5").replaceAll("</h5>", "\n")
-                    .replaceAll("<h6", "\n###### <h6").replaceAll("</h6>", "\n")
-                    .replace(/href="(\S*)">/g, 'href=""> $1 <a href="">')
-                    .replace(/src="(\S*)">/g, 'src=""> $1 <img src="">')
-                    // <script></script>
-                    // <span></span>
-                    .replace(/<[^>]+>/g, "") // quick hack
-                    .replaceAll("&lt;", "<").replaceAll("&gt;", ">")
-                    .replaceAll("&lte;", "<=").replaceAll("&gte;", ">=")
-                    .replaceAll("&amp;", "&");
+                    ].filter(x => x !== undefined).join("\n\n");
                 version["files"].forEach((file) => {
                     infos.push({
                         "images": images,
@@ -3197,7 +3230,7 @@ async function getModelInfos(urlText) {
                         "modelType": type,
                         "downloadUrl": file["downloadUrl"],
                         "downloadFilePath": "",
-                        "description": description,
+                        "description": downshow(description),
                         "details": {
                             "fileSizeKB": file["sizeKB"],
                             "fileType": file["type"],
@@ -3270,7 +3303,7 @@ async function getModelInfos(urlText) {
 class DownloadView {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     elements = {
         /** @type {HTMLInputElement} */ url: null,
         /** @type {HTMLDivElement} */ infos: null,
@@ -3279,16 +3312,16 @@ class DownloadView {
         /** @type {HTMLButtonElement} */ searchButton: null,
         /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
-    
+
     /** @type {DOMParser} */
     #domParser = null;
-    
+
     /** @type {Object.<string, HTMLElement>} */
     #settings = null;
-    
+
     /** @type {() => Promise<void>} */
     #updateModels = () => {};
-    
+
     /**
      * @param {ModelData} modelData
      * @param {Object.<string, HTMLElement>} settings
@@ -3304,7 +3337,7 @@ class DownloadView {
                 $el("h1", ["Input a URL to select a model to download."])
             );
         };
-        
+
         const searchButton = new ComfyButton({
             icon: "magnify",
             tooltip: "Search url",
@@ -3330,7 +3363,7 @@ class DownloadView {
             searchButton.style.display = hideSearchButton ? "none" : "";
         });
         this.elements.searchButton = searchButton;
-        
+
         const clearSearchButton = new ComfyButton({
             icon: "close",
             tooltip: "Clear search",
@@ -3346,7 +3379,7 @@ class DownloadView {
             clearSearchButton.style.display = hideClearButton ? "none" : "";
         });
         this.elements.clearSearchButton = clearSearchButton;
-        
+
         $el("div.tab-header", {
             $: (el) => (this.element = el),
         }, [
@@ -3380,7 +3413,7 @@ class DownloadView {
             ]),
         ]);
     }
-    
+
     /**
      * Tries to return the related ComfyUI model directory if unambiguous.
      *
@@ -3394,7 +3427,7 @@ class DownloadView {
             const f = fileType.toLowerCase();
             if (f == "diffusers") { return "diffusers"; } // TODO: is this correct?
         }
-        
+
         if (modelType !== undefined && modelType !== null) {
             const m = modelType.toLowerCase();
             // TODO: somehow allow for SERVER to set dir?
@@ -3421,10 +3454,10 @@ class DownloadView {
         }
         return null;
     }
-    
+
     /**
      * Returns empty string on failure
-     * @param {float | undefined} fileSizeKB 
+     * @param {float | undefined} fileSizeKB
      * @returns {string}
      */
     static #fileSizeToFormattedString(fileSizeKB) {
@@ -3443,7 +3476,7 @@ class DownloadView {
         fileSizeString = fileSizeString.substring(0, fileSizeString.indexOf(".") + 3);
         return `(${fileSizeString} ${sizes[sizeIndex]})`;
     }
-    
+
     /**
      * @param {Object} info
      * @param {ModelData} modelData
@@ -3456,7 +3489,7 @@ class DownloadView {
             "model-download-info-preview-model" + "-" + id,
             info["images"],
         );
-        
+
         const comfyUIModelType = (
             DownloadView.modelTypeToComfyUiDirectory(info["details"]["fileType"]) ??
             DownloadView.modelTypeToComfyUiDirectory(info["modelType"]) ??
@@ -3464,7 +3497,7 @@ class DownloadView {
         );
         const searchSeparator = modelData.searchSeparator;
         const defaultBasePath = searchSeparator + (comfyUIModelType === "" ? "" : comfyUIModelType + searchSeparator + "0");
-        
+
         const el_saveDirectoryPath = $el("input.search-text-area", {
             type: "text",
             name: "save directory",
@@ -3477,7 +3510,7 @@ class DownloadView {
             el_saveDirectoryPath,
             true,
         );
-        
+
         const default_name = (() => {
             const filename = info["fileName"];
             // TODO: only remove valid model file extensions
@@ -3497,7 +3530,7 @@ class DownloadView {
                 }
             },
         });
-        
+
         const infoNotes = $el("textarea.comfy-multiline-input.model-info-notes", {
             name: "model info notes",
             value: info["description"]??"",
@@ -3505,7 +3538,7 @@ class DownloadView {
             disabled: true,
             style: { display: info["description"] === undefined || info["description"] === "" ? "none" : "" },
         });
-        
+
         const filepath = info["downloadFilePath"];
         const modelInfo = $el("details.download-details", [
             $el("summary", [filepath + info["fileName"]]),
@@ -3584,7 +3617,7 @@ class DownloadView {
                 ]),
             ]),
         ]);
-        
+
         return modelInfo;
     }
 
@@ -3614,7 +3647,7 @@ class DownloadView {
             if (modelInfosHtml.length === 1) {
                 modelInfosHtml[0].open = true;
             }
-            
+
             const header = $el("div", [
                 $el("h1", [name]),
                 $el("div.model-manager-settings", [
@@ -3636,7 +3669,7 @@ class DownloadView {
         const infosHtml = this.elements.infos;
         infosHtml.innerHTML = "";
         infosHtml.append.apply(infosHtml, modelInfosHtml);
-        
+
         const downloadNotes = this.elements.downloadNotes;
         if (downloadNotes !== undefined && downloadNotes !== null) {
             downloadNotes.addEventListener("change", (e) => {
@@ -3649,10 +3682,10 @@ class DownloadView {
             downloadNotes.checked = settings["download-save-description-as-text-file"].checked;
             downloadNotes.dispatchEvent(new Event('change'));
         }
-        
+
         const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
         this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
-        
+
         const hideClearSearchButtons = settings["text-input-always-hide-clear-button"].checked;
         this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
     }
@@ -3661,7 +3694,7 @@ class DownloadView {
 class BrowseView {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     elements = {
         /** @type {HTMLDivElement} */ modelGrid: null,
         /** @type {HTMLSelectElement} */ modelTypeSelect: null,
@@ -3670,28 +3703,28 @@ class BrowseView {
         /** @type {HTMLButtonElement} */ searchButton: null,
         /** @type {HTMLButtonElement} */ clearSearchButton: null,
     };
-    
+
     /** @type {Array} */
     previousModelFilters = [];
-    
+
     /** @type {Object.<{value: string}>} */
     previousModelType = { value: null };
-    
+
     /** @type {DirectoryDropdown} */
     directoryDropdown = null;
-    
+
     /** @type {ModelData} */
     #modelData = null;
-    
+
     /** @type {@param {() => Promise<void>}} */
     #updateModels = null;
-    
+
     /**  */
     #settingsElements = null;
-    
+
     /** @type {() => void} */
     updateModelGrid = () => {};
-    
+
     /**
      * @param {() => Promise<void>} updateModels
      * @param {ModelData} modelData
@@ -3703,11 +3736,11 @@ class BrowseView {
         /** @type {HTMLDivElement} */
         const modelGrid = $el("div.comfy-grid");
         this.elements.modelGrid = modelGrid;
-        
+
         this.#updateModels = updateModels;
         this.#modelData = modelData;
         this.#settingsElements = settingsElements;
-        
+
         const searchInput = $el("input.search-text-area", {
             $: (el) => (this.elements.modelContentFilter = el),
             type: "text",
@@ -3715,13 +3748,13 @@ class BrowseView {
             autocomplete: "off",
             placeholder: "/Search",
         });
-        
+
         const updatePreviousModelFilter = () => {
             const modelType = this.elements.modelTypeSelect.value;
             const value = this.elements.modelContentFilter.value;
             this.previousModelFilters[modelType] = value;
         };
-        
+
         const updateModelGrid = () => {
             const sortValue = this.elements.modelSortSelect.value;
             const reverseSort = sortValue[0] === "-";
@@ -3739,18 +3772,18 @@ class BrowseView {
                 showModelInfo,
             );
             updateModelGridCallback();
-            
+
             const hideSearchButtons = (
                 this.#settingsElements["model-real-time-search"].checked |
                 this.#settingsElements["text-input-always-hide-search-button"].checked
             );
             this.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
-            
+
             const hideClearSearchButtons = this.#settingsElements["text-input-always-hide-clear-button"].checked;
             this.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
         }
         this.updateModelGrid = updateModelGrid;
-        
+
         const searchDropdown = new DirectoryDropdown(
             modelData,
             searchInput,
@@ -3761,7 +3794,7 @@ class BrowseView {
             () => { return this.#settingsElements["model-real-time-search"].checked; },
         );
         this.directoryDropdown = searchDropdown;
-        
+
         const searchButton = new ComfyButton({
             icon: "magnify",
             tooltip: "Search models",
@@ -3789,7 +3822,7 @@ class BrowseView {
             searchButton.style.display = hideSearchButton ? "none" : "";
         });
         this.elements.searchButton = searchButton;
-        
+
         const clearSearchButton = new ComfyButton({
             icon: "close",
             tooltip: "Clear search",
@@ -3808,7 +3841,7 @@ class BrowseView {
             clearSearchButton.style.display = hideClearSearchButton ? "none" : "";
         });
         this.elements.clearSearchButton = clearSearchButton;
-        
+
         this.element = $el("div", [
             $el("div.row.tab-header", [
                 $el("div.row.tab-header-flex-block", [
@@ -3873,7 +3906,7 @@ class BrowseView {
 class SettingsView {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     elements = {
         /** @type {HTMLButtonElement} */ reloadButton: null,
         /** @type {HTMLButtonElement} */ saveButton: null,
@@ -3883,7 +3916,7 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "model-default-browser-model-type": null,
             /** @type {HTMLInputElement} */ "model-real-time-search": null,
             /** @type {HTMLInputElement} */ "model-persistent-search": null,
-            
+
             /** @type {HTMLInputElement} */ "model-preview-thumbnail-type": null,
             /** @type {HTMLInputElement} */ "model-preview-fallback-search-safetensors-thumbnail": null,
             /** @type {HTMLInputElement} */ "model-show-label-extensions": null,
@@ -3891,33 +3924,33 @@ class SettingsView {
             /** @type {HTMLInputElement} */ "model-show-copy-button": null,
             /** @type {HTMLInputElement} */ "model-show-load-workflow-button": null,
             /** @type {HTMLInputElement} */ "model-info-button-on-left": null,
-            
+
             /** @type {HTMLInputElement} */ "model-add-embedding-extension": null,
             /** @type {HTMLInputElement} */ "model-add-drag-strict-on-field": null,
             /** @type {HTMLInputElement} */ "model-add-offset": null,
-            
+
             /** @type {HTMLInputElement} */ "model-info-autosave-notes": null,
-            
+
             /** @type {HTMLInputElement} */ "download-save-description-as-text-file": null,
-            
+
             /** @type {HTMLInputElement} */ "sidebar-default-width": null,
             /** @type {HTMLInputElement} */ "sidebar-default-height": null,
             /** @type {HTMLInputElement} */ "sidebar-control-always-compact": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-search-button": null,
             /** @type {HTMLInputElement} */ "text-input-always-hide-clear-button": null,
-            
+
             /** @type {HTMLInputElement} */ "tag-generator-sampler-method": null,
             /** @type {HTMLInputElement} */ "tag-generator-count": null,
             /** @type {HTMLInputElement} */ "tag-generator-threshold": null,
         },
     };
-    
+
     /** @return {() => Promise<void>} */
     #updateModels = () => {};
-    
+
     /**
-     * @param {Object} settingsData 
-     * @param {boolean} updateModels 
+     * @param {Object} settingsData
+     * @param {boolean} updateModels
      */
     async #setSettings(settingsData, updateModels) {
         const settings = this.elements.settings;
@@ -3941,7 +3974,7 @@ class SettingsView {
             await this.#updateModels(); // Is this slow?
         }
     }
-    
+
     /**
      * @param {boolean} updateModels
      * @returns {Promise<void>}
@@ -3952,7 +3985,7 @@ class SettingsView {
         await this.#setSettings(settingsData, updateModels);
         comfyButtonAlert(this.elements.reloadButton, true);
     }
-    
+
     /** @returns {Promise<void>} */
     async save() {
         let settingsData = {};
@@ -3970,7 +4003,7 @@ class SettingsView {
             }
             settingsData[setting] = value;
         }
-        
+
         const data = await comfyRequest(
             "/model-manager/settings/save",
             {
@@ -3987,7 +4020,7 @@ class SettingsView {
         }
         comfyButtonAlert(this.elements.saveButton, success);
     }
-    
+
     /**
      * @param {() => Promise<void>} updateModels
      * @param {() => void} updateSidebarButtons
@@ -3995,7 +4028,7 @@ class SettingsView {
     constructor(updateModels, updateSidebarButtons) {
         this.#updateModels = updateModels;
         const settings = this.elements.settings;
-        
+
         const sidebarControl = $checkbox({
             $: (el) => (settings["sidebar-control-always-compact"] = el),
             textContent: "Sidebar controls always compact",
@@ -4003,7 +4036,7 @@ class SettingsView {
         sidebarControl.getElementsByTagName('input')[0].addEventListener("change", () => {
             updateSidebarButtons();
         });
-        
+
         const reloadButton = new ComfyButton({
             content: "Reload",
             tooltip: "Reload settings and model manager files",
@@ -4015,7 +4048,7 @@ class SettingsView {
             },
         }).element;
         this.elements.reloadButton = reloadButton;
-        
+
         const saveButton = new ComfyButton({
             content: "Save",
             tooltip: "Save settings and reload model manager",
@@ -4027,7 +4060,7 @@ class SettingsView {
             },
         }).element;
         this.elements.saveButton = saveButton;
-        
+
         const correctPreviewsButton = new ComfyButton({
             content: "Fix Extensions",
             tooltip: "Correct image file extensions in all model directories",
@@ -4053,7 +4086,7 @@ class SettingsView {
                 button.disabled = false;
             },
         }).element;
-        
+
         $el("div.model-manager-settings", {
             $: (el) => (this.element = el),
         }, [
@@ -4302,7 +4335,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     const RADIO_BUTTON_GROUP_ACTIVE = "radio-button-group-active";
     const radioButtonGroup = $el("div.radio-button-group", []);
     const buttons = [];
-    
+
     const select = $el("select", {
             name: "sidebar-select",
             onchange: (event) => {
@@ -4333,7 +4366,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
             }, option);
         })
     );
-    
+
     for (let i = 0; i < labels.length; i++) {
         const text = labels[i];
         const activationCallback = activationCallbacks[i] ?? (() => {});
@@ -4376,72 +4409,72 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     radioButtonGroup.append.apply(radioButtonGroup, buttons);
     buttons[0].click();
     buttons[0].style.display = "none";
-    
+
     return [radioButtonGroup, select];
 }
 
 class ModelManager extends ComfyDialog {
     /** @type {HTMLDivElement} */
     element = null;
-    
+
     /** @type {ModelData} */
     #modelData = null;
-    
+
     /** @type {ModelInfo} */
     #modelInfo = null;
-    
+
     /** @type {DownloadView} */
     #downloadView = null;
-    
+
     /** @type {BrowseView} */
     #browseView = null;
-    
+
     /** @type {SettingsView} */
     #settingsView = null;
-    
+
     /** @type {HTMLDivElement} */
     #topbarRight = null;
-    
+
     /** @type {HTMLDivElement} */
     #tabManagerButtons = null;
-    
+
     /** @type {HTMLDivElement} */
     #tabManagerContents = null;
-    
+
     /** @type {HTMLDivElement} */
     #tabInfoButtons = null;
-    
+
     /** @type {HTMLDivElement} */
     #tabInfoContents = null;
-    
+
     /** @type {HTMLButtonElement} */
     #sidebarButtonGroup = null;
-    
+
     /** @type {HTMLButtonElement} */
     #sidebarSelect = null;
-    
+
     /** @type {HTMLButtonElement} */
     #closeModelInfoButton = null;
-    
+
     /** @type {String} */
     #dragSidebarState = "";
-    
+
     constructor() {
         super();
-        
+
         this.#modelData = new ModelData();
-        
+
         this.#settingsView = new SettingsView(
             this.#refreshModels,
             () => this.#updateSidebarButtons(),
         );
-        
+
         this.#modelInfo = new ModelInfo(
             this.#modelData,
             this.#refreshModels,
             this.#settingsView.elements.settings,
         );
-        
+
         this.#browseView = new BrowseView(
             this.#refreshModels,
             this.#modelData,
@@ -4449,27 +4482,27 @@ class ModelManager extends ComfyDialog {
             this.#resetManagerContentsScroll,
             this.#settingsView.elements.settings, // TODO: decouple settingsData from elements?
         );
-        
+
         this.#downloadView = new DownloadView(
             this.#modelData,
             this.#settingsView.elements.settings,
             this.#refreshModels,
         );
-        
+
         const [tabManagerButtons, tabManagerContents] = GenerateTabGroup([
             { name: "Download", icon: "arrow-collapse-down", tabContent: this.#downloadView.element },
             { name: "Models", icon: "folder-search-outline", tabContent: this.#browseView.element },
             { name: "Settings", icon: "cog-outline", tabContent: this.#settingsView.element },
         ]);
         tabManagerButtons[0]?.click();
-        
+
         const tabInfoButtons = this.#modelInfo.elements.tabButtons;
         const tabInfoContents = this.#modelInfo.elements.tabContents;
-        
+
         const [sidebarButtonGroup, sidebarSelect] = GenerateSidebarToggleRadioAndSelect(
             ["◼", "◨", "⬒", "⬓", "◧"],
             [
-                () => { 
+                () => {
                     const element = this.element;
                     if (element) { // callback on initialization as default state
                         element.dataset["sidebarState"] = "none";
@@ -4488,7 +4521,7 @@ class ModelManager extends ComfyDialog {
         for (let i = 0; i < sidebarButtonGroupChildren.length; i++) {
             sidebarButtonGroupChildren[i].classList.add("icon-button");
         }
-        
+
         const closeModelInfoButton = new ComfyButton({
             icon: "arrow-u-left-bottom",
             tooltip: "Return to model search",
@@ -4497,7 +4530,7 @@ class ModelManager extends ComfyDialog {
         }).element;
         this.#closeModelInfoButton = closeModelInfoButton;
         closeModelInfoButton.style.display = "none";
-        
+
         const modelManager = $el(
             "div.comfy-modal.model-manager",
             {
@@ -4558,36 +4591,36 @@ class ModelManager extends ComfyDialog {
                 ]),
             ]
         );
-        
+
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabManagerButtons, 704)).observe(modelManager);
         new ResizeObserver(GenerateDynamicTabTextCallback(modelManager, tabInfoButtons, 704)).observe(modelManager);
         new ResizeObserver(() => this.#updateSidebarButtons()).observe(modelManager);
         window.addEventListener('resize', () => {
             const width = window.innerWidth;
             const height = window.innerHeight;
-            
+
             const leftDecimal = modelManager.dataset["sidebarLeftWidthDecimal"];
             const rightDecimal = modelManager.dataset["sidebarRightWidthDecimal"];
             const topDecimal = modelManager.dataset["sidebarTopHeightDecimal"];
             const bottomDecimal = modelManager.dataset["sidebarBottomHeightDecimal"];
-            
+
             // restore decimal after resize
             modelManager.style.setProperty("--model-manager-sidebar-width-left", (leftDecimal * width) + "px");
             modelManager.style.setProperty("--model-manager-sidebar-width-right", (rightDecimal * width) + "px");
             modelManager.style.setProperty("--model-manager-sidebar-height-top", + (topDecimal * height) + "px");
             modelManager.style.setProperty("--model-manager-sidebar-height-bottom", (bottomDecimal * height) + "px");
         });
-        
+
         const EDGE_DELTA = 8;
-        
+
         const endDragSidebar = (e) => {
             this.#dragSidebarState = "";
-            
+
             modelManager.classList.remove("cursor-drag-left");
             modelManager.classList.remove("cursor-drag-top");
             modelManager.classList.remove("cursor-drag-right");
             modelManager.classList.remove("cursor-drag-bottom");
-            
+
             // cache for window resize
             modelManager.dataset["sidebarLeftWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-left")) / window.innerWidth;
             modelManager.dataset["sidebarRightWidthDecimal"] = parseInt(modelManager.style.getPropertyValue("--model-manager-sidebar-width-right")) / window.innerWidth;
@@ -4596,7 +4629,7 @@ class ModelManager extends ComfyDialog {
         };
         document.addEventListener("mouseup", (e) => endDragSidebar(e));
         document.addEventListener("touchend", (e) => endDragSidebar(e));
-        
+
         const detectDragSidebar = (e, x, y) => {
             const left = modelManager.offsetLeft;
             const top = modelManager.offsetTop;
@@ -4604,17 +4637,17 @@ class ModelManager extends ComfyDialog {
             const height = modelManager.offsetHeight;
             const right = left + width;
             const bottom = top + height;
-            
+
             if (!(x >= left && x <= right && y >= top && y <= bottom)) {
                 // click was not in model manager
                 return;
             }
-            
+
             const isOnEdgeLeft = x - left <= EDGE_DELTA;
             const isOnEdgeRight = right - x <= EDGE_DELTA;
             const isOnEdgeTop = y - top <= EDGE_DELTA;
             const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
-            
+
             const sidebarState = this.element.dataset["sidebarState"];
             if (sidebarState === "left" && isOnEdgeRight) {
                 this.#dragSidebarState = sidebarState;
@@ -4628,7 +4661,7 @@ class ModelManager extends ComfyDialog {
             else if (sidebarState === "bottom" && isOnEdgeTop) {
                 this.#dragSidebarState = sidebarState;
             }
-            
+
             if (this.#dragSidebarState !== "") {
                 e.preventDefault();
                 e.stopPropagation();
@@ -4636,25 +4669,25 @@ class ModelManager extends ComfyDialog {
         };
         modelManager.addEventListener("mousedown", (e) => detectDragSidebar(e, e.clientX, e.clientY));
         modelManager.addEventListener("touchstart", (e) => detectDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
-        
+
         const updateSidebarCursor = (e, x, y) => {
             if (this.#dragSidebarState !== "") {
                 // do not update cursor style while dragging
                 return;
             }
-            
+
             const left = modelManager.offsetLeft;
             const top = modelManager.offsetTop;
             const width = modelManager.offsetWidth;
             const height = modelManager.offsetHeight;
             const right = left + width;
             const bottom = top + height;
-            
+
             const isOnEdgeLeft = x - left <= EDGE_DELTA;
             const isOnEdgeRight = right - x <= EDGE_DELTA;
             const isOnEdgeTop = y - top <= EDGE_DELTA;
             const isOnEdgeBottom = bottom - y <= EDGE_DELTA;
-            
+
             const updateClass = (add, className) => {
                 if (add) {
                     modelManager.classList.add(className);
@@ -4663,7 +4696,7 @@ class ModelManager extends ComfyDialog {
                     modelManager.classList.remove(className);
                 }
             };
-            
+
             const sidebarState = this.element.dataset["sidebarState"];
             updateClass(sidebarState === "right" && isOnEdgeLeft, "cursor-drag-left");
             updateClass(sidebarState === "bottom" && isOnEdgeTop, "cursor-drag-top");
@@ -4672,18 +4705,18 @@ class ModelManager extends ComfyDialog {
         };
         modelManager.addEventListener("mousemove", (e) => updateSidebarCursor(e, e.clientX, e.clientY));
         modelManager.addEventListener("touchmove", (e) => updateSidebarCursor(e, e.touches[0].clientX, e.touches[0].clientY));
-        
+
         const updateDragSidebar = (e, x, y) => {
             const sidebarState = this.#dragSidebarState;
             if (sidebarState === "") {
                 return;
             }
-            
+
             e.preventDefault();
-            
+
             const width = window.innerWidth;
             const height = window.innerHeight;
-            
+
             if (sidebarState === "left") {
                 const pixels = clamp(x, 0, width).toString() + "px";
                 modelManager.style.setProperty("--model-manager-sidebar-width-left", pixels);
@@ -4703,16 +4736,16 @@ class ModelManager extends ComfyDialog {
         };
         document.addEventListener("mousemove", (e) => updateDragSidebar(e, e.clientX, e.clientY));
         document.addEventListener("touchmove", (e) => updateDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY));
-        
+
         this.#init();
     }
-    
+
     async #init() {
         await this.#settingsView.reload(false);
         await this.#refreshModels();
-        
+
         const settings = this.#settingsView.elements.settings;
-        
+
         {
             // initialize buttons' visibility state
             const hideSearchButtons = settings["text-input-always-hide-search-button"].checked;
@@ -4720,41 +4753,41 @@ class ModelManager extends ComfyDialog {
             this.#downloadView.elements.searchButton.style.display = hideSearchButtons ? "none" : "";
             this.#downloadView.elements.clearSearchButton.style.display = hideClearSearchButtons ? "none" : "";
         }
-        
+
         {
             // set initial sidebar widths & heights
             const width = window.innerWidth;
             const height = window.innerHeight;
-            
+
             const xDecimal = settings["sidebar-default-width"].value;
             const yDecimal = settings["sidebar-default-height"].value;
-            
+
             this.element.dataset["sidebarLeftWidthDecimal"] = xDecimal;
             this.element.dataset["sidebarRightWidthDecimal"] = xDecimal;
             this.element.dataset["sidebarTopHeightDecimal"] = yDecimal;
             this.element.dataset["sidebarBottomHeightDecimal"] = yDecimal;
-            
+
             const x = Math.floor(width * xDecimal);
             const y = Math.floor(height * yDecimal);
-            
+
             const leftPixels = x.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-width-left", leftPixels);
-            
+
             const rightPixels = x.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-width-right", rightPixels);
-            
+
             const topPixels = y.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-height-top", topPixels);
-            
+
             const bottomPixels = y.toString() + "px";
             this.element.style.setProperty("--model-manager-sidebar-height-bottom", bottomPixels);
         }
     }
-    
+
     #resetManagerContentsScroll = () => {
         this.#tabManagerContents.scrollTop = 0;
     }
-    
+
     #refreshModels = async() => {
         const modelData = this.#modelData;
         modelData.systemSeparator = await comfyRequest("/model-manager/system-separator");
@@ -4762,38 +4795,38 @@ class ModelManager extends ComfyDialog {
         Object.assign(modelData.models, newModels); // NOTE: do NOT create a new object
         const newModelDirectories = await comfyRequest("/model-manager/models/directory-list");
         modelData.directories.data.splice(0, Infinity, ...newModelDirectories); // NOTE: do NOT create a new array
-        
+
         this.#browseView.updateModelGrid();
         await this.#tryHideModelInfo(false);
-        
+
         document.getElementById("comfy-refresh-button")?.click();
     }
-    
+
     /**
      * @param {searchPath: string}
      * @return {Promise<void>}
      */
     #showModelInfo = async(searchPath) => {
         await this.#modelInfo.update(
-            searchPath, 
-            this.#refreshModels, 
-            this.#modelData.searchSeparator, 
+            searchPath,
+            this.#refreshModels,
+            this.#modelData.searchSeparator,
         ).then(() => {
             this.#tabManagerButtons.style.display = "none";
             this.#tabManagerContents.style.display = "none";
-            
+
             this.#closeModelInfoButton.style.display = "";
             this.#tabInfoButtons.style.display = "";
             this.#tabInfoContents.style.display = "";
-            
+
             this.#tabInfoButtons.children[0]?.click();
             this.#modelInfo.show();
             this.#tabInfoContents.scrollTop = 0;
         });
     }
-    
+
     /**
-     * @param {boolean} promptSave 
+     * @param {boolean} promptSave
      * @returns {Promise<boolean>}
      */
     #tryHideModelInfo = async(promptSave) => {
@@ -4801,17 +4834,17 @@ class ModelManager extends ComfyDialog {
             if (!await this.#modelInfo.tryHide(promptSave)) {
                 return false;
             }
-            
+
             this.#closeModelInfoButton.style.display = "none";
             this.#tabInfoButtons.style.display = "none";
             this.#tabInfoContents.style.display = "none";
-            
+
             this.#tabManagerButtons.style.display = "";
             this.#tabManagerContents.style.display = "";
         }
         return true;
     }
-    
+
     #updateSidebarButtons = () => {
         const managerRect = this.element.getBoundingClientRect();
         const isNarrow = managerRect.width < 768; // TODO: `minWidth` is a magic value
@@ -4861,7 +4894,7 @@ app.registerExtension({
             rel: "stylesheet",
             href: "./extensions/ComfyUI-Model-Manager/model-manager.css",
         });
-        
+
         app.ui?.menuContainer?.appendChild(
             $el("button", {
                 id: "comfyui-model-manager-button",
@@ -4870,7 +4903,7 @@ app.registerExtension({
                 onclick: () => toggleModelManager(),
             })
         );
-        
+
         // [Beta] mobile menu
         app.menu?.settingsGroup?.append(new ComfyButton({
             icon: "folder-search",
