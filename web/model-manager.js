@@ -4612,7 +4612,7 @@ class SettingsView {
         $select({
           $: (el) => (settings['sidebar-default-state'] = el),
           textContent: 'Default model manager position',
-          options: ['left', 'right', 'top', 'bottom', 'none'],
+          options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
         }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
@@ -4922,9 +4922,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     );
   }
   radioButtonGroup.append.apply(radioButtonGroup, buttons);
-  buttons[0].click();
   buttons[0].style.display = 'none';
-
   return [radioButtonGroup, select];
 }
 
@@ -5031,11 +5029,7 @@ class ModelManager extends ComfyDialog {
         ['◼', '◨', '⬒', '⬓', '◧'],
         [
           () => {
-            const element = this.element;
-            if (element) {
-              // callback on initialization as default state
-              element.dataset['sidebarState'] = 'none';
-            }
+            this.element.dataset['sidebarState'] = 'none';
           },
           () => {
             this.element.dataset['sidebarState'] = 'right';
@@ -5364,11 +5358,23 @@ class ModelManager extends ComfyDialog {
     await this.#refreshModels();
   }
 
-  /**
-   * @param {settings: Object}
-   * @return {void}
-   */
   #updateSidebarSettings = (settings) => {
+	  
+    const newSidebarState = settings['sidebar-default-state'].value;
+    let buttonNumb = 0;
+    if (newSidebarState === 'Left') {
+      buttonNumb = 4;
+    } else if (newSidebarState === 'Right') {
+      buttonNumb = 1;
+    } else if (newSidebarState === 'Top') {
+      buttonNumb = 2;
+    } else if (newSidebarState === 'Bottom') {
+      buttonNumb = 3;
+    }
+    if(!this.#sidebarButtonGroup.children[buttonNumb].classList.contains('radio-button-group-active')){
+      this.#sidebarButtonGroup.children[buttonNumb].click();
+    }
+	
     {
       // initialize buttons' visibility state
       const hideSearchButtons =
@@ -5390,7 +5396,6 @@ class ModelManager extends ComfyDialog {
       const xDecimal = settings['sidebar-default-width'].value;
       const yDecimal = settings['sidebar-default-height'].value;
 
-      this.element.dataset['sidebarState'] = settings['sidebar-default-state'].value;
       this.element.dataset['sidebarLeftWidthDecimal'] = xDecimal;
       this.element.dataset['sidebarRightWidthDecimal'] = xDecimal;
       this.element.dataset['sidebarTopHeightDecimal'] = yDecimal;
