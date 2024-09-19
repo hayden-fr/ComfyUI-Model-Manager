@@ -2095,10 +2095,7 @@ class ModelGrid {
           systemSeparator,
         );
         let actionButtons = [];
-        if (
-          showAddButton &&
-          !(modelType === 'embeddings' && !navigator.clipboard)
-        ) {
+        if (showCopyButton) {
           actionButtons.push(
             new ComfyButton({
               icon: 'content-copy',
@@ -2114,7 +2111,7 @@ class ModelGrid {
             }).element,
           );
         }
-        if (showCopyButton) {
+        if (showAddButton && !(modelType === 'embeddings' && !navigator.clipboard)) {
           actionButtons.push(
             new ComfyButton({
               icon: 'plus-box-outline',
@@ -4394,6 +4391,9 @@ class SettingsView {
   /** @return {() => Promise<void>} */
   #updateModels = () => {};
 
+  /** @return {() => void} */
+  #updateSidebarSettings = () => {};
+
   /**
    * @param {Object} settingsData
    * @param {boolean} updateModels
@@ -4426,6 +4426,8 @@ class SettingsView {
           console.warn(`Unknown settings input type '${type}'!`);
       }
     }
+
+    this.#updateSidebarSettings(settings);
 
     if (updateModels) {
       await this.#updateModels(); // Is this slow?
@@ -4491,9 +4493,11 @@ class SettingsView {
   /**
    * @param {() => Promise<void>} updateModels
    * @param {() => void} updateSidebarButtons
+   * @param {(settings: Object) => void} updateSidebarSettings
    */
-  constructor(updateModels, updateSidebarButtons) {
+  constructor(updateModels, updateSidebarButtons, updateSidebarSettings) {
     this.#updateModels = updateModels;
+    this.#updateSidebarSettings = updateSidebarSettings;
     const settings = this.elements.settings;
 
     const sidebarControl = $checkbox({
@@ -4569,6 +4573,7 @@ class SettingsView {
           {
             style: { color: 'var(--fg-color)' },
             href: 'https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/',
+            target: '_blank',
           },
           ['File bugs and issues here.'],
         ),
@@ -4604,6 +4609,11 @@ class SettingsView {
             'vae_approx',
           ],
         }),
+        $select({
+          $: (el) => (settings['sidebar-default-state'] = el),
+          textContent: 'Default model manager position',
+          options: ['left', 'right', 'top', 'bottom', 'none'],
+        }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
           textContent: 'Real-time search',
@@ -4833,6 +4843,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     'select',
     {
       name: 'sidebar-select',
+      classList: 'icon-button',
       onchange: (event) => {
         const select = event.target;
         const children = select.children;
@@ -4970,6 +4981,7 @@ class ModelManager extends ComfyDialog {
 
     this.#settingsView = new SettingsView(this.#refreshModels, () =>
       this.#updateSidebarButtons(),
+      this.#updateSidebarSettings,
     );
 
     this.#modelInfo = new ModelInfo(
@@ -5350,9 +5362,13 @@ class ModelManager extends ComfyDialog {
   async #init() {
     await this.#settingsView.reload(false);
     await this.#refreshModels();
+  }
 
-    const settings = this.#settingsView.elements.settings;
-
+  /**
+   * @param {settings: Object}
+   * @return {void}
+   */
+  #updateSidebarSettings = (settings) => {
     {
       // initialize buttons' visibility state
       const hideSearchButtons =
@@ -5374,6 +5390,7 @@ class ModelManager extends ComfyDialog {
       const xDecimal = settings['sidebar-default-width'].value;
       const yDecimal = settings['sidebar-default-height'].value;
 
+      this.element.dataset['sidebarState'] = settings['sidebar-default-state'].value;
       this.element.dataset['sidebarLeftWidthDecimal'] = xDecimal;
       this.element.dataset['sidebarRightWidthDecimal'] = xDecimal;
       this.element.dataset['sidebarTopHeightDecimal'] = yDecimal;
