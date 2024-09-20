@@ -188,3 +188,9 @@ Icon
 Network Trash Folder
 Temporary Items
 .apdisk
+
+# dependencies
+node_modules/
+
+# dist
+web/
