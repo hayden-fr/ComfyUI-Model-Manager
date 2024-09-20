@@ -2060,7 +2060,7 @@ class ModelGrid {
                 strictDragToAdd: strictDragToAdd,
               };
               e.dataTransfer.setData('manager-model', JSON.stringify(data));
-			  e.dataTransfer.setData('text/plain', '');
+              e.dataTransfer.setData('text/plain', '');
             },
             draggable: true,
           });
