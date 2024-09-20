@@ -5372,10 +5372,7 @@ class ModelManager extends ComfyDialog {
       } else if (newSidebarState === 'Left') {
         buttonNumb = 4;
       }
-      const button = this.#sidebarButtonGroup.children[buttonNumb];
-      if(!button.classList.contains('radio-button-group-active')){
-        button.click();
-      }
+      this.#sidebarButtonGroup.children[buttonNumb].click();
 	}
 
     {
