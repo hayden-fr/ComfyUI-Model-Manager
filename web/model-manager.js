@@ -1875,7 +1875,7 @@ class ModelGrid {
     removeEmbeddingExtension,
     strictlyOnWidget,
   ) {
-    const target = document.elementFromPoint(event.x, event.y);
+    const target = document.elementFromPoint(event.clientX, event.clientY);
     if (modelType !== 'embeddings' && target.id === 'graph-canvas') {
       const pos = app.canvas.convertEventToCanvasOffset(event);
 
