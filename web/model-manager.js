@@ -97,7 +97,7 @@ class KeyComboListener {
   }
 }
 
-// This is used in Firefox to bypass the ‘dragend’ event because it returns incorrect ‘screenX’ and ‘screenY’
+// This is used in Firefox to bypass the ‘dragend’ event because it returns incorrect ‘clientX’ and ‘clientY’
 const IS_FIREFOX = navigator.userAgent.indexOf('Firefox') > -1;
 
 /**
