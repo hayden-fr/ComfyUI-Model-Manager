@@ -5373,7 +5373,7 @@ class ModelManager extends ComfyDialog {
         buttonNumb = 4;
       }
       this.#sidebarButtonGroup.children[buttonNumb].click();
-	}
+    }
 
     {
       // set initial sidebar widths & heights
