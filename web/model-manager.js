@@ -2043,6 +2043,47 @@ class ModelGrid {
     const previewThumbnailFormat =
       settingsElements['model-preview-thumbnail-type'].value;
     if (models.length > 0) {
+
+      const $overlay = IS_FIREFOX
+        ? ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragstart: (e) =>{
+              const data = {
+                modelType: modelType,
+                path: path,
+                removeEmbeddingExtension: removeEmbeddingExtension,
+                strictDragToAdd: strictDragToAdd,
+              };
+              e.dataTransfer.setData('manager-model', JSON.stringify(data));
+			  e.dataTransfer.setData('text/plain', '');
+            },
+            draggable: true,
+          });
+        })
+        : ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragend: (e) =>
+              ModelGrid.dragAddModel(
+                e,
+                modelType,
+                path,
+                removeEmbeddingExtension,
+                strictDragToAdd,
+              ),
+            draggable: true,
+          });
+        });
+
       return models.map((item) => {
         const previewInfo = item.preview;
         const previewThumbnail = $el('img.model-preview', {
@@ -2133,41 +2174,14 @@ class ModelGrid {
             },
           }).element,
         ];
-
-        const overlay = (() => {
-          if(IS_FIREFOX){
-            const dragAdd = (e) =>{
-              const data = {
-                modelType: modelType,
-                path: path,
-                removeEmbeddingExtension: removeEmbeddingExtension,
-                strictDragToAdd: strictDragToAdd,
-              };
-              e.dataTransfer.setData('manager-model', JSON.stringify(data));
-            }
-            return $el('div.model-preview-overlay', {
-              ondragstart: (e) => dragAdd(e),
-              draggable: true,
-            });
-          } else {
-            const dragAdd = (e) =>
-            ModelGrid.dragAddModel(
-              e,
-              modelType,
-              path,
-              removeEmbeddingExtension,
-              strictDragToAdd,
-            );
-            return $el('div.model-preview-overlay', {
-              ondragend: (e) => dragAdd(e),
-              draggable: true,
-            });
-          }
-        })();
-
         return $el('div.item', {}, [
           previewThumbnail,
-          overlay,
+          $overlay(
+            modelType,
+            path,
+            removeEmbeddingExtension,
+            strictDragToAdd,
+          ),
           $el(
             'div.model-preview-top-right',
             {
@@ -5335,7 +5349,7 @@ class ModelManager extends ComfyDialog {
     );
 
     if(IS_FIREFOX){
-      app.canvasEl.addEventListener('drop', (e) => {
+      app.canvasContainer.addEventListener('drop', (e) => {
         if (e.dataTransfer.types.includes('manager-model')){
           const data = JSON.parse(e.dataTransfer.getData('manager-model'));
           ModelGrid.dragAddModel(
