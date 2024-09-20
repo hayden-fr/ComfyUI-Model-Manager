@@ -4611,7 +4611,7 @@ class SettingsView {
         }),
         $select({
           $: (el) => (settings['sidebar-default-state'] = el),
-          textContent: 'Default model manager position',
+          textContent: 'Default model manager position (on start up)',
           options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
         }),	  
         $checkbox({
@@ -5356,37 +5356,27 @@ class ModelManager extends ComfyDialog {
   async #init() {
     await this.#settingsView.reload(false);
     await this.#refreshModels();
-  }
 
-  #updateSidebarSettings = (settings) => {
-	  
-    const newSidebarState = settings['sidebar-default-state'].value;
-    let buttonNumb = 0;
-    if (newSidebarState === 'Left') {
-      buttonNumb = 4;
-    } else if (newSidebarState === 'Right') {
-      buttonNumb = 1;
-    } else if (newSidebarState === 'Top') {
-      buttonNumb = 2;
-    } else if (newSidebarState === 'Bottom') {
-      buttonNumb = 3;
-    }
-    if(!this.#sidebarButtonGroup.children[buttonNumb].classList.contains('radio-button-group-active')){
-      this.#sidebarButtonGroup.children[buttonNumb].click();
-    }
-	
+    const settings = this.#settingsView.elements.settings;
+
     {
-      // initialize buttons' visibility state
-      const hideSearchButtons =
-        settings['text-input-always-hide-search-button'].checked;
-      const hideClearSearchButtons =
-        settings['text-input-always-hide-clear-button'].checked;
-      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
-        ? 'none'
-        : '';
-      this.#downloadView.elements.clearSearchButton.style.display =
-        hideClearSearchButtons ? 'none' : '';
-    }
+      // set initial sidebar state
+      const newSidebarState = settings['sidebar-default-state'].value;
+      let buttonNumb = 0;
+      if (newSidebarState === 'Right') {
+        buttonNumb = 1;
+      } else if (newSidebarState === 'Top') {
+        buttonNumb = 2;
+      } else if (newSidebarState === 'Bottom') {
+        buttonNumb = 3;
+      } else if (newSidebarState === 'Left') {
+        buttonNumb = 4;
+      }
+      const button = this.#sidebarButtonGroup.children[buttonNumb];
+      if(!button.classList.contains('radio-button-group-active')){
+        button.click();
+      }
+	}
 
     {
       // set initial sidebar widths & heights
@@ -5427,6 +5417,21 @@ class ModelManager extends ComfyDialog {
         '--model-manager-sidebar-height-bottom',
         bottomPixels,
       );
+    }
+  }
+
+  #updateSidebarSettings = (settings) => {
+    {
+      // update buttons' visibility state
+      const hideSearchButtons =
+        settings['text-input-always-hide-search-button'].checked;
+      const hideClearSearchButtons =
+        settings['text-input-always-hide-clear-button'].checked;
+      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
+        ? 'none'
+        : '';
+      this.#downloadView.elements.clearSearchButton.style.display =
+        hideClearSearchButtons ? 'none' : '';
     }
   }
 
