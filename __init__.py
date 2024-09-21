@@ -324,18 +324,18 @@ class Civitai:
         elif "description" in model_version_info and "activation text" in model_version_info and "notes" in model_version_info:
             # {'description': str, 'sd version': str, 'activation text': str, 'preferred weight': int, 'notes': str}
             model_description = model_version_info.get("description")
-            model_trigger_words = model_version_info.get("activation text")
-            if type(model_trigger_words) is str:
-                model_trigger_words = [model_trigger_words]
+            activation_text = model_version_info.get("activation text")
+            if activation_text != "":
+                model_trigger_words = [activation_text]
             else:
                 model_trigger_words = []
             model_version_description = model_version_info.get("notes")
         else:
             return ""
-        model_description = model_description if type(model_description) is str else ""
+        model_description = model_description if model_description is not None else ""
         model_trigger_words = model_trigger_words if model_trigger_words is not None else []
-        model_version_description = model_version_description if type(model_version_description) is str else ""
-        model_name = model_name if type(model_name) is str else "Model Description"
+        model_version_description = model_version_description if model_version_description is not None else ""
+        model_name = model_name if model_name is not None else "Model Description"
 
         notes = ""
         if len(model_trigger_words) > 0:
