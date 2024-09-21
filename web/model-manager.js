@@ -2918,7 +2918,7 @@ class ModelInfo {
     infoHtml.append.apply(infoHtml, innerHtml);
     // TODO: set default value of dropdown and value to model type?
 
-//
+    //
     // NOTES
     //
 
@@ -4545,7 +4545,7 @@ class SettingsView {
   };
 
   /** @return {() => Promise<void>} */
-  #updateModels = () => {};
+  #updateModels = async () => {};
 
   /**
    * @param {Object} settingsData
@@ -4709,6 +4709,38 @@ class SettingsView {
       },
     }).element;
 
+    const scanDownloadModelInfosButton = new ComfyButton({
+      content: 'Download Scan Model Info',
+      tooltip: 'Scans all model files and tries to download and save model info, notes and urls.',
+      action: async (e) => {
+        const confirmation = window.confirm(
+          'WARNING: This may take a while and generate MANY server requests!\nUSE AT YOUR OWN RISK!',
+        );
+        if (!confirmation) {
+          return;
+        }
+        
+        const [button, icon, span] = comfyButtonDisambiguate(e.target);
+        button.disabled = true;
+        const data = await comfyRequest('/model-manager/models/scan-download', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }).catch((err) => {
+          return { success: false };
+        });
+        const successMessage = data['success'] ? "Scan Finished!" : "Scan Failed!";
+        const infoCount = data['infoCount'];
+        const notesCount = data['notesCount'];
+        const urlCount = data['urlCount'];
+        window.alert(`${successMessage}\n\nInfo Count: ${infoCount}\nNotes Count: ${notesCount}\nUrl Count: ${urlCount}`);
+        comfyButtonAlert(e.target, success);
+        if (infoCount > 0 || notesCount > 0 || urlCount > 0) {
+          await this.reload(true);
+        }
+        button.disabled = false;
+      },
+    }).element;
+
     $el(
       'div.model-manager-settings',
       {
@@ -4862,8 +4894,9 @@ class SettingsView {
           $: (el) => (settings['text-input-always-hide-clear-button'] = el),
           textContent: 'Always hide "Clear Search" buttons.',
         }),
-        $el('h2', ['Model Preview Images']),
+        $el('h2', ['Scan Files']),
         $el('div', [correctPreviewsButton]),
+        $el('div', [scanDownloadModelInfosButton]),
         $el('h2', ['Random Tag Generator']),
         $select({
           $: (el) => (settings['tag-generator-sampler-method'] = el),

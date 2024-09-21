@@ -74,6 +74,7 @@ def split_valid_ext(s, *arg_exts):
 
 _folder_names_and_paths = None # dict[str, tuple[list[str], list[str]]]
 def folder_paths_folder_names_and_paths(refresh = False):
+    # TODO: "diffusers" extension whitelist is ["folder"]
     global _folder_names_and_paths
     if refresh or _folder_names_and_paths is None:
         _folder_names_and_paths = {}
@@ -300,21 +301,41 @@ class Civitai:
 
     @staticmethod
     def search_notes(model_version_info):
-        model_id = model_version_info.get("modelId")
-        model_version_id = model_version_info.get("id")
+        if len(model_version_info) == 0:
+            return ""
+        model_name = None
+        if "modelId" in model_version_info and "id" in model_version_info:
+            model_id = model_version_info.get("modelId")
+            model_version_id = model_version_info.get("id")
 
-        assert(model_id is not None)
-        assert(model_version_id is not None)
-
-        model_version_description = ""
-        model_trigger_words = []
-        model_info = Civitai.search_by_model_id(model_id)
-        model_description = model_info.get("description", "")
-        for model_version in model_info["modelVersions"]:
-            if model_version["id"] == model_version_id:
-                model_version_description = model_version.get("description", "")
-                model_trigger_words = model_version.get("trainedWords", [])
-                break
+            model_version_description = ""
+            model_trigger_words = []
+            model_info = Civitai.search_by_model_id(model_id)
+            if len(model_info) == 0: # can happen if model download is disabled
+                print("Model Manager WARNING: Unable to find Civitai 'modelId' " + str(model_id))
+                return ""
+            model_name = model_info.get("name")
+            model_description = model_info.get("description")
+            for model_version in model_info["modelVersions"]:
+                if model_version["id"] == model_version_id:
+                    model_version_description = model_version.get("description")
+                    model_trigger_words = model_version.get("trainedWords")
+                    break
+        elif "description" in model_version_info and "activation text" in model_version_info and "notes" in model_version_info:
+            # {'description': str, 'sd version': str, 'activation text': str, 'preferred weight': int, 'notes': str}
+            model_description = model_version_info.get("description")
+            model_trigger_words = model_version_info.get("activation text")
+            if type(model_trigger_words) is str:
+                model_trigger_words = [model_trigger_words]
+            else:
+                model_trigger_words = []
+            model_version_description = model_version_info.get("notes")
+        else:
+            return ""
+        model_description = model_description if type(model_description) is str else ""
+        model_trigger_words = model_trigger_words if model_trigger_words is not None else []
+        model_version_description = model_version_description if type(model_version_description) is str else ""
+        model_name = model_name if type(model_name) is str else "Model Description"
 
         notes = ""
         if len(model_trigger_words) > 0:
@@ -334,7 +355,7 @@ class Civitai:
             notes += markdownify.markdownify(model_version_description)
         if model_description != "":
             if len(notes) > 0: notes += "\n\n"
-            notes += "# " + model_info.get("name", str(model_id)) + "\n\n"
+            notes += "# " + model_name + "\n\n"
             notes += markdownify.markdownify(model_description)
         return notes.strip()
 
@@ -381,28 +402,25 @@ class ModelInfo:
 
     @staticmethod
     def get_url(model_info):
-        if len(model_info) == 0: return ""
+        if len(model_info) == 0:
+            return ""
         model_url = Civitai.get_model_url(model_info)
-        if model_url != "": return model_url
-
+        if model_url != "":
+            return model_url
         # TODO: huggingface has <user>/<model> formats
-
         # TODO: support other websites
         return ""
 
     @staticmethod
     def search_notes(model_path):
-        notes = ""
-
+        assert(os.path.isfile(model_path))
         model_info = ModelInfo.search_info(model_path, cache=True, use_cached=True) # assume cached is correct; re-download elsewhere
-        if len(model_info) > 0:
-            notes = Civitai.search_notes(model_info)
-
-        # TODO: support other websites
-        return notes
-
+        if len(model_info) == 0:
+            return ""
+        notes = Civitai.search_notes(model_info)
+        if len(notes) > 0 and not notes.isspace():
+            return notes
         # TODO: search other websites
-
         return ""
 
 
@@ -945,6 +963,65 @@ async def get_directory_list(request):
     return web.json_response(dir_list)
 
 
+@server.PromptServer.instance.routes.post("/model-manager/models/scan-download")
+async def try_scan_download(request):
+    refresh = request.query.get("refresh", None) is not None
+    response = {
+        "success": False,
+        "infoCount": 0,
+        "notesCount": 0,
+        "urlCount": 0,
+    }
+    model_paths = folder_paths_folder_names_and_paths(refresh)
+    for _, (model_dirs, model_extension_whitelist) in model_paths.items():
+        for root_dir in model_dirs:
+            for root, dirs, files in os.walk(root_dir):
+                for file in files:
+                    file_name, file_extension = os.path.splitext(file)
+                    if file_extension not in model_extension_whitelist:
+                        continue
+                    model_file_path = root + os.path.sep + file
+
+                    model_info_path = root + os.path.sep + file_name + model_info_extension
+                    model_notes_path = root + os.path.sep + file_name + model_notes_extension
+                    model_url_path = root + os.path.sep + file_name + ".url"
+                    if os.path.exists(model_info_path) and os.path.exists(model_notes_path) and os.path.exists(model_url_path):
+                        continue
+                    print("Scanning " + model_file_path)
+
+                    model_info = {}
+                    model_info = ModelInfo.search_info(model_file_path, cache=True, use_cached=True)
+                    if len(model_info) == 0:
+                        continue
+                    response["infoCount"] += 1
+
+                    if not os.path.exists(model_notes_path):
+                        notes = ModelInfo.search_notes(model_file_path)
+                        if not notes.isspace() and notes != "":
+                            try:
+                                with open(model_notes_path, "w", encoding="utf-8") as f:
+                                    f.write(notes)
+                                print("Saved file: " + model_notes_path)
+                                response["notesCount"] += 1
+                            except Exception as e:
+                                print(f"Failed to save {model_notes_path}!")
+                                print(e, file=sys.stderr, flush=True)
+
+                    if not os.path.exists(model_url_path):
+                        web_url = ModelInfo.get_url(model_info)
+                        if web_url is not None and web_url != "":
+                            try:
+                                save_web_url(model_url_path, web_url)
+                                print("Saved file: " + model_url_path)
+                                response["urlCount"] += 1
+                            except Exception as e:
+                                print(f"Failed to save {model_url_path}!")
+                                print(e, file=sys.stderr, flush=True)
+
+    response["success"] = True
+    return web.json_response(response)
+
+
 def download_file(url, filename, overwrite):
     if not overwrite and os.path.isfile(filename):
         raise ValueError("File already exists!")
@@ -1468,15 +1545,18 @@ async def try_download_notes(request):
         return web.json_response(result)
 
     notes = ModelInfo.search_notes(abs_path)
-    if not notes.isspace() and notes != "":
-        try:
-            with open(notes_path, "w", encoding="utf-8") as f:
-                f.write(notes)
-            result["success"] = True
-        except ValueError as e:
-            print(e, file=sys.stderr, flush=True)
-            result["alert"] = "Failed to save notes!\n\n" + str(e)
-            return web.json_response(result)
+    if notes.isspace() or notes == "":
+        result["alert"] = "No notes found!"
+        return web.json_response(result)
+
+    try:
+        with open(notes_path, "w", encoding="utf-8") as f:
+            f.write(notes)
+        result["success"] = True
+    except ValueError as e:
+        print(e, file=sys.stderr, flush=True)
+        result["alert"] = "Failed to save notes!\n\n" + str(e)
+        return web.json_response(result)
 
     result["notes"] = notes
     return web.json_response(result)
