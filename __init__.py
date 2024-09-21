@@ -312,7 +312,7 @@ class Civitai:
             model_trigger_words = []
             model_info = Civitai.search_by_model_id(model_id)
             if len(model_info) == 0: # can happen if model download is disabled
-                print("Model Manager WARNING: Unable to find Civitai 'modelId' " + str(model_id))
+                print("Model Manager WARNING: Unable to find Civitai 'modelId' " + str(model_id) + ". Try deleting .json file and trying again later!")
                 return ""
             model_name = model_info.get("name")
             model_description = model_info.get("description")
