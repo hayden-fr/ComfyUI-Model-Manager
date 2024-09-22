@@ -4900,11 +4900,11 @@ class SettingsView {
         $el('h2', ['Random Tag Generator']),
         $select({
           $: (el) => (settings['tag-generator-sampler-method'] = el),
-          textContent: 'Default sampling method',
+          textContent: 'Sampling method',
           options: ['Frequency', 'Uniform'],
         }),
         $el('label', [
-          'Default count',
+          'Generation count',
           $el('input', {
             $: (el) => (settings['tag-generator-count'] = el),
             type: 'number',
@@ -4914,7 +4914,7 @@ class SettingsView {
           }),
         ]),
         $el('label', [
-          'Default minimum threshold',
+          'Minimum frequency threshold',
           $el('input', {
             $: (el) => (settings['tag-generator-threshold'] = el),
             type: 'number',
