@@ -4684,7 +4684,7 @@ class SettingsView {
     this.elements.saveButton = saveButton;
 
     const correctPreviewsButton = new ComfyButton({
-      content: 'Fix Extensions',
+      content: 'Fix Preview Extensions',
       tooltip: 'Correct image file extensions in all model directories',
       action: async (e) => {
         const [button, icon, span] = comfyButtonDisambiguate(e.target);
@@ -4710,7 +4710,7 @@ class SettingsView {
     }).element;
 
     const scanDownloadModelInfosButton = new ComfyButton({
-      content: 'Download Scan Model Info',
+      content: 'Download Model Info',
       tooltip: 'Scans all model files and tries to download and save model info, notes and urls.',
       action: async (e) => {
         const confirmation = window.confirm(
