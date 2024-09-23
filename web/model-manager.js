@@ -97,35 +97,8 @@ class KeyComboListener {
   }
 }
 
-/**
- * Handles Firefox's drag event, which returns different coordinates and then fails when calling `elementFromPoint`.
- * @param {DragEvent} event
- * @returns {[Number, Number, HTMLElement]} [clientX, clientY, targetElement]
- */
-function elementFromDragEvent(event) {
-  let clientX = null;
-  let clientY = null;
-  let target;
-  const userAgentString = navigator.userAgent;
-  if (userAgentString.indexOf('Firefox') > -1) {
-    clientX = event.clientX;
-    clientY = event.clientY;
-    const screenOffsetX = window.screenLeft;
-    if (clientX >= screenOffsetX) {
-      clientX = clientX - screenOffsetX;
-    }
-    const screenOffsetY = window.screenTop;
-    if (clientY >= screenOffsetY) {
-      clientY = clientY - screenOffsetY;
-    }
-    target = document.elementFromPoint(clientX, clientY);
-  } else {
-    clientX = event.clientX;
-    clientY = event.clientY;
-    target = document.elementFromPoint(event.clientX, event.clientY);
-  }
-  return [clientX, clientY, target];
-}
+// This is used in Firefox to bypass the ‘dragend’ event because it returns incorrect ‘clientX’ and ‘clientY’
+const IS_FIREFOX = navigator.userAgent.indexOf('Firefox') > -1;
 
 /**
  * @param {string} url
@@ -1895,20 +1868,16 @@ class ModelGrid {
    * @param {boolean} removeEmbeddingExtension
    * @param {boolean} strictlyOnWidget
    */
-  static #dragAddModel(
+  static dragAddModel(
     event,
     modelType,
     path,
     removeEmbeddingExtension,
     strictlyOnWidget,
   ) {
-    const [clientX, clientY, target] = elementFromDragEvent(event);
+    const target = document.elementFromPoint(event.clientX, event.clientY);
     if (modelType !== 'embeddings' && target.id === 'graph-canvas') {
-      //const pos = app.canvas.convertEventToCanvasOffset(event);
-      const pos = app.canvas.convertEventToCanvasOffset({
-        clientX: clientX,
-        clientY: clientY,
-      });
+      const pos = app.canvas.convertEventToCanvasOffset(event);
 
       const node = app.graph.getNodeOnPos(
         pos[0],
@@ -2074,6 +2043,47 @@ class ModelGrid {
     const previewThumbnailFormat =
       settingsElements['model-preview-thumbnail-type'].value;
     if (models.length > 0) {
+
+      const $overlay = IS_FIREFOX
+        ? ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragstart: (e) =>{
+              const data = {
+                modelType: modelType,
+                path: path,
+                removeEmbeddingExtension: removeEmbeddingExtension,
+                strictDragToAdd: strictDragToAdd,
+              };
+              e.dataTransfer.setData('manager-model', JSON.stringify(data));
+              e.dataTransfer.setData('text/plain', '');
+            },
+            draggable: true,
+          });
+        })
+        : ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragend: (e) =>
+              ModelGrid.dragAddModel(
+                e,
+                modelType,
+                path,
+                removeEmbeddingExtension,
+                strictDragToAdd,
+              ),
+            draggable: true,
+          });
+        });
+
       return models.map((item) => {
         const previewInfo = item.preview;
         const previewThumbnail = $el('img.model-preview', {
@@ -2095,10 +2105,7 @@ class ModelGrid {
           systemSeparator,
         );
         let actionButtons = [];
-        if (
-          showAddButton &&
-          !(modelType === 'embeddings' && !navigator.clipboard)
-        ) {
+        if (showCopyButton) {
           actionButtons.push(
             new ComfyButton({
               icon: 'content-copy',
@@ -2114,7 +2121,7 @@ class ModelGrid {
             }).element,
           );
         }
-        if (showCopyButton) {
+        if (showAddButton && !(modelType === 'embeddings' && !navigator.clipboard)) {
           actionButtons.push(
             new ComfyButton({
               icon: 'plus-box-outline',
@@ -2164,20 +2171,14 @@ class ModelGrid {
             },
           }).element,
         ];
-        const dragAdd = (e) =>
-          ModelGrid.#dragAddModel(
-            e,
+        return $el('div.item', {}, [
+          previewThumbnail,
+          $overlay(
             modelType,
             path,
             removeEmbeddingExtension,
             strictDragToAdd,
-          );
-        return $el('div.item', {}, [
-          previewThumbnail,
-          $el('div.model-preview-overlay', {
-            ondragend: (e) => dragAdd(e),
-            draggable: true,
-          }),
+          ),
           $el(
             'div.model-preview-top-right',
             {
@@ -4394,6 +4395,9 @@ class SettingsView {
   /** @return {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = () => {};
 
+  /** @return {() => void} */
+  #updateSidebarSettings = () => {};
+
   /**
    * @param {Object} settingsData
    * @param {boolean} withoutComfyRefresh
@@ -4426,7 +4430,7 @@ class SettingsView {
           console.warn(`Unknown settings input type '${type}'!`);
       }
     }
-
+    this.#updateSidebarSettings(settings);
     await this.#updateModels(withoutComfyRefresh);
   }
 
@@ -4489,9 +4493,11 @@ class SettingsView {
   /**
    * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {() => void} updateSidebarButtons
+   * @param {(settings: Object) => void} updateSidebarSettings
    */
-  constructor(updateModels, updateSidebarButtons) {
+  constructor(updateModels, updateSidebarButtons, updateSidebarSettings) {
     this.#updateModels = updateModels;
+    this.#updateSidebarSettings = updateSidebarSettings;
     const settings = this.elements.settings;
 
     const sidebarControl = $checkbox({
@@ -4567,6 +4573,7 @@ class SettingsView {
           {
             style: { color: 'var(--fg-color)' },
             href: 'https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/',
+            target: '_blank',
           },
           ['File bugs and issues here.'],
         ),
@@ -4602,6 +4609,11 @@ class SettingsView {
             'vae_approx',
           ],
         }),
+        $select({
+          $: (el) => (settings['sidebar-default-state'] = el),
+          textContent: 'Default model manager position (on start up)',
+          options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
+        }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
           textContent: 'Real-time search',
@@ -4831,6 +4843,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     'select',
     {
       name: 'sidebar-select',
+      classList: 'icon-button',
       onchange: (event) => {
         const select = event.target;
         const children = select.children;
@@ -4909,9 +4922,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     );
   }
   radioButtonGroup.append.apply(radioButtonGroup, buttons);
-  buttons[0].click();
   buttons[0].style.display = 'none';
-
   return [radioButtonGroup, select];
 }
 
@@ -4968,6 +4979,7 @@ class ModelManager extends ComfyDialog {
 
     this.#settingsView = new SettingsView(this.#refreshModels, () =>
       this.#updateSidebarButtons(),
+      this.#updateSidebarSettings,
     );
 
     this.#modelInfo = new ModelInfo(
@@ -5017,11 +5029,7 @@ class ModelManager extends ComfyDialog {
         ['◼', '◨', '⬒', '⬓', '◧'],
         [
           () => {
-            const element = this.element;
-            if (element) {
-              // callback on initialization as default state
-              element.dataset['sidebarState'] = 'none';
-            }
+            this.element.dataset['sidebarState'] = 'none';
           },
           () => {
             this.element.dataset['sidebarState'] = 'right';
@@ -5342,6 +5350,20 @@ class ModelManager extends ComfyDialog {
       updateDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY),
     );
 
+    if(IS_FIREFOX){
+      app.canvasContainer.addEventListener('drop', (e) => {
+        if (e.dataTransfer.types.includes('manager-model')){
+          const data = JSON.parse(e.dataTransfer.getData('manager-model'));
+          ModelGrid.dragAddModel(
+            e,
+            data.modelType,
+            data.path,
+            data.removeEmbeddingExtension,
+            data.strictDragToAdd,
+          );
+        }
+      });
+    }
     this.#init();
   }
 
@@ -5351,16 +5373,19 @@ class ModelManager extends ComfyDialog {
     const settings = this.#settingsView.elements.settings;
 
     {
-      // initialize buttons' visibility state
-      const hideSearchButtons =
-        settings['text-input-always-hide-search-button'].checked;
-      const hideClearSearchButtons =
-        settings['text-input-always-hide-clear-button'].checked;
-      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
-        ? 'none'
-        : '';
-      this.#downloadView.elements.clearSearchButton.style.display =
-        hideClearSearchButtons ? 'none' : '';
+      // set initial sidebar state
+      const newSidebarState = settings['sidebar-default-state'].value;
+      let buttonNumb = 0;
+      if (newSidebarState === 'Right') {
+        buttonNumb = 1;
+      } else if (newSidebarState === 'Top') {
+        buttonNumb = 2;
+      } else if (newSidebarState === 'Bottom') {
+        buttonNumb = 3;
+      } else if (newSidebarState === 'Left') {
+        buttonNumb = 4;
+      }
+      this.#sidebarButtonGroup.children[buttonNumb].click();
     }
 
     {
@@ -5402,6 +5427,21 @@ class ModelManager extends ComfyDialog {
         '--model-manager-sidebar-height-bottom',
         bottomPixels,
       );
+    }
+  }
+
+  #updateSidebarSettings = (settings) => {
+    {
+      // update buttons' visibility state
+      const hideSearchButtons =
+        settings['text-input-always-hide-search-button'].checked;
+      const hideClearSearchButtons =
+        settings['text-input-always-hide-clear-button'].checked;
+      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
+        ? 'none'
+        : '';
+      this.#downloadView.elements.clearSearchButton.style.display =
+        hideClearSearchButtons ? 'none' : '';
     }
   }
 
