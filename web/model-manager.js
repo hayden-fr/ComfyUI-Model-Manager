@@ -97,35 +97,8 @@ class KeyComboListener {
   }
 }
 
-/**
- * Handles Firefox's drag event, which returns different coordinates and then fails when calling `elementFromPoint`.
- * @param {DragEvent} event
- * @returns {[Number, Number, HTMLElement]} [clientX, clientY, targetElement]
- */
-function elementFromDragEvent(event) {
-  let clientX = null;
-  let clientY = null;
-  let target;
-  const userAgentString = navigator.userAgent;
-  if (userAgentString.indexOf('Firefox') > -1) {
-    clientX = event.clientX;
-    clientY = event.clientY;
-    const screenOffsetX = window.screenLeft;
-    if (clientX >= screenOffsetX) {
-      clientX = clientX - screenOffsetX;
-    }
-    const screenOffsetY = window.screenTop;
-    if (clientY >= screenOffsetY) {
-      clientY = clientY - screenOffsetY;
-    }
-    target = document.elementFromPoint(clientX, clientY);
-  } else {
-    clientX = event.clientX;
-    clientY = event.clientY;
-    target = document.elementFromPoint(event.clientX, event.clientY);
-  }
-  return [clientX, clientY, target];
-}
+// This is used in Firefox to bypass the ‘dragend’ event because it returns incorrect ‘clientX’ and ‘clientY’
+const IS_FIREFOX = navigator.userAgent.indexOf('Firefox') > -1;
 
 /**
  * @param {string} url
@@ -1895,20 +1868,16 @@ class ModelGrid {
    * @param {boolean} removeEmbeddingExtension
    * @param {boolean} strictlyOnWidget
    */
-  static #dragAddModel(
+  static dragAddModel(
     event,
     modelType,
     path,
     removeEmbeddingExtension,
     strictlyOnWidget,
   ) {
-    const [clientX, clientY, target] = elementFromDragEvent(event);
+    const target = document.elementFromPoint(event.clientX, event.clientY);
     if (modelType !== 'embeddings' && target.id === 'graph-canvas') {
-      //const pos = app.canvas.convertEventToCanvasOffset(event);
-      const pos = app.canvas.convertEventToCanvasOffset({
-        clientX: clientX,
-        clientY: clientY,
-      });
+      const pos = app.canvas.convertEventToCanvasOffset(event);
 
       const node = app.graph.getNodeOnPos(
         pos[0],
@@ -2074,6 +2043,47 @@ class ModelGrid {
     const previewThumbnailFormat =
       settingsElements['model-preview-thumbnail-type'].value;
     if (models.length > 0) {
+
+      const $overlay = IS_FIREFOX
+        ? ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragstart: (e) =>{
+              const data = {
+                modelType: modelType,
+                path: path,
+                removeEmbeddingExtension: removeEmbeddingExtension,
+                strictDragToAdd: strictDragToAdd,
+              };
+              e.dataTransfer.setData('manager-model', JSON.stringify(data));
+              e.dataTransfer.setData('text/plain', '');
+            },
+            draggable: true,
+          });
+        })
+        : ((
+          modelType,
+          path,
+          removeEmbeddingExtension,
+          strictDragToAdd,
+        ) => {
+          return $el('div.model-preview-overlay', {
+            ondragend: (e) =>
+              ModelGrid.dragAddModel(
+                e,
+                modelType,
+                path,
+                removeEmbeddingExtension,
+                strictDragToAdd,
+              ),
+            draggable: true,
+          });
+        });
+
       return models.map((item) => {
         const previewInfo = item.preview;
         const previewThumbnail = $el('img.model-preview', {
@@ -2161,20 +2171,14 @@ class ModelGrid {
             },
           }).element,
         ];
-        const dragAdd = (e) =>
-          ModelGrid.#dragAddModel(
-            e,
+        return $el('div.item', {}, [
+          previewThumbnail,
+          $overlay(
             modelType,
             path,
             removeEmbeddingExtension,
             strictDragToAdd,
-          );
-        return $el('div.item', {}, [
-          previewThumbnail,
-          $el('div.model-preview-overlay', {
-            ondragend: (e) => dragAdd(e),
-            draggable: true,
-          }),
+          ),
           $el(
             'div.model-preview-top-right',
             {
@@ -5350,6 +5354,20 @@ class ModelManager extends ComfyDialog {
       updateDragSidebar(e, e.touches[0].clientX, e.touches[0].clientY),
     );
 
+    if(IS_FIREFOX){
+      app.canvasContainer.addEventListener('drop', (e) => {
+        if (e.dataTransfer.types.includes('manager-model')){
+          const data = JSON.parse(e.dataTransfer.getData('manager-model'));
+          ModelGrid.dragAddModel(
+            e,
+            data.modelType,
+            data.path,
+            data.removeEmbeddingExtension,
+            data.strictDragToAdd,
+          );
+        }
+      });
+    }
     this.#init();
   }
 
