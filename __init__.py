@@ -183,6 +183,8 @@ def ui_rules():
         
         Rule("model-preview-thumbnail-type", "AUTO", str),
         Rule("model-preview-fallback-search-safetensors-thumbnail", False, bool),
+        Rule("model-preview-thumbnail-width", 240, int, 150, 480),
+        Rule("model-preview-thumbnail-height", 360, int, 185, 480),
         Rule("model-show-label-extensions", False, bool),
         Rule("model-show-add-button", True, bool),
         Rule("model-show-copy-button", True, bool),

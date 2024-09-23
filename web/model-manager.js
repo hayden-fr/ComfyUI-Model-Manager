@@ -250,8 +250,6 @@ function imageUri(
   return uri;
 }
 const PREVIEW_NONE_URI = imageUri();
-const PREVIEW_THUMBNAIL_WIDTH = 320;
-const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
  *
@@ -2042,6 +2040,10 @@ class ModelGrid {
       !settingsElements['model-add-embedding-extension'].checked;
     const previewThumbnailFormat =
       settingsElements['model-preview-thumbnail-type'].value;
+    const previewThumbnailWidth =
+      Math.round(settingsElements['model-preview-thumbnail-width'].value / 0.75);
+    const previewThumbnailHeight =
+      Math.round(settingsElements['model-preview-thumbnail-height'].value / 0.75);
     if (models.length > 0) {
 
       const $overlay = IS_FIREFOX
@@ -2092,8 +2094,8 @@ class ModelGrid {
           src: imageUri(
             previewInfo?.path,
             previewInfo?.dateModified,
-            PREVIEW_THUMBNAIL_WIDTH,
-            PREVIEW_THUMBNAIL_HEIGHT,
+            previewThumbnailWidth,
+            previewThumbnailHeight,
             previewThumbnailFormat,
           ),
           draggable: false,
@@ -4361,6 +4363,8 @@ class SettingsView {
       /** @type {HTMLInputElement} */ 'model-persistent-search': null,
 
       /** @type {HTMLInputElement} */ 'model-preview-thumbnail-type': null,
+      /** @type {HTMLInputElement} */ 'model-preview-thumbnail-width': null,
+      /** @type {HTMLInputElement} */ 'model-preview-thumbnail-height': null,
       /** @type {HTMLInputElement} */ 'model-preview-fallback-search-safetensors-thumbnail':
         null,
       /** @type {HTMLInputElement} */ 'model-show-label-extensions': null,
@@ -4632,6 +4636,34 @@ class SettingsView {
           textContent: 'Preview thumbnail type',
           options: ['AUTO', 'JPEG'], // should use AUTO to avoid artifacts from changing between formats; use JPEG for backward compatibility
         }),
+        $el('label', [
+          'Preview thumbnail width',
+          $el('input', {
+            $: (el) => (settings['model-preview-thumbnail-width'] = el),
+            type: 'range',
+            name: 'default thumbnail width',
+            value: 240,
+            min: 150,
+            max: 480,
+            step: 5,
+            oninput: function(){ this.nextElementSibling.textContent = this.value + 'px'},
+          }),
+          $el('span'),
+        ]),
+        $el('label', [
+          'Preview thumbnail height', 
+          $el('input', {
+            $: (el) => (settings['model-preview-thumbnail-height'] = el),
+            type: 'range',
+            name: 'default thumbnail height',
+            value: 360,
+            min: 185,
+            max: 480,
+            step: 5,
+            oninput: function(){ this.nextElementSibling.textContent = this.value + 'px'},
+          }),
+          $el('span'),
+        ]),
         $checkbox({
           $: (el) =>
             (settings['model-preview-fallback-search-safetensors-thumbnail'] =
@@ -5447,6 +5479,24 @@ class ModelManager extends ComfyDialog {
         : '';
       this.#downloadView.elements.clearSearchButton.style.display =
         hideClearSearchButtons ? 'none' : '';
+    }
+
+    {
+      // update thumbnail widths & heights
+      const thumbnailWidthEl = settings['model-preview-thumbnail-width'];
+      const thumbnailHeightEl = settings['model-preview-thumbnail-height'];
+
+      this.element.style.setProperty(
+        '--model-manager-thumbnail-width',
+        thumbnailWidthEl.value.toString() + 'px',
+      );
+      thumbnailWidthEl.dispatchEvent(new Event('input'));
+
+      this.element.style.setProperty(
+        '--model-manager-thumbnail-height',
+        thumbnailHeightEl.value.toString() + 'px',
+      );
+      thumbnailHeightEl.dispatchEvent(new Event('input'));
     }
   }
 
