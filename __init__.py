@@ -205,6 +205,7 @@ def ui_rules():
         Rule("sidebar-control-always-compact", False, bool),
         Rule("sidebar-default-width", 0.5, float, 0.0, 1.0),
         Rule("sidebar-default-height", 0.5, float, 0.0, 1.0),
+        Rule("sidebar-default-state", "None", str),
         Rule("text-input-always-hide-search-button", False, bool),
         Rule("text-input-always-hide-clear-button", False, bool),
         
