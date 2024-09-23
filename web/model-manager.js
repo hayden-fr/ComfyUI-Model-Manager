@@ -4898,11 +4898,6 @@ class SettingsView {
             'vae_approx',
           ],
         }),
-        $select({
-          $: (el) => (settings['sidebar-default-state'] = el),
-          textContent: 'Default model manager position (on start up)',
-          options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
-        }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
           textContent: 'Real-time search',
@@ -4975,6 +4970,11 @@ class SettingsView {
           textContent: 'Save notes by default.',
         }),
         $el('h2', ['Window']),
+        $select({
+          $: (el) => (settings['sidebar-default-state'] = el),
+          textContent: 'Default model manager position (on start up)',
+          options: ['None', 'Left', 'Bottom', 'Top', 'Right'],
+        }),
         sidebarControl,
         $el('label', [
           'Sidebar width  (on start up)',
