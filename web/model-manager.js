@@ -4836,13 +4836,45 @@ class SettingsView {
         }).catch((err) => {
           return { success: false };
         });
-        const successMessage = data['success'] ? "Scan Finished!" : "Scan Failed!";
+        const success = data['success'];
+        const successMessage = success ? "Scan Finished!" : "Scan Failed!";
         const infoCount = data['infoCount'];
         const notesCount = data['notesCount'];
         const urlCount = data['urlCount'];
         window.alert(`${successMessage}\nScanned: ${infoCount}\nSaved Notes: ${notesCount}\nSaved Url: ${urlCount}`);
         comfyButtonAlert(e.target, success);
         if (infoCount > 0 || notesCount > 0 || urlCount > 0) {
+          await this.reload(true);
+        }
+        button.disabled = false;
+      },
+    }).element;
+
+    const scanDownloadPreviewsButton = new ComfyButton({
+      content: 'Download Missing Previews',
+      tooltip: 'Downloads missing model previews from model info.\nRun model info scan first!',
+      action: async (e) => {
+        const confirmation = window.confirm(
+          'WARNING: This may take a while and generate MANY server requests!\nUSE AT YOUR OWN RISK!',
+        );
+        if (!confirmation) {
+          return;
+        }
+        
+        const [button, icon, span] = comfyButtonDisambiguate(e.target);
+        button.disabled = true;
+        const data = await comfyRequest('/model-manager/preview/scan', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        }).catch((err) => {
+          return { success: false };
+        });
+        const success = data['success'];
+        const successMessage = success ? "Scan Finished!" : "Scan Failed!";
+        const count = data['count'];
+        window.alert(`${successMessage}\nPreviews Downloaded: ${count}`);
+        comfyButtonAlert(e.target, success);
+        if (count > 0) {
           await this.reload(true);
         }
         button.disabled = false;
@@ -5011,6 +5043,7 @@ class SettingsView {
         $el('h2', ['Scan Files']),
         $el('div', [correctPreviewsButton]),
         $el('div', [scanDownloadModelInfosButton]),
+        $el('div', [scanDownloadPreviewsButton]),
         $el('h2', ['Random Tag Generator']),
         $select({
           $: (el) => (settings['tag-generator-sampler-method'] = el),
