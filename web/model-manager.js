@@ -2869,6 +2869,33 @@ class ModelInfo {
                   button.disabled = false;
               },
           }).element,
+          new ComfyButton({
+            icon: 'earth-arrow-down',
+            tooltip: 'Try download model info.',
+            classList: 'comfyui-button icon-button',
+            action: async(e) => {
+              const [button, icon, span] = comfyButtonDisambiguate(e.target);
+              button.disabled = true;
+              const success = await comfyRequest(
+                  `/model-manager/model/download/info?path=${path}`,
+                  {
+                      method: 'POST',
+                      body: {},
+                  }
+              ).then((data) => {
+                  const success = data['success'];
+                  const message = data['alert'];
+                  if (message !== undefined) {
+                      window.alert(message);
+                  }
+                  return success;
+              }).catch((err) => {
+                  return false;
+              });
+              comfyButtonAlert(e.target, success, 'mdi-check-bold', 'mdi-close-thick');
+              button.disabled = false;
+            },
+          }).element,
         ]),
         $el('div.row.tab-header', [
           $el('div.row.tab-header-flex-block', [
@@ -4722,7 +4749,7 @@ class SettingsView {
         
         const [button, icon, span] = comfyButtonDisambiguate(e.target);
         button.disabled = true;
-        const data = await comfyRequest('/model-manager/models/scan-download', {
+        const data = await comfyRequest('/model-manager/models/scan', {
           method: 'POST',
           body: JSON.stringify({}),
         }).catch((err) => {
@@ -4732,7 +4759,7 @@ class SettingsView {
         const infoCount = data['infoCount'];
         const notesCount = data['notesCount'];
         const urlCount = data['urlCount'];
-        window.alert(`${successMessage}\n\nInfo Count: ${infoCount}\nNotes Count: ${notesCount}\nUrl Count: ${urlCount}`);
+        window.alert(`${successMessage}\nScanned: ${infoCount}\nSaved Notes: ${notesCount}\nSaved Url: ${urlCount}`);
         comfyButtonAlert(e.target, success);
         if (infoCount > 0 || notesCount > 0 || urlCount > 0) {
           await this.reload(true);

@@ -963,7 +963,48 @@ async def get_directory_list(request):
     return web.json_response(dir_list)
 
 
-@server.PromptServer.instance.routes.post("/model-manager/models/scan-download")
+def try_download_and_save_model_info(model_file_path):
+    success = (0, 0, 0) #info, notes, url
+    head, _ = os.path.splitext(model_file_path)
+    model_info_path = head + model_info_extension
+    model_notes_path = head + model_notes_extension
+    model_url_path = head + ".url"
+    if os.path.exists(model_info_path) and os.path.exists(model_notes_path) and os.path.exists(model_url_path):
+        return success
+    print("Scanning " + model_file_path)
+
+    model_info = {}
+    model_info = ModelInfo.search_info(model_file_path, cache=True, use_cached=True)
+    if len(model_info) == 0:
+        return success
+    success[0] = 1
+
+    if not os.path.exists(model_notes_path):
+        notes = ModelInfo.search_notes(model_file_path)
+        if not notes.isspace() and notes != "":
+            try:
+                with open(model_notes_path, "w", encoding="utf-8") as f:
+                    f.write(notes)
+                print("Saved file: " + model_notes_path)
+                success[1] = 1
+            except Exception as e:
+                print(f"Failed to save {model_notes_path}!")
+                print(e, file=sys.stderr, flush=True)
+
+    if not os.path.exists(model_url_path):
+        web_url = ModelInfo.get_url(model_info)
+        if web_url is not None and web_url != "":
+            try:
+                save_web_url(model_url_path, web_url)
+                print("Saved file: " + model_url_path)
+                success[2] = 1
+            except Exception as e:
+                print(f"Failed to save {model_url_path}!")
+                print(e, file=sys.stderr, flush=True)
+    return success
+
+
+@server.PromptServer.instance.routes.post("/model-manager/models/scan")
 async def try_scan_download(request):
     refresh = request.query.get("refresh", None) is not None
     response = {
@@ -981,42 +1022,10 @@ async def try_scan_download(request):
                     if file_extension not in model_extension_whitelist:
                         continue
                     model_file_path = root + os.path.sep + file
-
-                    model_info_path = root + os.path.sep + file_name + model_info_extension
-                    model_notes_path = root + os.path.sep + file_name + model_notes_extension
-                    model_url_path = root + os.path.sep + file_name + ".url"
-                    if os.path.exists(model_info_path) and os.path.exists(model_notes_path) and os.path.exists(model_url_path):
-                        continue
-                    print("Scanning " + model_file_path)
-
-                    model_info = {}
-                    model_info = ModelInfo.search_info(model_file_path, cache=True, use_cached=True)
-                    if len(model_info) == 0:
-                        continue
-                    response["infoCount"] += 1
-
-                    if not os.path.exists(model_notes_path):
-                        notes = ModelInfo.search_notes(model_file_path)
-                        if not notes.isspace() and notes != "":
-                            try:
-                                with open(model_notes_path, "w", encoding="utf-8") as f:
-                                    f.write(notes)
-                                print("Saved file: " + model_notes_path)
-                                response["notesCount"] += 1
-                            except Exception as e:
-                                print(f"Failed to save {model_notes_path}!")
-                                print(e, file=sys.stderr, flush=True)
-
-                    if not os.path.exists(model_url_path):
-                        web_url = ModelInfo.get_url(model_info)
-                        if web_url is not None and web_url != "":
-                            try:
-                                save_web_url(model_url_path, web_url)
-                                print("Saved file: " + model_url_path)
-                                response["urlCount"] += 1
-                            except Exception as e:
-                                print(f"Failed to save {model_url_path}!")
-                                print(e, file=sys.stderr, flush=True)
+                    savedInfo, savedNotes, savedUrl = try_download_and_save_model_info(model_file_path)
+                    response["infoCount"] += savedInfo
+                    response["notesCount"] += savedNotes
+                    response["urlCount"] += savedUrl
 
     response["success"] = True
     return web.json_response(response)
@@ -1293,6 +1302,28 @@ async def get_model_web_url(request):
 @server.PromptServer.instance.routes.get("/model-manager/system-separator")
 async def get_system_separator(request):
     return web.json_response(os.path.sep)
+
+
+@server.PromptServer.instance.routes.post("/model-manager/model/download/info")
+async def download_model_info(request):
+    result = { "success": False }
+
+    model_path = request.query.get("path", None)
+    if model_path is None:
+        result["alert"] = "Missing model path!"
+        return web.json_response(result)
+    model_path = urllib.parse.unquote(model_path)
+
+    abs_path, model_type = search_path_to_system_path(model_path)
+    if abs_path is None:
+        result["alert"] = "Invalid model path!"
+        return web.json_response(result)
+
+    model_info = ModelInfo.search_info(abs_path, cache=True, use_cached=False)
+    if len(model_info) > 0:
+        result["success"] = True
+
+    return web.json_response(result)
 
 
 @server.PromptServer.instance.routes.post("/model-manager/model/download")
