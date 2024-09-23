@@ -2411,13 +2411,18 @@ class ModelInfo {
   /** @type {[HTMLElement][]} */
   #settingsElements = null;
 
+  /** @type {() -> Promise<void>} */
+  #tryHideModelInfo = () => {};
+
   /**
    * @param {ModelData} modelData
    * @param {() => Promise<void>} updateModels
    * @param {any} settingsElements
+   * @param {() => Promise<void>} tryHideModelInfo
    */
-  constructor(modelData, updateModels, settingsElements) {
+  constructor(modelData, updateModels, settingsElements, tryHideModelInfo) {
     this.#settingsElements = settingsElements;
+    this.#tryHideModelInfo = tryHideModelInfo;
     const moveDestinationInput = $el('input.search-text-area', {
       name: 'move directory',
       autocomplete: 'off',
@@ -2936,6 +2941,9 @@ class ModelInfo {
               }).catch((err) => {
                   return false;
               });
+              if (success) {
+                this.#tryHideModelInfo();
+              }
               comfyButtonAlert(e.target, success, 'mdi-check-bold', 'mdi-close-thick');
               button.disabled = false;
             },
@@ -5254,6 +5262,7 @@ class ModelManager extends ComfyDialog {
       this.#modelData,
       this.#refreshModels,
       this.#settingsView.elements.settings,
+      () => this.#tryHideModelInfo(),
     );
 
     this.#browseView = new BrowseView(
