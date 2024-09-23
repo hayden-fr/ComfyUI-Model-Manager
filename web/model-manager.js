@@ -2955,6 +2955,9 @@ class ModelInfo {
                 previewImage.style.display = "none";
                 previewSelect.elements.previews.style.display = "";
                 setPreviewDiv.style.display = "";
+                if (previewSelect.elements.defaultPreviews.children[0].src.includes(PREVIEW_NONE_URI)) {
+                  window.alert("No model previews found!\nTry downloading model info first!");
+                }
               }
             },
           }).element,
