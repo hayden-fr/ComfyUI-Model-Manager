@@ -2095,10 +2095,7 @@ class ModelGrid {
           systemSeparator,
         );
         let actionButtons = [];
-        if (
-          showAddButton &&
-          !(modelType === 'embeddings' && !navigator.clipboard)
-        ) {
+        if (showCopyButton) {
           actionButtons.push(
             new ComfyButton({
               icon: 'content-copy',
@@ -2114,7 +2111,7 @@ class ModelGrid {
             }).element,
           );
         }
-        if (showCopyButton) {
+        if (showAddButton && !(modelType === 'embeddings' && !navigator.clipboard)) {
           actionButtons.push(
             new ComfyButton({
               icon: 'plus-box-outline',
@@ -4394,6 +4391,9 @@ class SettingsView {
   /** @return {() => Promise<void>} */
   #updateModels = () => {};
 
+  /** @return {() => void} */
+  #updateSidebarSettings = () => {};
+
   /**
    * @param {Object} settingsData
    * @param {boolean} updateModels
@@ -4426,6 +4426,8 @@ class SettingsView {
           console.warn(`Unknown settings input type '${type}'!`);
       }
     }
+
+    this.#updateSidebarSettings(settings);
 
     if (updateModels) {
       await this.#updateModels(); // Is this slow?
@@ -4491,9 +4493,11 @@ class SettingsView {
   /**
    * @param {() => Promise<void>} updateModels
    * @param {() => void} updateSidebarButtons
+   * @param {(settings: Object) => void} updateSidebarSettings
    */
-  constructor(updateModels, updateSidebarButtons) {
+  constructor(updateModels, updateSidebarButtons, updateSidebarSettings) {
     this.#updateModels = updateModels;
+    this.#updateSidebarSettings = updateSidebarSettings;
     const settings = this.elements.settings;
 
     const sidebarControl = $checkbox({
@@ -4569,6 +4573,7 @@ class SettingsView {
           {
             style: { color: 'var(--fg-color)' },
             href: 'https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/',
+            target: '_blank',
           },
           ['File bugs and issues here.'],
         ),
@@ -4604,6 +4609,11 @@ class SettingsView {
             'vae_approx',
           ],
         }),
+        $select({
+          $: (el) => (settings['sidebar-default-state'] = el),
+          textContent: 'Default model manager position (on start up)',
+          options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
+        }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
           textContent: 'Real-time search',
@@ -4833,6 +4843,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     'select',
     {
       name: 'sidebar-select',
+      classList: 'icon-button',
       onchange: (event) => {
         const select = event.target;
         const children = select.children;
@@ -4911,9 +4922,7 @@ function GenerateSidebarToggleRadioAndSelect(labels, activationCallbacks = []) {
     );
   }
   radioButtonGroup.append.apply(radioButtonGroup, buttons);
-  buttons[0].click();
   buttons[0].style.display = 'none';
-
   return [radioButtonGroup, select];
 }
 
@@ -4970,6 +4979,7 @@ class ModelManager extends ComfyDialog {
 
     this.#settingsView = new SettingsView(this.#refreshModels, () =>
       this.#updateSidebarButtons(),
+      this.#updateSidebarSettings,
     );
 
     this.#modelInfo = new ModelInfo(
@@ -5019,11 +5029,7 @@ class ModelManager extends ComfyDialog {
         ['◼', '◨', '⬒', '⬓', '◧'],
         [
           () => {
-            const element = this.element;
-            if (element) {
-              // callback on initialization as default state
-              element.dataset['sidebarState'] = 'none';
-            }
+            this.element.dataset['sidebarState'] = 'none';
           },
           () => {
             this.element.dataset['sidebarState'] = 'right';
@@ -5354,16 +5360,19 @@ class ModelManager extends ComfyDialog {
     const settings = this.#settingsView.elements.settings;
 
     {
-      // initialize buttons' visibility state
-      const hideSearchButtons =
-        settings['text-input-always-hide-search-button'].checked;
-      const hideClearSearchButtons =
-        settings['text-input-always-hide-clear-button'].checked;
-      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
-        ? 'none'
-        : '';
-      this.#downloadView.elements.clearSearchButton.style.display =
-        hideClearSearchButtons ? 'none' : '';
+      // set initial sidebar state
+      const newSidebarState = settings['sidebar-default-state'].value;
+      let buttonNumb = 0;
+      if (newSidebarState === 'Right') {
+        buttonNumb = 1;
+      } else if (newSidebarState === 'Top') {
+        buttonNumb = 2;
+      } else if (newSidebarState === 'Bottom') {
+        buttonNumb = 3;
+      } else if (newSidebarState === 'Left') {
+        buttonNumb = 4;
+      }
+      this.#sidebarButtonGroup.children[buttonNumb].click();
     }
 
     {
@@ -5405,6 +5414,21 @@ class ModelManager extends ComfyDialog {
         '--model-manager-sidebar-height-bottom',
         bottomPixels,
       );
+    }
+  }
+
+  #updateSidebarSettings = (settings) => {
+    {
+      // update buttons' visibility state
+      const hideSearchButtons =
+        settings['text-input-always-hide-search-button'].checked;
+      const hideClearSearchButtons =
+        settings['text-input-always-hide-clear-button'].checked;
+      this.#downloadView.elements.searchButton.style.display = hideSearchButtons
+        ? 'none'
+        : '';
+      this.#downloadView.elements.clearSearchButton.style.display =
+        hideClearSearchButtons ? 'none' : '';
     }
   }
 
