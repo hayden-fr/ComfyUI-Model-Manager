@@ -2044,6 +2044,8 @@ class ModelGrid {
       Math.round(settingsElements['model-preview-thumbnail-width'].value / 0.75);
     const previewThumbnailHeight =
       Math.round(settingsElements['model-preview-thumbnail-height'].value / 0.75);
+    const buttonsOnlyOnHover =
+      settingsElements['model-buttons-only-on-hover'].checked;
     if (models.length > 0) {
 
       const $overlay = IS_FIREFOX
@@ -2085,6 +2087,8 @@ class ModelGrid {
             draggable: true,
           });
         });
+        const forHiddingButtonsClass = buttonsOnlyOnHover
+          ? 'model-buttons-hidden' : 'model-buttons-visible';
 
       return models.map((item) => {
         const previewInfo = item.preview;
@@ -2182,14 +2186,14 @@ class ModelGrid {
             strictDragToAdd,
           ),
           $el(
-            'div.model-preview-top-right',
+            'div.model-preview-top-right.' + forHiddingButtonsClass,
             {
               draggable: false,
             },
             modelInfoButtonOnLeft ? infoButtons : actionButtons,
           ),
           $el(
-            'div.model-preview-top-left',
+            'div.model-preview-top-left.' + forHiddingButtonsClass,
             {
               draggable: false,
             },
@@ -4372,6 +4376,7 @@ class SettingsView {
       /** @type {HTMLInputElement} */ 'model-show-copy-button': null,
       /** @type {HTMLInputElement} */ 'model-show-load-workflow-button': null,
       /** @type {HTMLInputElement} */ 'model-info-button-on-left': null,
+      /** @type {HTMLInputElement} */ 'model-buttons-only-on-hover': null,
 
       /** @type {HTMLInputElement} */ 'model-add-embedding-extension': null,
       /** @type {HTMLInputElement} */ 'model-add-drag-strict-on-field': null,
@@ -4689,6 +4694,10 @@ class SettingsView {
         $checkbox({
           $: (el) => (settings['model-info-button-on-left'] = el),
           textContent: '"Model Info" button on left',
+        }),
+        $checkbox({
+          $: (el) => (settings['model-buttons-only-on-hover'] = el),
+          textContent: 'Show buttons on hover only',
         }),
         $el('h2', ['Node Graph']),
         $checkbox({

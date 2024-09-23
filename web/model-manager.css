@@ -492,7 +492,6 @@
 .model-manager .comfy-grid .model-preview-top-right,
 .model-manager .comfy-grid .model-preview-top-left {
     position: absolute;
-    display: flex;
     flex-direction: column;
     gap: 8px;
     top: 8px;
@@ -504,6 +503,15 @@
 
 .model-manager .comfy-grid .model-preview-top-left {
     left: 8px;
+}
+
+.model-manager .item .model-buttons-hidden {
+    display: none;
+}
+
+.model-manager .item:hover .model-buttons-hidden,
+.model-manager .comfy-grid .model-buttons-visible  {
+    display: flex;
 }
 
 .model-manager .comfy-grid .model-button {
