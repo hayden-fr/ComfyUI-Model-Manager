@@ -300,6 +300,13 @@ class Civitai:
         return url
 
     @staticmethod
+    def get_preview_urls(model_version_info):
+        images = model_version_info.get("images", None)
+        if images is None:
+            return []
+        return [image_info["url"] for image_info in images]
+
+    @staticmethod
     def search_notes(model_version_info):
         if len(model_version_info) == 0:
             return ""
@@ -423,6 +430,15 @@ class ModelInfo:
         # TODO: search other websites
         return ""
 
+    @staticmethod
+    def get_web_preview_urls(model_info):
+        if len(model_info) == 0:
+            return []
+        preview_urls = Civitai.get_preview_urls(model_info)
+        if len(preview_urls) > 0:
+            return preview_urls
+        # TODO: support other websites
+        return []
 
 @server.PromptServer.instance.routes.get("/model-manager/timestamp")
 async def get_timestamp(request):
@@ -1254,6 +1270,9 @@ async def get_model_metadata(request):
         tags = list(tags.items())
         tags.sort(key=lambda x: x[1], reverse=True)
 
+    model_info = ModelInfo.try_load_cached(abs_path)
+    web_previews = ModelInfo.get_web_preview_urls(model_info)
+
     result["success"] = True
     result["info"] = data
     if metadata is not None:
@@ -1262,6 +1281,7 @@ async def get_model_metadata(request):
         result["tags"] = tags
     result["notes"] = notes
     result["url"] = web_url
+    result["webPreviews"] = web_previews
     return web.json_response(result)
 
 

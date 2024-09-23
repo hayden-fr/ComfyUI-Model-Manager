@@ -673,6 +673,7 @@ class ImageSelect {
     /** @type {HTMLImageElement} */ defaultPreviewNoImage: null,
     /** @type {HTMLDivElement} */ defaultPreviews: null,
     /** @type {HTMLDivElement} */ defaultUrl: null,
+    /** @type {HTMLDivElement} */ previewButtons: null,
 
     /** @type {HTMLImageElement} */ customUrlPreview: null,
     /** @type {HTMLInputElement} */ customUrl: null,
@@ -741,8 +742,11 @@ class ImageSelect {
     return PREVIEW_NONE_URI;
   }
 
-  /** @returns {void} */
-  resetModelInfoPreview() {
+ /**
+   * @param {String[]} defaultPreviewUrls
+   * @returns {void}
+   */
+  resetModelInfoPreview(defaultPreviewUrls = []) {
     let noimage = this.elements.defaultUrl.dataset.noimage;
     [
       this.elements.defaultPreviewNoImage,
@@ -761,6 +765,18 @@ class ImageSelect {
         el.src = PREVIEW_NONE_URI;
       }
     });
+    const defaultPreviews = this.elements.defaultPreviews;
+    defaultPreviews.innerHTML = '';
+    if (defaultPreviewUrls.length > 0) {
+      ImageSelect.generateDefaultPreviews(defaultPreviewUrls).forEach(previewElement => {
+        defaultPreviews.appendChild(previewElement);
+      });
+    }
+    else {
+      const defaultImage = ImageSelect.generateDefaultPreviews([PREVIEW_NONE_URI]);
+      defaultPreviews.appendChild(defaultImage[0]);
+    }
+    this.elements.previewButtons.style.display = defaultPreviewUrls.length > 1 ? 'block' : 'none';
     this.checkDefault();
     this.elements.uploadFile.value = '';
     this.elements.customUrl.value = '';
@@ -822,6 +838,28 @@ class ImageSelect {
   }
 
   /**
+   * @param {string[]|undefined} defaultPreviewUrls
+   * @returns {HTMLImageElement[]}
+   */
+  static generateDefaultPreviews(defaultPreviewUrls) {
+    const imgs = defaultPreviewUrls.map((url) => {
+      return $el('img', {
+        loading:
+          'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
+        src: url,
+        style: { display: 'none' },
+        onerror: (e) => {
+          e.target.src = PREVIEW_NONE_URI;
+        },
+      });
+    });
+    if (imgs.length > 0) {
+      imgs[0].style.display = 'block';
+    }
+    return imgs;
+  }
+
+  /**
    * @param {string} radioGroupName - Should be unique for every radio group.
    * @param {string[]|undefined} defaultPreviews
    */
@@ -858,23 +896,7 @@ class ImageSelect {
           height: '100%',
         },
       },
-      (() => {
-        const imgs = defaultPreviews.map((url) => {
-          return $el('img', {
-            loading:
-              'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
-            src: url,
-            style: { display: 'none' },
-            onerror: (e) => {
-              e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
-            },
-          });
-        });
-        if (imgs.length > 0) {
-          imgs[0].style.display = 'block';
-        }
-        return imgs;
-      })(),
+      ImageSelect.generateDefaultPreviews(defaultPreviews),
     );
 
     const el_uploadPreview = $el('img', {
@@ -984,6 +1006,7 @@ class ImageSelect {
     const el_previewButtons = $el(
       'div.model-preview-overlay',
       {
+        $: (el) => (this.elements.previewButtons = el),
         style: {
           display: el_defaultPreviews.children.length > 1 ? 'block' : 'none',
         },
@@ -2480,11 +2503,6 @@ class ModelInfo {
       },
     }).element;
     this.elements.setPreviewButton = setPreviewButton;
-    previewSelect.elements.radioButtons.addEventListener('change', (e) => {
-      setPreviewButton.style.display = previewSelect.defaultIsChecked()
-        ? 'none'
-        : 'block';
-    });
 
     this.element = $el(
       'div',
@@ -2700,7 +2718,7 @@ class ModelInfo {
    */
   async update(searchPath, updateModels, searchSeparator) {
     const path = encodeURIComponent(searchPath);
-    const [info, metadata, tags, noteText, url] = await comfyRequest(
+    const [info, metadata, tags, noteText, url, webPreviews] = await comfyRequest(
       `/model-manager/model/info/${path}`,
     )
       .then((result) => {
@@ -2716,8 +2734,9 @@ class ModelInfo {
           result['info'],
           result['metadata'],
           result['tags'],
-          result['notes'], 
-          result['url'], 
+          result['notes'],
+          result['url'],
+          result['webPreviews'],
         ];
       })
       .catch((err) => {
@@ -2830,50 +2849,75 @@ class ModelInfo {
     } else {
       defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
     }
-    previewSelect.resetModelInfoPreview();
-    const setPreviewButton = this.elements.setPreviewButton;
-    setPreviewButton.style.display = previewSelect.defaultIsChecked()
-      ? 'none'
-      : 'block';
+    previewSelect.resetModelInfoPreview(webPreviews);
+    const setPreviewDiv = $el('div.row.tab-header', {
+      style: {
+        display: "none"
+      }
+    }, [
+      $el('div.row.tab-header-flex-block', [
+        previewSelect.elements.radioGroup,
+      ]),
+      $el('div.row.tab-header-flex-block', [
+        this.elements.setPreviewButton,
+      ]),
+    ]);
+    previewSelect.elements.previews.style.display = "none";
+
+    let previewUri;
+    if (info['Preview']) {
+      const imagePath = encodeURIComponent(info['Preview']['path']);
+      const imageDateModified = encodeURIComponent(info['Preview']['dateModified']);
+      previewUri = imageUri(imagePath, imageDateModified);
+    } else {
+      previewUri = PREVIEW_NONE_URI;
+    }
+    const previewImage = $el('img.model-preview-full', {
+      loading:
+        'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
+      src: previewUri,
+    });
 
     innerHtml.push(
       $el('div', [
-        previewSelect.elements.previews,
         $el('div.row.tab-header', { style: { "flex-direction": "row" } }, [
-            new ComfyButton({
-              icon: 'arrow-bottom-left-bold-box-outline',
-              tooltip: 'Attempt to load preview image workflow',
-              classList: 'comfyui-button icon-button',
-              action: async () => {
-                const urlString =
-                  previewSelect.elements.defaultPreviews.children[0].src;
-                await loadWorkflow(urlString);
-              },
-            }).element,
-            new ComfyButton({
-              icon: 'open-in-new',
-              tooltip: 'Attempt to open model url page in a new tab.',
-              classList: 'comfyui-button icon-button',
-              action: async (e) => {
-                  const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                  button.disabled = true;
-                  let webUrl;
-                  if (url !== undefined && url !== "") {
-                      webUrl = url;
-                  }
-                  else {
-                      webUrl = await tryGetModelWebUrl(searchPath);
-                  }
-                  const success = tryOpenUrl(webUrl, searchPath);
-                  comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
-                  button.disabled = false;
-              },
+          new ComfyButton({
+            icon: 'arrow-bottom-left-bold-box-outline',
+            tooltip: 'Attempt to load preview image workflow',
+            classList: 'comfyui-button icon-button',
+            action: async () => {
+              await loadWorkflow(previewImage.src);
+            },
+          }).element,
+          new ComfyButton({
+            icon: 'open-in-new',
+            tooltip: 'Attempt to open model url page in a new tab.',
+            classList: 'comfyui-button icon-button',
+            action: async (e) => {
+                const [button, icon, span] = comfyButtonDisambiguate(e.target);
+                button.disabled = true;
+                let webUrl;
+                if (url !== undefined && url !== "") {
+                    webUrl = url;
+                }
+                else {
+                    webUrl = await tryGetModelWebUrl(searchPath);
+                }
+                const success = tryOpenUrl(webUrl, searchPath);
+                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
+                button.disabled = false;
+            },
           }).element,
           new ComfyButton({
             icon: 'earth-arrow-down',
-            tooltip: 'Try download model info.',
+            tooltip: 'Hash model and try to download model info.',
             classList: 'comfyui-button icon-button',
             action: async(e) => {
+              const confirm = window.confirm('Overwrite model info?');
+              if (!confirm) {
+                comfyButtonAlert(e.target, false, 'mdi-check-bold', 'mdi-close-thick');
+                return;
+              }
               const [button, icon, span] = comfyButtonDisambiguate(e.target);
               button.disabled = true;
               const success = await comfyRequest(
@@ -2896,13 +2940,28 @@ class ModelInfo {
               button.disabled = false;
             },
           }).element,
+          new ComfyButton({
+            icon: 'image-edit-outline',
+            tooltip: 'Open preview edit dialog.',
+            classList: 'comfyui-button icon-button',
+            action: () => {
+              // TODO: toggle button border highlight
+              if (previewImage.style.display === "none") {
+                setPreviewDiv.style.display = "none";
+                previewSelect.elements.previews.style.display = "none";
+                previewImage.style.display = "";
+              }
+              else {
+                previewImage.style.display = "none";
+                previewSelect.elements.previews.style.display = "";
+                setPreviewDiv.style.display = "";
+              }
+            },
+          }).element,
         ]),
-        $el('div.row.tab-header', [
-          $el('div.row.tab-header-flex-block', [
-            previewSelect.elements.radioGroup,
-          ]),
-          $el('div.row.tab-header-flex-block', [setPreviewButton]),
-        ]),
+        previewImage,
+        previewSelect.elements.previews,
+        setPreviewDiv,
         $el('h2', ['File Info:']),
         $el(
           'div',
