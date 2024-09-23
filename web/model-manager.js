@@ -104,11 +104,10 @@ const IS_FIREFOX = navigator.userAgent.indexOf('Firefox') > -1;
  * @param {string} url
  */
 async function loadWorkflow(url) {
-    const fileNameIndex = Math.max(url.lastIndexOf('/'), url.lastIndexOf('\\')) + 1;
-    const fileName = url.substring(fileNameIndex);
+    const fileName = SearchPath.filename(decodeURIComponent(url));
     const response = await fetch(url);
     const data = await response.blob();
-    const file = new File([data],  fileName, { type: data.type });
+    const file = new File([data], fileName, { type: data.type });
     app.handleFile(file);
 }
 
@@ -260,6 +259,19 @@ class SearchPath {
     const i1 = path.indexOf(searchSeparator, 1);
     const i2 = path.indexOf(searchSeparator, i1 + 1);
     return path.slice(i2 + 1).replaceAll(searchSeparator, systemSeparator);
+  }
+  
+  /**
+   * @param {string} s search path or url
+   * @returns {string}
+   */
+  static filename(s) {
+    let name = SearchPath.split(s)[1];
+    const queryIndex = name.indexOf('?');
+    if (queryIndex > -1) {
+      return name.substring(0, queryIndex);
+    }
+    return name;
   }
 }
 
