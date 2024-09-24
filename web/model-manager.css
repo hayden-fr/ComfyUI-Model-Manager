@@ -51,6 +51,9 @@
     --model-manager-sidebar-height-top: 50vh;
     --model-manager-sidebar-height-bottom: 50vh;
     
+    --model-manager-thumbnail-width: 240px;
+    --model-manager-thumbnail-height: 360px;
+    
     --model-manager-left: 0;
     --model-manager-right: 0;
     --model-manager-top: 0;
@@ -399,8 +402,8 @@
 /* preview image */
 .model-manager .item {
     position: relative;
-    width: 240px;
-    height: 360px;
+    width: var(--model-manager-thumbnail-width);;
+    height: var(--model-manager-thumbnail-height);;
     text-align: center;
     overflow: hidden;
 	border-radius: 8px;
@@ -489,7 +492,6 @@
 .model-manager .comfy-grid .model-preview-top-right,
 .model-manager .comfy-grid .model-preview-top-left {
     position: absolute;
-    display: flex;
     flex-direction: column;
     gap: 8px;
     top: 8px;
@@ -501,6 +503,15 @@
 
 .model-manager .comfy-grid .model-preview-top-left {
     left: 8px;
+}
+
+.model-manager .item .model-buttons-hidden {
+    display: none;
+}
+
+.model-manager .item:hover .model-buttons-hidden,
+.model-manager .comfy-grid .model-buttons-visible  {
+    display: flex;
 }
 
 .model-manager .comfy-grid .model-button {
