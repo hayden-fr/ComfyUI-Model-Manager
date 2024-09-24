@@ -2309,7 +2309,7 @@ class ModelInfo {
 
   /**
    * @param {ModelData} modelData
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {any} settingsElements
    */
   constructor(modelData, updateModels, settingsElements) {
@@ -2386,7 +2386,7 @@ class ModelInfo {
               });
           }
           if (updatedPreview) {
-            updateModels();
+            updateModels(true);
             const previewSelect = this.previewSelect;
             previewSelect.elements.defaultUrl.dataset.noimage =
               PREVIEW_NONE_URI;
@@ -2614,7 +2614,7 @@ class ModelInfo {
 
   /**
    * @param {string} searchPath
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {string} searchSeparator
    */
   async update(searchPath, updateModels, searchSeparator) {
@@ -3633,13 +3633,13 @@ class DownloadView {
   /** @type {Object.<string, HTMLElement>} */
   #settings = null;
 
-  /** @type {() => Promise<void>} */
+  /** @type {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = () => {};
 
   /**
    * @param {ModelData} modelData
    * @param {Object.<string, HTMLElement>} settings
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    */
   constructor(modelData, settings, updateModels) {
     this.#domParser = new DOMParser();
@@ -4119,7 +4119,7 @@ class BrowseView {
   /** @type {ModelData} */
   #modelData = null;
 
-  /** @type {@param {() => Promise<void>}} */
+  /** @type {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = null;
 
   /**  */
@@ -4129,7 +4129,7 @@ class BrowseView {
   updateModelGrid = () => {};
 
   /**
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {ModelData} modelData
    * @param {(searchPath: string) => Promise<void>} showModelInfo
    * @param {() => void} updateModelGridCallback
@@ -4392,7 +4392,7 @@ class SettingsView {
     },
   };
 
-  /** @return {() => Promise<void>} */
+  /** @return {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = () => {};
 
   /** @return {() => void} */
@@ -4400,9 +4400,9 @@ class SettingsView {
 
   /**
    * @param {Object} settingsData
-   * @param {boolean} updateModels
+   * @param {boolean} withoutComfyRefresh
    */
-  async #setSettings(settingsData, updateModels) {
+  async #setSettings(settingsData, withoutComfyRefresh) {
     const settings = this.elements.settings;
     for (const [key, value] of Object.entries(settingsData)) {
       const setting = settings[key];
@@ -4430,22 +4430,18 @@ class SettingsView {
           console.warn(`Unknown settings input type '${type}'!`);
       }
     }
-
     this.#updateSidebarSettings(settings);
-
-    if (updateModels) {
-      await this.#updateModels(); // Is this slow?
-    }
+    await this.#updateModels(withoutComfyRefresh);
   }
 
   /**
-   * @param {boolean} updateModels
+   * @param {boolean} withoutComfyRefresh
    * @returns {Promise<void>}
    */
-  async reload(updateModels) {
+  async reload(withoutComfyRefresh) {
     const data = await comfyRequest('/model-manager/settings/load');
     const settingsData = data['settings'];
-    await this.#setSettings(settingsData, updateModels);
+    await this.#setSettings(settingsData, withoutComfyRefresh);
     comfyButtonAlert(this.elements.reloadButton, true);
   }
 
@@ -4495,7 +4491,7 @@ class SettingsView {
   }
 
   /**
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {() => void} updateSidebarButtons
    * @param {(settings: Object) => void} updateSidebarSettings
    */
@@ -5372,8 +5368,7 @@ class ModelManager extends ComfyDialog {
   }
 
   async #init() {
-    await this.#settingsView.reload(false);
-    await this.#refreshModels();
+    await this.#settingsView.reload(true)
 
     const settings = this.#settingsView.elements.settings;
 
@@ -5454,7 +5449,7 @@ class ModelManager extends ComfyDialog {
     this.#tabManagerContents.scrollTop = 0;
   };
 
-  #refreshModels = async () => {
+  #refreshModels = async (withoutComfyRefresh = false) => {
     const modelData = this.#modelData;
     modelData.systemSeparator = await comfyRequest(
       '/model-manager/system-separator',
@@ -5468,8 +5463,9 @@ class ModelManager extends ComfyDialog {
 
     this.#browseView.updateModelGrid();
     await this.#tryHideModelInfo(false);
-
-    document.getElementById('comfy-refresh-button')?.click();
+    if (!withoutComfyRefresh){
+      document.getElementById('comfy-refresh-button')?.click();
+    }
   };
 
   /**
