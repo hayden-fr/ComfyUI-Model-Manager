@@ -312,8 +312,6 @@ class SearchPath {
   return uri;
   }
 const PREVIEW_NONE_URI = imageUri();
-const PREVIEW_THUMBNAIL_WIDTH = 320;
-const PREVIEW_THUMBNAIL_HEIGHT = 480;
 
 /**
  *
@@ -2132,6 +2130,12 @@ class ModelGrid {
       !settingsElements['model-add-embedding-extension'].checked;
     const previewThumbnailFormat =
       settingsElements['model-preview-thumbnail-type'].value;
+    const previewThumbnailWidth =
+      Math.round(settingsElements['model-preview-thumbnail-width'].value / 0.75);
+    const previewThumbnailHeight =
+      Math.round(settingsElements['model-preview-thumbnail-height'].value / 0.75);
+    const buttonsOnlyOnHover =
+      settingsElements['model-buttons-only-on-hover'].checked;
     if (models.length > 0) {
 
       const $overlay = IS_FIREFOX
@@ -2173,6 +2177,8 @@ class ModelGrid {
             draggable: true,
           });
         });
+        const forHiddingButtonsClass = buttonsOnlyOnHover
+          ? 'model-buttons-hidden' : 'model-buttons-visible';
 
       return models.map((item) => {
         const previewInfo = item.preview;
@@ -2182,8 +2188,8 @@ class ModelGrid {
           src: imageUri(
             previewInfo?.path ? encodeURIComponent(previewInfo.path) : undefined, 
             previewInfo?.dateModified ? encodeURIComponent(previewInfo.dateModified) : undefined, 
-            PREVIEW_THUMBNAIL_WIDTH,
-            PREVIEW_THUMBNAIL_HEIGHT,
+            previewThumbnailWidth,
+            previewThumbnailHeight,
             previewThumbnailFormat,
           ),
           draggable: false,
@@ -2293,14 +2299,14 @@ class ModelGrid {
             strictDragToAdd,
           ),
           $el(
-            'div.model-preview-top-right',
+            'div.model-preview-top-right.' + forHiddingButtonsClass,
             {
               draggable: false,
             },
             modelInfoButtonOnLeft ? infoButtons : actionButtons,
           ),
           $el(
-            'div.model-preview-top-left',
+            'div.model-preview-top-left.' + forHiddingButtonsClass,
             {
               draggable: false,
             },
@@ -2432,7 +2438,7 @@ class ModelInfo {
 
   /**
    * @param {ModelData} modelData
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {any} settingsElements
    * @param {() => Promise<void>} tryHideModelInfo
    */
@@ -2511,7 +2517,7 @@ class ModelInfo {
               });
           }
           if (updatedPreview) {
-            updateModels();
+            updateModels(true);
             const previewSelect = this.previewSelect;
             previewSelect.elements.defaultUrl.dataset.noimage =
               PREVIEW_NONE_URI;
@@ -2734,7 +2740,7 @@ class ModelInfo {
 
   /**
    * @param {string} searchPath
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {string} searchSeparator
    */
   async update(searchPath, updateModels, searchSeparator) {
@@ -3901,13 +3907,13 @@ class DownloadView {
   /** @type {Object.<string, HTMLElement>} */
   #settings = null;
 
-  /** @type {() => Promise<void>} */
+  /** @type {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = () => {};
 
   /**
    * @param {ModelData} modelData
    * @param {Object.<string, HTMLElement>} settings
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    */
   constructor(modelData, settings, updateModels) {
     this.#domParser = new DOMParser();
@@ -4383,7 +4389,7 @@ class BrowseView {
   /** @type {ModelData} */
   #modelData = null;
 
-  /** @type {@param {() => Promise<void>}} */
+  /** @type {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = null;
 
   /**  */
@@ -4393,7 +4399,7 @@ class BrowseView {
   updateModelGrid = () => {};
 
   /**
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {ModelData} modelData
    * @param {(searchPath: string) => Promise<void>} showModelInfo
    * @param {() => void} updateModelGridCallback
@@ -4625,6 +4631,8 @@ class SettingsView {
       /** @type {HTMLInputElement} */ 'model-persistent-search': null,
 
       /** @type {HTMLInputElement} */ 'model-preview-thumbnail-type': null,
+      /** @type {HTMLInputElement} */ 'model-preview-thumbnail-width': null,
+      /** @type {HTMLInputElement} */ 'model-preview-thumbnail-height': null,
       /** @type {HTMLInputElement} */ 'model-preview-fallback-search-safetensors-thumbnail':
         null,
       /** @type {HTMLInputElement} */ 'model-show-label-extensions': null,
@@ -4633,6 +4641,7 @@ class SettingsView {
       /** @type {HTMLInputElement} */ 'model-show-load-workflow-button': null,
       /** @type {HTMLInputElement} */ 'model-show-open-model-url-button': null,
       /** @type {HTMLInputElement} */ 'model-info-button-on-left': null,
+      /** @type {HTMLInputElement} */ 'model-buttons-only-on-hover': null,
 
       /** @type {HTMLInputElement} */ 'model-add-embedding-extension': null,
       /** @type {HTMLInputElement} */ 'model-add-drag-strict-on-field': null,
@@ -4657,7 +4666,7 @@ class SettingsView {
     },
   };
 
-  /** @return {() => Promise<void>} */
+  /** @return {(withoutComfyRefresh?: boolean) => Promise<void>} */
   #updateModels = async () => {};
 
   /** @return {() => void} */
@@ -4665,9 +4674,9 @@ class SettingsView {
 
   /**
    * @param {Object} settingsData
-   * @param {boolean} updateModels
+   * @param {boolean} withoutComfyRefresh
    */
-  async #setSettings(settingsData, updateModels) {
+  async #setSettings(settingsData, withoutComfyRefresh) {
     const settings = this.elements.settings;
     for (const [key, value] of Object.entries(settingsData)) {
       const setting = settings[key];
@@ -4695,22 +4704,18 @@ class SettingsView {
           console.warn(`Unknown settings input type '${type}'!`);
       }
     }
-
     this.#updateSidebarSettings(settings);
-
-    if (updateModels) {
-      await this.#updateModels(); // Is this slow?
-    }
+    await this.#updateModels(withoutComfyRefresh);
   }
 
   /**
-   * @param {boolean} updateModels
+   * @param {boolean} withoutComfyRefresh
    * @returns {Promise<void>}
    */
-  async reload(updateModels) {
+  async reload(withoutComfyRefresh) {
     const data = await comfyRequest('/model-manager/settings/load');
     const settingsData = data['settings'];
-    await this.#setSettings(settingsData, updateModels);
+    await this.#setSettings(settingsData, withoutComfyRefresh);
     comfyButtonAlert(this.elements.reloadButton, true);
   }
 
@@ -4760,7 +4765,7 @@ class SettingsView {
   }
 
   /**
-   * @param {() => Promise<void>} updateModels
+   * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {() => void} updateSidebarButtons
    * @param {(settings: Object) => void} updateSidebarSettings
    */
@@ -4956,6 +4961,34 @@ class SettingsView {
           textContent: 'Preview thumbnail type',
           options: ['AUTO', 'JPEG'], // should use AUTO to avoid artifacts from changing between formats; use JPEG for backward compatibility
         }),
+        $el('label', [
+          'Preview thumbnail width',
+          $el('input', {
+            $: (el) => (settings['model-preview-thumbnail-width'] = el),
+            type: 'range',
+            name: 'default thumbnail width',
+            value: 240,
+            min: 150,
+            max: 480,
+            step: 5,
+            oninput: function(){ this.nextElementSibling.textContent = this.value + 'px'},
+          }),
+          $el('span'),
+        ]),
+        $el('label', [
+          'Preview thumbnail height', 
+          $el('input', {
+            $: (el) => (settings['model-preview-thumbnail-height'] = el),
+            type: 'range',
+            name: 'default thumbnail height',
+            value: 360,
+            min: 185,
+            max: 480,
+            step: 5,
+            oninput: function(){ this.nextElementSibling.textContent = this.value + 'px'},
+          }),
+          $el('span'),
+        ]),
         $checkbox({
           $: (el) =>
             (settings['model-preview-fallback-search-safetensors-thumbnail'] =
@@ -4984,6 +5017,10 @@ class SettingsView {
         $checkbox({
           $: (el) => (settings['model-info-button-on-left'] = el),
           textContent: '"Model Info" button on left',
+        }),
+        $checkbox({
+          $: (el) => (settings['model-buttons-only-on-hover'] = el),
+          textContent: 'Show buttons on hover only',
         }),
         $el('h2', ['Node Graph']),
         $checkbox({
@@ -5707,8 +5744,7 @@ class ModelManager extends ComfyDialog {
   }
 
   async #init() {
-    await this.#settingsView.reload(false);
-    await this.#refreshModels();
+    await this.#settingsView.reload(true)
 
     const settings = this.#settingsView.elements.settings;
 
@@ -5783,13 +5819,31 @@ class ModelManager extends ComfyDialog {
       this.#downloadView.elements.clearSearchButton.style.display =
         hideClearSearchButtons ? 'none' : '';
     }
+
+    {
+      // update thumbnail widths & heights
+      const thumbnailWidthEl = settings['model-preview-thumbnail-width'];
+      const thumbnailHeightEl = settings['model-preview-thumbnail-height'];
+
+      this.element.style.setProperty(
+        '--model-manager-thumbnail-width',
+        thumbnailWidthEl.value.toString() + 'px',
+      );
+      thumbnailWidthEl.dispatchEvent(new Event('input'));
+
+      this.element.style.setProperty(
+        '--model-manager-thumbnail-height',
+        thumbnailHeightEl.value.toString() + 'px',
+      );
+      thumbnailHeightEl.dispatchEvent(new Event('input'));
+    }
   }
 
   #resetManagerContentsScroll = () => {
     this.#tabManagerContents.scrollTop = 0;
   };
 
-  #refreshModels = async () => {
+  #refreshModels = async (withoutComfyRefresh = false) => {
     const modelData = this.#modelData;
     modelData.systemSeparator = await comfyRequest(
       '/model-manager/system-separator',
@@ -5803,8 +5857,9 @@ class ModelManager extends ComfyDialog {
 
     this.#browseView.updateModelGrid();
     await this.#tryHideModelInfo(false);
-
-    document.getElementById('comfy-refresh-button')?.click();
+    if (!withoutComfyRefresh){
+      document.getElementById('comfy-refresh-button')?.click();
+    }
   };
 
   /**
