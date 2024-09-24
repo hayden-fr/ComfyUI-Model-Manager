@@ -104,59 +104,14 @@ const IS_FIREFOX = navigator.userAgent.indexOf('Firefox') > -1;
  * @param {string} url
  */
 async function loadWorkflow(url) {
-    const fileName = SearchPath.filename(decodeURIComponent(url));
-    const response = await fetch(url);
-    const data = await response.blob();
-    const file = new File([data], fileName, { type: data.type });
-    app.handleFile(file);
-}
-
-/**
- * @param {string} modelSearchPath
- * @returns {Promise<string|undefined>}
- */
-async function tryGetModelWebUrl(modelSearchPath) {
-    const encodedPath = encodeURIComponent(modelSearchPath);
-    const response = await comfyRequest(`/model-manager/model/web-url?path=${encodedPath}`);
-    const url = response.url;
-    return url !== undefined && url !== '' ? url : undefined;
-}
-
-/**
- * @param {string} url
- * @param {string} name
- * @returns {boolean}
- */
-function tryOpenUrl(url, name="Url") {
-    try {
-        new URL(url);
-    }
-    catch (exception) {
-        return false;
-    }
-    try {
-        window.open(url, '_blank').focus();
-    }
-    catch (exception) {        
-        // browser or ad-blocker blocking opening new window
-        modelManagerDialog.show($el("span",
-            [
-                $el("p", {
-                    style: { color: "var(--input-text)" },
-                }, [name]),
-                $el("a", {
-                    href: url,
-                    target: "_blank",
-                }, [
-                    $el("span", [
-                        url,
-                        $el("i.mdi.mdi-open-in-new"),
-                    ])
-                ]),
-            ]
-        ));
-    }
-    return true;
+  const uri = new URL(url).searchParams.get('uri');
+  const fileNameIndex =
+    Math.max(uri.lastIndexOf('/'), uri.lastIndexOf('\\')) + 1;
+  const fileName = uri.substring(fileNameIndex);
+  const response = await fetch(url);
+  const data = await response.blob();
+  const file = new File([data], fileName, { type: data.type });
+  app.handleFile(file);
 }
 
 const modelNodeType = {
@@ -260,57 +215,40 @@ class SearchPath {
     const i2 = path.indexOf(searchSeparator, i1 + 1);
     return path.slice(i2 + 1).replaceAll(searchSeparator, systemSeparator);
   }
-  
-  /**
-   * @param {string} s search path or url
-   * @returns {string}
-   */
-  static filename(s) {
-    let name = SearchPath.split(s)[1];
-    const queryIndex = name.indexOf('?');
-    if (queryIndex > -1) {
-      return name.substring(0, queryIndex);
-    }
-    return name;
-  }
 }
 
 /**
- * @param {string | undefined} [imageUriSearchPath=undefined]
+ * @param {string | undefined} [searchPath=undefined]
  * @param {string | undefined} [dateImageModified=undefined]
  * @param {string | undefined} [width=undefined]
  * @param {string | undefined} [height=undefined]
  * @param {string | undefined} [imageFormat=undefined]
  * @returns {string}
  */
-  function imageUri(
-  imageUriSearchPath = undefined,
-  dateImageModified = undefined, 
-  width = undefined, 
-  height = undefined, 
-  imageFormat = undefined, 
-  ) {
-  const params = [];
+function imageUri(
+  imageSearchPath = undefined,
+  dateImageModified = undefined,
+  width = undefined,
+  height = undefined,
+  imageFormat = undefined,
+) {
+  const path = imageSearchPath ?? 'no-preview';
+  const date = dateImageModified;
+  let uri = `/model-manager/preview/get?uri=${path}`;
   if (width !== undefined && width !== null) {
-    params.push(`width=${width}`);
+    uri += `&width=${width}`;
   }
   if (height !== undefined && height !== null) {
-    params.push(`height=${height}`);
+    uri += `&height=${height}`;
   }
-  if (dateImageModified !== undefined && dateImageModified !== null) {
-    params.push(`v=${dateImageModified}`);
+  if (date !== undefined && date !== null) {
+    uri += `&v=${date}`;
   }
   if (imageFormat !== undefined && imageFormat !== null) {
-    params.push(`image-format=${imageFormat}`);
-  }
-
-  const path = imageUriSearchPath ?? 'no-preview';
-  const uri = `/model-manager/preview/get/${path}`;
-  if (params.length > 0) {
-  return uri + '?' + params.join('&');
+    uri += `&image-format=${imageFormat}`;
   }
   return uri;
-  }
+}
 const PREVIEW_NONE_URI = imageUri();
 
 /**
@@ -656,7 +594,6 @@ class ImageSelect {
     /** @type {HTMLImageElement} */ defaultPreviewNoImage: null,
     /** @type {HTMLDivElement} */ defaultPreviews: null,
     /** @type {HTMLDivElement} */ defaultUrl: null,
-    /** @type {HTMLDivElement} */ previewButtons: null,
 
     /** @type {HTMLImageElement} */ customUrlPreview: null,
     /** @type {HTMLInputElement} */ customUrl: null,
@@ -721,15 +658,11 @@ class ImageSelect {
       case this.#PREVIEW_NONE:
         return PREVIEW_NONE_URI;
     }
-    console.warn(`Invalid preview select type: ${value}`);
-    return PREVIEW_NONE_URI;
+    return '';
   }
 
- /**
-   * @param {String[]} defaultPreviewUrls
-   * @returns {void}
-   */
-  resetModelInfoPreview(defaultPreviewUrls = []) {
+  /** @returns {void} */
+  resetModelInfoPreview() {
     let noimage = this.elements.defaultUrl.dataset.noimage;
     [
       this.elements.defaultPreviewNoImage,
@@ -748,18 +681,6 @@ class ImageSelect {
         el.src = PREVIEW_NONE_URI;
       }
     });
-    const defaultPreviews = this.elements.defaultPreviews;
-    defaultPreviews.innerHTML = '';
-    if (defaultPreviewUrls.length > 0) {
-      ImageSelect.generateDefaultPreviews(defaultPreviewUrls).forEach(previewElement => {
-        defaultPreviews.appendChild(previewElement);
-      });
-    }
-    else {
-      const defaultImage = ImageSelect.generateDefaultPreviews([PREVIEW_NONE_URI]);
-      defaultPreviews.appendChild(defaultImage[0]);
-    }
-    this.elements.previewButtons.style.display = defaultPreviewUrls.length > 1 ? 'block' : 'none';
     this.checkDefault();
     this.elements.uploadFile.value = '';
     this.elements.customUrl.value = '';
@@ -821,28 +742,6 @@ class ImageSelect {
   }
 
   /**
-   * @param {string[]|undefined} defaultPreviewUrls
-   * @returns {HTMLImageElement[]}
-   */
-  static generateDefaultPreviews(defaultPreviewUrls) {
-    const imgs = defaultPreviewUrls.map((url) => {
-      return $el('img', {
-        loading:
-          'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
-        src: url,
-        style: { display: 'none' },
-        onerror: (e) => {
-          e.target.src = PREVIEW_NONE_URI;
-        },
-      });
-    });
-    if (imgs.length > 0) {
-      imgs[0].style.display = 'block';
-    }
-    return imgs;
-  }
-
-  /**
    * @param {string} radioGroupName - Should be unique for every radio group.
    * @param {string[]|undefined} defaultPreviews
    */
@@ -879,7 +778,23 @@ class ImageSelect {
           height: '100%',
         },
       },
-      ImageSelect.generateDefaultPreviews(defaultPreviews),
+      (() => {
+        const imgs = defaultPreviews.map((url) => {
+          return $el('img', {
+            loading:
+              'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
+            src: url,
+            style: { display: 'none' },
+            onerror: (e) => {
+              e.target.src = el_defaultUri.dataset.noimage ?? PREVIEW_NONE_URI;
+            },
+          });
+        });
+        if (imgs.length > 0) {
+          imgs[0].style.display = 'block';
+        }
+        return imgs;
+      })(),
     );
 
     const el_uploadPreview = $el('img', {
@@ -989,7 +904,6 @@ class ImageSelect {
     const el_previewButtons = $el(
       'div.model-preview-overlay',
       {
-        $: (el) => (this.elements.previewButtons = el),
         style: {
           display: el_defaultPreviews.children.length > 1 ? 'block' : 'none',
         },
@@ -1914,7 +1828,6 @@ class ModelGrid {
         const widgetIndex = ModelGrid.modelWidgetIndex(nodeType);
         const target = selectedNode?.widgets[widgetIndex]?.element;
         if (target && target.type === 'textarea') {
-          // TODO: If the node has >1 text areas, the textarea element must be selected
           target.value = ModelGrid.insertEmbeddingIntoText(
             target.value,
             embeddingFile,
@@ -1924,7 +1837,7 @@ class ModelGrid {
         }
       }
       if (!success) {
-        window.alert('No selected nodes have a text area!');
+        console.warn('Try selecting a node before adding the embedding.');
       }
       event.stopPropagation();
     }
@@ -2109,16 +2022,13 @@ class ModelGrid {
     // TODO: separate text and model logic; getting too messy
     // TODO: fallback on button failure to copy text?
     const canShowButtons = modelNodeType[modelType] !== undefined;
-    const shouldShowTryOpenModelUrl =
-      canShowButtons &&
-      settingsElements['model-show-open-model-url-button'].checked;
-    const showLoadWorkflowButton =
-      canShowButtons &&
-      settingsElements['model-show-load-workflow-button'].checked;
     const showAddButton =
       canShowButtons && settingsElements['model-show-add-button'].checked;
     const showCopyButton =
       canShowButtons && settingsElements['model-show-copy-button'].checked;
+    const showLoadWorkflowButton =
+      canShowButtons &&
+      settingsElements['model-show-load-workflow-button'].checked;
     const strictDragToAdd =
       settingsElements['model-add-drag-strict-on-field'].checked;
     const addOffset = parseInt(settingsElements['model-add-offset'].value);
@@ -2186,8 +2096,8 @@ class ModelGrid {
           loading:
             'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
           src: imageUri(
-            previewInfo?.path ? encodeURIComponent(previewInfo.path) : undefined, 
-            previewInfo?.dateModified ? encodeURIComponent(previewInfo.dateModified) : undefined, 
+            previewInfo?.path,
+            previewInfo?.dateModified,
             previewThumbnailWidth,
             previewThumbnailHeight,
             previewThumbnailFormat,
@@ -2201,47 +2111,23 @@ class ModelGrid {
           systemSeparator,
         );
         let actionButtons = [];
-        if (shouldShowTryOpenModelUrl) {
+        if (showCopyButton) {
           actionButtons.push(
-              new ComfyButton({
-                  icon: 'open-in-new',
-                  tooltip: 'Attempt to open model url page in a new tab.',
-                  classList: 'comfyui-button icon-button model-button',
-                  action: async (e) => {
-                      const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                      button.disabled = true;
-                      const webUrl = await tryGetModelWebUrl(searchPath);
-                      const success = tryOpenUrl(webUrl, searchPath);
-                      comfyButtonAlert(e.target, success, 'mdi-check-bold', 'mdi-close-thick');
-                      button.disabled = false;
-                  },
-              }).element
+            new ComfyButton({
+              icon: 'content-copy',
+              tooltip: 'Copy model to clipboard',
+              classList: 'comfyui-button icon-button model-button',
+              action: (e) =>
+                ModelGrid.#copyModelToClipboard(
+                  e,
+                  modelType,
+                  path,
+                  removeEmbeddingExtension,
+                ),
+            }).element,
           );
-      }
-      if (showLoadWorkflowButton) {
-        actionButtons.push(
-          new ComfyButton({
-            icon: 'arrow-bottom-left-bold-box-outline',
-            tooltip: 'Load preview workflow',
-            classList: 'comfyui-button icon-button model-button',
-            action: async (e) => {
-              const urlString = previewThumbnail.src;
-              const url = new URL(urlString);
-              const urlSearchParams = url.searchParams;
-              const uri = urlSearchParams.get('uri');
-              const v = urlSearchParams.get('v');
-              const urlFull =
-                urlString.substring(0, urlString.indexOf('?')) +
-                '?uri=' +
-                uri +
-                '&v=' +
-                v;
-              await loadWorkflow(urlFull);
-            },
-          }).element,
-        );
-      }
-        if (showAddButton) {
+        }
+        if (showAddButton && !(modelType === 'embeddings' && !navigator.clipboard)) {
           actionButtons.push(
             new ComfyButton({
               icon: 'plus-box-outline',
@@ -2258,36 +2144,37 @@ class ModelGrid {
             }).element,
           );
         }
-        if (
-            showCopyButton && 
-            !(modelType === 'embeddings' && !navigator.clipboard)
-          ) {
-            actionButtons.push(
-              new ComfyButton({
-                icon: 'content-copy',
-                tooltip: 'Copy model to clipboard',
-                classList: 'comfyui-button icon-button model-button',
-                action: (e) =>
-                  ModelGrid.#copyModelToClipboard(
-                    e,
-                    modelType,
-                    path,
-                    removeEmbeddingExtension,
-                  ),
-              }).element,
-            );
+        if (showLoadWorkflowButton) {
+          actionButtons.push(
+            new ComfyButton({
+              icon: 'arrow-bottom-left-bold-box-outline',
+              tooltip: 'Load preview workflow',
+              classList: 'comfyui-button icon-button model-button',
+              action: async (e) => {
+                const urlString = previewThumbnail.src;
+                const url = new URL(urlString);
+                const urlSearchParams = url.searchParams;
+                const uri = urlSearchParams.get('uri');
+                const v = urlSearchParams.get('v');
+                const urlFull =
+                  urlString.substring(0, urlString.indexOf('?')) +
+                  '?uri=' +
+                  uri +
+                  '&v=' +
+                  v;
+                await loadWorkflow(urlFull);
+              },
+            }).element,
+          );
         }
         const infoButtons = [
           new ComfyButton({
             icon: 'information-outline',
             tooltip: 'View model information',
             classList: 'comfyui-button icon-button model-button',
-            action: async(e) => {
-              const [button, icon, span] = comfyButtonDisambiguate(e.target);
-              button.disabled = true;
+            action: async () => {
               await showModelInfo(searchPath);
-              button.disabled = false;
-          },
+            },
           }).element,
         ];
         return $el('div.item', {}, [
@@ -2377,21 +2264,14 @@ class ModelGrid {
       previousModelType.value = modelType;
     }
 
-        let modelTypeOptions = [];
-        for (const key of Object.keys(models)) {
-            const el = $el('option', [key]);
-            modelTypeOptions.push(el);
-        }
-        modelTypeOptions.sort((a, b) => 
-          a.innerText.localeCompare(
-            b.innerText, 
-            undefined, 
-            {sensitivity : 'base'}, 
-          )
-        );
-        modelSelect.innerHTML = "";
-        modelTypeOptions.forEach(option => modelSelect.add(option));
-        modelSelect.value = modelType;
+    let modelTypeOptions = [];
+    for (const [key, value] of Object.entries(models)) {
+      const el = $el('option', [key]);
+      modelTypeOptions.push(el);
+    }
+    modelSelect.innerHTML = '';
+    modelTypeOptions.forEach((option) => modelSelect.add(option));
+    modelSelect.value = modelType;
 
     const searchAppend = settings['model-search-always-append'].value;
     const searchText = modelFilter.value + ' ' + searchAppend;
@@ -2433,18 +2313,13 @@ class ModelInfo {
   /** @type {[HTMLElement][]} */
   #settingsElements = null;
 
-  /** @type {() -> Promise<void>} */
-  #tryHideModelInfo = () => {};
-
   /**
    * @param {ModelData} modelData
    * @param {(withoutComfyRefresh?: boolean) => Promise<void>} updateModels
    * @param {any} settingsElements
-   * @param {() => Promise<void>} tryHideModelInfo
    */
-  constructor(modelData, updateModels, settingsElements, tryHideModelInfo) {
+  constructor(modelData, updateModels, settingsElements) {
     this.#settingsElements = settingsElements;
-    this.#tryHideModelInfo = tryHideModelInfo;
     const moveDestinationInput = $el('input.search-text-area', {
       name: 'move directory',
       autocomplete: 'off',
@@ -2530,6 +2405,11 @@ class ModelInfo {
       },
     }).element;
     this.elements.setPreviewButton = setPreviewButton;
+    previewSelect.elements.radioButtons.addEventListener('change', (e) => {
+      setPreviewButton.style.display = previewSelect.defaultIsChecked()
+        ? 'none'
+        : 'block';
+    });
 
     this.element = $el(
       'div',
@@ -2662,9 +2542,9 @@ class ModelInfo {
         tabContent: this.element,
       },
       {
-        name: 'Notes',
-        icon: 'pencil-outline',
-        tabContent: $el('div', ['Notes']),
+        name: 'Metadata',
+        icon: 'file-document-outline',
+        tabContent: $el('div', ['Metadata']),
       },
       {
         name: 'Tags',
@@ -2672,9 +2552,9 @@ class ModelInfo {
         tabContent: $el('div', ['Tags']),
       },
       {
-        name: 'Metadata',
-        icon: 'file-document-outline',
-        tabContent: $el('div', ['Metadata']),
+        name: 'Notes',
+        icon: 'pencil-outline',
+        tabContent: $el('div', ['Notes']),
       },
     ]);
   }
@@ -2745,8 +2625,8 @@ class ModelInfo {
    */
   async update(searchPath, updateModels, searchSeparator) {
     const path = encodeURIComponent(searchPath);
-    const [info, metadata, tags, noteText, url, webPreviews] = await comfyRequest(
-      `/model-manager/model/info/${path}`,
+    const [info, metadata, tags, noteText] = await comfyRequest(
+      `/model-manager/model/info?path=${path}`,
     )
       .then((result) => {
         const success = result['success'];
@@ -2762,8 +2642,6 @@ class ModelInfo {
           result['metadata'],
           result['tags'],
           result['notes'],
-          result['url'],
-          result['webPreviews'],
         ];
       })
       .catch((err) => {
@@ -2870,131 +2748,38 @@ class ModelInfo {
     const previewSelect = this.previewSelect;
     const defaultUrl = previewSelect.elements.defaultUrl;
     if (info['Preview']) {
-      const imagePath = encodeURIComponent(info['Preview']['path']);
-      const imageDateModified = encodeURIComponent(info['Preview']['dateModified']);
+      const imagePath = info['Preview']['path'];
+      const imageDateModified = info['Preview']['dateModified'];
       defaultUrl.dataset.noimage = imageUri(imagePath, imageDateModified);
     } else {
       defaultUrl.dataset.noimage = PREVIEW_NONE_URI;
     }
-    previewSelect.resetModelInfoPreview(webPreviews);
-    const setPreviewDiv = $el('div.row.tab-header', {
-      style: {
-        display: "none"
-      }
-    }, [
-      $el('div.row.tab-header-flex-block', [
-        previewSelect.elements.radioGroup,
-      ]),
-      $el('div.row.tab-header-flex-block', [
-        this.elements.setPreviewButton,
-      ]),
-    ]);
-    previewSelect.elements.previews.style.display = "none";
-
-    let previewUri;
-    if (info['Preview']) {
-      const imagePath = encodeURIComponent(info['Preview']['path']);
-      const imageDateModified = encodeURIComponent(info['Preview']['dateModified']);
-      previewUri = imageUri(imagePath, imageDateModified);
-    } else {
-      previewUri = PREVIEW_NONE_URI;
-    }
-    const previewImage = $el('img.model-preview-full', {
-      loading:
-        'lazy' /* `loading` BEFORE `src`; Known bug in Firefox 124.0.2 and Safari for iOS 17.4.1 (https://stackoverflow.com/a/76252772) */,
-      src: previewUri,
-    });
+    previewSelect.resetModelInfoPreview();
+    const setPreviewButton = this.elements.setPreviewButton;
+    setPreviewButton.style.display = previewSelect.defaultIsChecked()
+      ? 'none'
+      : 'block';
 
     innerHtml.push(
       $el('div', [
-        $el('div.row.tab-header', { style: { "flex-direction": "row" } }, [
-          new ComfyButton({
-            icon: 'arrow-bottom-left-bold-box-outline',
-            tooltip: 'Attempt to load preview image workflow',
-            classList: 'comfyui-button icon-button',
-            action: async () => {
-              await loadWorkflow(previewImage.src);
-            },
-          }).element,
-          new ComfyButton({
-            icon: 'open-in-new',
-            tooltip: 'Attempt to open model url page in a new tab.',
-            classList: 'comfyui-button icon-button',
-            action: async (e) => {
-                const [button, icon, span] = comfyButtonDisambiguate(e.target);
-                button.disabled = true;
-                let webUrl;
-                if (url !== undefined && url !== "") {
-                    webUrl = url;
-                }
-                else {
-                    webUrl = await tryGetModelWebUrl(searchPath);
-                }
-                const success = tryOpenUrl(webUrl, searchPath);
-                comfyButtonAlert(e.target, success, "mdi-check-bold", "mdi-close-thick");
-                button.disabled = false;
-            },
-          }).element,
-          new ComfyButton({
-            icon: 'earth-arrow-down',
-            tooltip: 'Hash model and try to download model info.',
-            classList: 'comfyui-button icon-button',
-            action: async(e) => {
-              const confirm = window.confirm('Overwrite model info?');
-              if (!confirm) {
-                comfyButtonAlert(e.target, false, 'mdi-check-bold', 'mdi-close-thick');
-                return;
-              }
-              const [button, icon, span] = comfyButtonDisambiguate(e.target);
-              button.disabled = true;
-              const success = await comfyRequest(
-                  `/model-manager/model/download/info?path=${path}`,
-                  {
-                      method: 'POST',
-                      body: {},
-                  }
-              ).then((data) => {
-                  const success = data['success'];
-                  const message = data['alert'];
-                  if (message !== undefined) {
-                      window.alert(message);
-                  }
-                  return success;
-              }).catch((err) => {
-                  return false;
-              });
-              if (success) {
-                this.#tryHideModelInfo();
-              }
-              comfyButtonAlert(e.target, success, 'mdi-check-bold', 'mdi-close-thick');
-              button.disabled = false;
-            },
-          }).element,
-          new ComfyButton({
-            icon: 'image-edit-outline',
-            tooltip: 'Open preview edit dialog.',
-            classList: 'comfyui-button icon-button',
-            action: () => {
-              // TODO: toggle button border highlight
-              if (previewImage.style.display === "none") {
-                setPreviewDiv.style.display = "none";
-                previewSelect.elements.previews.style.display = "none";
-                previewImage.style.display = "";
-              }
-              else {
-                previewImage.style.display = "none";
-                previewSelect.elements.previews.style.display = "";
-                setPreviewDiv.style.display = "";
-                if (previewSelect.elements.defaultPreviews.children[0].src.includes(PREVIEW_NONE_URI)) {
-                  window.alert("No model previews found!\nTry downloading model info first!");
-                }
-              }
-            },
-          }).element,
-        ]),
-        previewImage,
         previewSelect.elements.previews,
-        setPreviewDiv,
+        $el('div.row.tab-header', [
+          $el('div', [
+            new ComfyButton({
+              content: 'Load Workflow',
+              tooltip: 'Attempt to load preview image workflow',
+              action: async () => {
+                const urlString =
+                  previewSelect.elements.defaultPreviews.children[0].src;
+                await loadWorkflow(urlString);
+              },
+            }).element,
+          ]),
+          $el('div.row.tab-header-flex-block', [
+            previewSelect.elements.radioGroup,
+          ]),
+          $el('div.row.tab-header-flex-block', [setPreviewButton]),
+        ]),
         $el('h2', ['File Info:']),
         $el(
           'div',
@@ -3037,163 +2822,40 @@ class ModelInfo {
     infoHtml.append.apply(infoHtml, innerHtml);
     // TODO: set default value of dropdown and value to model type?
 
-    //
-    // NOTES
-    //
-
-    const saveIcon = 'content-save';
-    const savingIcon = 'cloud-upload-outline';
-
-    const saveNotesButton = new ComfyButton({
-      icon: saveIcon,
-      tooltip: 'Save note',
-      classList: 'comfyui-button icon-button',
-      action: async (e) => {
-        const [button, icon, span] = comfyButtonDisambiguate(e.target);
-        button.disabled = true;
-        const saved = await this.trySave(false);
-        comfyButtonAlert(e.target, saved);
-        button.disabled = false;
-      },
-    }).element;
-
-    const downloadNotesButton = new ComfyButton({
-      icon: 'earth-arrow-down',
-      tooltip: 'Attempt to download model info from the internet.',
-      classList: 'comfyui-button icon-button',
-      action: async (e) => {
-          if (this.#savedNotesValue !== '') {
-              const overwriteNoteConfirmation = window.confirm('Overwrite note?');
-              if (!overwriteNoteConfirmation) {
-                  comfyButtonAlert(e.target, false, 'mdi-check-bold', 'mdi-close-thick');
-                  return;
-              }
-          }
-          
-          const [button, icon, span] = comfyButtonDisambiguate(e.target);
-          button.disabled = true;
-          const [success, downloadedNotesValue] = await comfyRequest(
-              `/model-manager/notes/download?path=${path}&overwrite=True`,
-              {
-                  method: 'POST',
-                  body: {},
-              }
-          ).then((data) => {
-              const success = data['success'];
-              const message = data['alert'];
-              if (message !== undefined) {
-                  window.alert(message);
-              }
-              return [success, data['notes']];
-          }).catch((err) => {
-              return [false, ''];
-          });
-          if (success) {
-              this.#savedNotesValue = downloadedNotesValue;
-              this.elements.notes.value = downloadedNotesValue;
-              this.elements.markdown.innerHTML = marked.parse(downloadedNotesValue);
-          }
-          comfyButtonAlert(e.target, success, 'mdi-check-bold', 'mdi-close-thick');
-          button.disabled = false;
-      },
-  }).element;
-
-    const saveDebounce = debounce(async () => {
-      const saveIconClass = 'mdi-' + saveIcon;
-      const savingIconClass = 'mdi-' + savingIcon;
-      const iconElement = saveNotesButton.getElementsByTagName('i')[0];
-      iconElement.classList.remove(saveIconClass);
-      iconElement.classList.add(savingIconClass);
-      const saved = await this.trySave(false);
-      iconElement.classList.remove(savingIconClass);
-      iconElement.classList.add(saveIconClass);
-    }, 1000);
-
     /** @type {HTMLDivElement} */
-    const notesElement = this.elements.tabContents[1]; // TODO: remove magic value
-    notesElement.innerHTML = '';
-    const markdown = $el('div', {}, '');
-    markdown.innerHTML = marked.parse(noteText);
-
-    notesElement.append.apply(
-      notesElement,
-      (() => {
-        const notes = $el('textarea.comfy-multiline-input', {
-          name: 'model notes',
-          value: noteText,
-          oninput: (e) => {
-            if (this.#settingsElements['model-info-autosave-notes'].checked) {
-              saveDebounce();
+    const metadataElement = this.elements.tabContents[1]; // TODO: remove magic value
+    const isMetadata =
+      typeof metadata === 'object' &&
+      metadata !== null &&
+      Object.keys(metadata).length > 0;
+    metadataElement.innerHTML = '';
+    metadataElement.append.apply(metadataElement, [
+      $el('h1', ['Metadata']),
+      $el(
+        'div',
+        (() => {
+          const tableRows = [];
+          if (isMetadata) {
+            for (const [key, value] of Object.entries(metadata)) {
+              if (value === undefined || value === null) {
+                continue;
+              }
+              if (value !== '') {
+                tableRows.push(
+                  $el('tr', [
+                    $el('th.model-metadata-key', [key]),
+                    $el('th.model-metadata-value', [value]),
+                  ]),
+                );
+              }
             }
-          },
-        });
-
-        if (navigator.userAgent.includes('Mac')) {
-          new KeyComboListener(['MetaLeft', 'KeyS'], saveDebounce, notes);
-          new KeyComboListener(['MetaRight', 'KeyS'], saveDebounce, notes);
-        } else {
-          new KeyComboListener(['ControlLeft', 'KeyS'], saveDebounce, notes);
-          new KeyComboListener(['ControlRight', 'KeyS'], saveDebounce, notes);
-        }
-
-        this.elements.notes = notes;
-        this.elements.markdown = markdown;
-        this.#savedNotesValue = noteText;
-
-        const notesEditor = $el(
-          'div',
-          {
-            style: {
-              display: noteText == '' ? 'flex' : 'none',
-              height: '100%',
-              'min-height': '60px',
-            },
-          },
-          notes,
-        );
-        const notesViewer = $el(
-          'div',
-          {
-            style: {
-              display: noteText == '' ? 'none' : 'flex',
-              height: '100%',
-              'min-height': '60px',
-              overflow: 'scroll',
-              'overflow-wrap': 'anywhere',
-            },
-          },
-          markdown,
-        );
-
-        const editNotesButton = new ComfyButton({
-          icon: 'pencil',
-          tooltip: 'Change file name',
-          classList: 'comfyui-button icon-button',
-          action: async () => {
-            notesEditor.style.display =
-              notesEditor.style.display == 'flex' ? 'none' : 'flex';
-            notesViewer.style.display =
-              notesViewer.style.display == 'none' ? 'flex' : 'none';
-          },
-        }).element;
-
-        return [
-          $el(
-            'div.row',
-            {
-              style: { 'align-items': 'center' },
-            },
-            [$el('h1', ['Notes']), downloadNotesButton, saveNotesButton, editNotesButton],
-          ),
-          notesEditor,
-          notesViewer,
-        ];
-      })(),
-    );
-
-    //
-    // TAGS
-    //
+          }
+          return $el('table.model-metadata', tableRows);
+        })(),
+      ),
+    ]);
+    const metadataButton = this.elements.tabButtons[1]; // TODO: remove magic value
+    metadataButton.style.display = isMetadata ? '' : 'none';
 
     /** @type {HTMLDivElement} */
     const tagsElement = this.elements.tabContents[2]; // TODO: remove magic value
@@ -3307,44 +2969,114 @@ class ModelInfo {
     const tagButton = this.elements.tabButtons[2]; // TODO: remove magic value
     tagButton.style.display = isTags ? '' : 'none';
 
-    //
-    // METADATA
-    //
+    const saveIcon = 'content-save';
+    const savingIcon = 'cloud-upload-outline';
+
+    const saveNotesButton = new ComfyButton({
+      icon: saveIcon,
+      tooltip: 'Save note',
+      classList: 'comfyui-button icon-button',
+      action: async (e) => {
+        const [button, icon, span] = comfyButtonDisambiguate(e.target);
+        button.disabled = true;
+        const saved = await this.trySave(false);
+        comfyButtonAlert(e.target, saved);
+        button.disabled = false;
+      },
+    }).element;
+
+    const saveDebounce = debounce(async () => {
+      const saveIconClass = 'mdi-' + saveIcon;
+      const savingIconClass = 'mdi-' + savingIcon;
+      const iconElement = saveNotesButton.getElementsByTagName('i')[0];
+      iconElement.classList.remove(saveIconClass);
+      iconElement.classList.add(savingIconClass);
+      const saved = await this.trySave(false);
+      iconElement.classList.remove(savingIconClass);
+      iconElement.classList.add(saveIconClass);
+    }, 1000);
 
     /** @type {HTMLDivElement} */
-    const metadataElement = this.elements.tabContents[3]; // TODO: remove magic value
-    const isMetadata =
-      typeof metadata === 'object' &&
-      metadata !== null &&
-      Object.keys(metadata).length > 0;
-    metadataElement.innerHTML = '';
-    metadataElement.append.apply(metadataElement, [
-      $el('h1', ['Metadata']),
-      $el(
-        'div',
-        (() => {
-          const tableRows = [];
-          if (isMetadata) {
-            for (const [key, value] of Object.entries(metadata)) {
-              if (value === undefined || value === null) {
-                continue;
-              }
-              if (value !== '') {
-                tableRows.push(
-                  $el('tr', [
-                    $el('th.model-metadata-key', [key]),
-                    $el('th.model-metadata-value', [value]),
-                  ]),
-                );
-              }
+    const notesElement = this.elements.tabContents[3]; // TODO: remove magic value
+    notesElement.innerHTML = '';
+    const markdown = $el('div', {}, '');
+    markdown.innerHTML = marked.parse(noteText);
+
+    notesElement.append.apply(
+      notesElement,
+      (() => {
+        const notes = $el('textarea.comfy-multiline-input', {
+          name: 'model notes',
+          value: noteText,
+          oninput: (e) => {
+            if (this.#settingsElements['model-info-autosave-notes'].checked) {
+              saveDebounce();
             }
-          }
-          return $el('table.model-metadata', tableRows);
-        })(),
-      ),
-    ]);
-    const metadataButton = this.elements.tabButtons[3]; // TODO: remove magic value
-    metadataButton.style.display = isMetadata ? '' : 'none';
+          },
+        });
+
+        if (navigator.userAgent.includes('Mac')) {
+          new KeyComboListener(['MetaLeft', 'KeyS'], saveDebounce, notes);
+          new KeyComboListener(['MetaRight', 'KeyS'], saveDebounce, notes);
+        } else {
+          new KeyComboListener(['ControlLeft', 'KeyS'], saveDebounce, notes);
+          new KeyComboListener(['ControlRight', 'KeyS'], saveDebounce, notes);
+        }
+
+        this.elements.notes = notes;
+        this.elements.markdown = markdown;
+        this.#savedNotesValue = noteText;
+
+        const notes_editor = $el(
+          'div',
+          {
+            style: {
+              display: noteText == '' ? 'flex' : 'none',
+              height: '100%',
+              'min-height': '60px',
+            },
+          },
+          notes,
+        );
+        const notes_viewer = $el(
+          'div',
+          {
+            style: {
+              display: noteText == '' ? 'none' : 'flex',
+              height: '100%',
+              'min-height': '60px',
+              overflow: 'scroll',
+              'overflow-wrap': 'anywhere',
+            },
+          },
+          markdown,
+        );
+
+        const editNotesButton = new ComfyButton({
+          icon: 'pencil',
+          tooltip: 'Change file name',
+          classList: 'comfyui-button icon-button',
+          action: async () => {
+            notes_editor.style.display =
+              notes_editor.style.display == 'flex' ? 'none' : 'flex';
+            notes_viewer.style.display =
+              notes_viewer.style.display == 'none' ? 'flex' : 'none';
+          },
+        }).element;
+
+        return [
+          $el(
+            'div.row',
+            {
+              style: { 'align-items': 'center' },
+            },
+            [$el('h1', ['Notes']), saveNotesButton, editNotesButton],
+          ),
+          notes_editor,
+          notes_viewer,
+        ];
+      })(),
+    );
   }
 
   static UniformTagSampling(
@@ -3994,7 +3726,11 @@ class DownloadView {
             onkeydown: async (e) => {
               if (e.key === 'Enter') {
                 e.stopPropagation();
-                searchButton.click();
+                if (this.elements.url.value === '') {
+                  reset();
+                } else {
+                  await update();
+                }
                 e.target.blur();
               }
             },
@@ -4639,7 +4375,6 @@ class SettingsView {
       /** @type {HTMLInputElement} */ 'model-show-add-button': null,
       /** @type {HTMLInputElement} */ 'model-show-copy-button': null,
       /** @type {HTMLInputElement} */ 'model-show-load-workflow-button': null,
-      /** @type {HTMLInputElement} */ 'model-show-open-model-url-button': null,
       /** @type {HTMLInputElement} */ 'model-info-button-on-left': null,
       /** @type {HTMLInputElement} */ 'model-buttons-only-on-hover': null,
 
@@ -4667,7 +4402,7 @@ class SettingsView {
   };
 
   /** @return {(withoutComfyRefresh?: boolean) => Promise<void>} */
-  #updateModels = async () => {};
+  #updateModels = () => {};
 
   /** @return {() => void} */
   #updateSidebarSettings = () => {};
@@ -4809,7 +4544,7 @@ class SettingsView {
     this.elements.saveButton = saveButton;
 
     const correctPreviewsButton = new ComfyButton({
-      content: 'Fix Preview Extensions',
+      content: 'Fix Extensions',
       tooltip: 'Correct image file extensions in all model directories',
       action: async (e) => {
         const [button, icon, span] = comfyButtonDisambiguate(e.target);
@@ -4828,70 +4563,6 @@ class SettingsView {
         }
         comfyButtonAlert(e.target, success);
         if (data['corrected'] > 0) {
-          await this.reload(true);
-        }
-        button.disabled = false;
-      },
-    }).element;
-
-    const scanDownloadModelInfosButton = new ComfyButton({
-      content: 'Download Model Info',
-      tooltip: 'Scans all model files and tries to download and save model info, notes and urls.',
-      action: async (e) => {
-        const confirmation = window.confirm(
-          'WARNING: This may take a while and generate MANY server requests!\nUSE AT YOUR OWN RISK!',
-        );
-        if (!confirmation) {
-          return;
-        }
-        
-        const [button, icon, span] = comfyButtonDisambiguate(e.target);
-        button.disabled = true;
-        const data = await comfyRequest('/model-manager/models/scan', {
-          method: 'POST',
-          body: JSON.stringify({}),
-        }).catch((err) => {
-          return { success: false };
-        });
-        const success = data['success'];
-        const successMessage = success ? "Scan Finished!" : "Scan Failed!";
-        const infoCount = data['infoCount'];
-        const notesCount = data['notesCount'];
-        const urlCount = data['urlCount'];
-        window.alert(`${successMessage}\nScanned: ${infoCount}\nSaved Notes: ${notesCount}\nSaved Url: ${urlCount}`);
-        comfyButtonAlert(e.target, success);
-        if (infoCount > 0 || notesCount > 0 || urlCount > 0) {
-          await this.reload(true);
-        }
-        button.disabled = false;
-      },
-    }).element;
-
-    const scanDownloadPreviewsButton = new ComfyButton({
-      content: 'Download Missing Previews',
-      tooltip: 'Downloads missing model previews from model info.\nRun model info scan first!',
-      action: async (e) => {
-        const confirmation = window.confirm(
-          'WARNING: This may take a while and generate MANY server requests!\nUSE AT YOUR OWN RISK!',
-        );
-        if (!confirmation) {
-          return;
-        }
-        
-        const [button, icon, span] = comfyButtonDisambiguate(e.target);
-        button.disabled = true;
-        const data = await comfyRequest('/model-manager/preview/scan', {
-          method: 'POST',
-          body: JSON.stringify({}),
-        }).catch((err) => {
-          return { success: false };
-        });
-        const success = data['success'];
-        const successMessage = success ? "Scan Finished!" : "Scan Failed!";
-        const count = data['count'];
-        window.alert(`${successMessage}\nPreviews Downloaded: ${count}`);
-        comfyButtonAlert(e.target, success);
-        if (count > 0) {
           await this.reload(true);
         }
         button.disabled = false;
@@ -4947,6 +4618,11 @@ class SettingsView {
             'vae_approx',
           ],
         }),
+        $select({
+          $: (el) => (settings['sidebar-default-state'] = el),
+          textContent: 'Default model manager position (on start up)',
+          options: ['Left', 'Right', 'Top', 'Bottom', 'None'],
+        }),	  
         $checkbox({
           $: (el) => (settings['model-real-time-search'] = el),
           textContent: 'Real-time search',
@@ -5010,9 +4686,6 @@ class SettingsView {
         $checkbox({
           $: (el) => (settings['model-show-load-workflow-button'] = el),
           textContent: 'Show "Load Workflow" button',
-        }),$checkbox({
-          $: (el) => (settings['model-show-open-model-url-button'] = el),
-          textContent: 'Show "Open Model Url" button',
         }),
         $checkbox({
           $: (el) => (settings['model-info-button-on-left'] = el),
@@ -5051,11 +4724,6 @@ class SettingsView {
           textContent: 'Save notes by default.',
         }),
         $el('h2', ['Window']),
-        $select({
-          $: (el) => (settings['sidebar-default-state'] = el),
-          textContent: 'Default model manager position (on start up)',
-          options: ['None', 'Left', 'Bottom', 'Top', 'Right'],
-        }),
         sidebarControl,
         $el('label', [
           'Sidebar width  (on start up)',
@@ -5089,18 +4757,16 @@ class SettingsView {
           $: (el) => (settings['text-input-always-hide-clear-button'] = el),
           textContent: 'Always hide "Clear Search" buttons.',
         }),
-        $el('h2', ['Scan Files']),
+        $el('h2', ['Model Preview Images']),
         $el('div', [correctPreviewsButton]),
-        $el('div', [scanDownloadModelInfosButton]),
-        $el('div', [scanDownloadPreviewsButton]),
         $el('h2', ['Random Tag Generator']),
         $select({
           $: (el) => (settings['tag-generator-sampler-method'] = el),
-          textContent: 'Sampling method',
+          textContent: 'Default sampling method',
           options: ['Frequency', 'Uniform'],
         }),
         $el('label', [
-          'Generation count',
+          'Default count',
           $el('input', {
             $: (el) => (settings['tag-generator-count'] = el),
             type: 'number',
@@ -5110,7 +4776,7 @@ class SettingsView {
           }),
         ]),
         $el('label', [
-          'Minimum frequency threshold',
+          'Default minimum threshold',
           $el('input', {
             $: (el) => (settings['tag-generator-threshold'] = el),
             type: 'number',
@@ -5361,7 +5027,6 @@ class ModelManager extends ComfyDialog {
       this.#modelData,
       this.#refreshModels,
       this.#settingsView.elements.settings,
-      () => this.#tryHideModelInfo(),
     );
 
     this.#browseView = new BrowseView(
@@ -5922,21 +5587,14 @@ class ModelManager extends ComfyDialog {
 /** @type {ModelManager | undefined} */
 let instance;
 
-/** @type {ComfyDialog | undefined} */
-let modelManagerDialog;
-
 /**
  * @returns {ModelManager}
  */
 function getInstance() {
-    if (!instance) {
-        instance = new ModelManager();
-        
-        modelManagerDialog = new ComfyDialog();
-        modelManagerDialog.element.classList.add("model-manager-dialog");
-        instance.element.appendChild(modelManagerDialog.element);
-    }
-    return instance;
+  if (!instance) {
+    instance = new ModelManager();
+  }
+  return instance;
 }
 
 const toggleModelManager = () => {
