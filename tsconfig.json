@@ -24,7 +24,14 @@
     "allowJs": true,
     "baseUrl": ".",
     "outDir": "./web",
-    "rootDir": "./"
+    "rootDir": "./",
+    "paths": {
+      "components/*": ["src/components/*"],
+      "hooks/*": ["src/hooks/*"],
+      "scripts/*": ["src/scripts/*"],
+      "types/*": ["src/types/*"],
+      "utils/*": ["src/utils/*"],
+    }
   },
   "include": [
     "src/**/*",

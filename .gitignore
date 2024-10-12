@@ -194,3 +194,6 @@ node_modules/
 
 # dist
 web/
+
+# config
+config/
