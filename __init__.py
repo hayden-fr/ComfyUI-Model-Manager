@@ -9,7 +9,8 @@ import importlib
 import re
 import base64
 
-from aiohttp import web
+from aiohttp import ClientSession, web
+import aiofiles
 import server
 import urllib.parse
 import urllib.request
@@ -224,7 +225,7 @@ server_settings = config_loader.yaml_load(server_settings_uri, server_rules())
 config_loader.yaml_save(server_settings_uri, server_rules(), server_settings)
 
 
-def get_def_headers(url=""):
+def get_def_headers(url="") -> dict[str, str]:
     def_headers = {
         "User-Agent": "Mozilla/5.0 (iPad; CPU OS 12_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148",
     }
@@ -451,7 +452,7 @@ async def get_image_extensions(request):
     return web.json_response(image_extensions)
 
 
-def download_model_preview(formdata):
+async def download_model_preview(formdata):
     path = formdata.get("path", None)
     if type(path) is not str:
         raise ValueError("Invalid path!")
@@ -491,7 +492,7 @@ def download_model_preview(formdata):
         if image_extension == "":
             raise ValueError("Invalid image type!")
         image_path = path_without_extension + image_extension
-        download_file(image, image_path, overwrite)
+        await download_file(image, image_path, overwrite)
     else:
         content_type = image.content_type
         if not content_type.startswith("image/"):
@@ -532,7 +533,7 @@ def download_model_preview(formdata):
 async def set_model_preview(request):
     formdata = await request.post()
     try:
-        download_model_preview(formdata)
+        await download_model_preview(formdata)
         return web.json_response({ "success": True })
     except ValueError as e:
         print(e, file=sys.stderr, flush=True)
@@ -778,98 +779,84 @@ async def get_directory_list(request):
     #json.dump(dir_list, sys.stdout, indent=4)
     return web.json_response(dir_list)
 
-
-def download_file(url, filename, overwrite):
-    if not overwrite and os.path.isfile(filename):
+async def download_file(url, filename, overwrite):
+      if not overwrite and os.path.isfile(filename):
         raise ValueError("File already exists!")
 
-    filename_temp = filename + ".download"
+      filename_temp = filename + ".download"
 
-    def_headers = get_def_headers(url)
-    rh = requests.get(
-        url=url, 
-        stream=True, 
-        verify=False, 
-        headers=def_headers, 
-        proxies=None, 
-        allow_redirects=False, 
-    )
-    if not rh.ok:
-        raise ValueError(
-            "Unable to download! Request header status code: " + 
-            str(rh.status_code)
-        )
+      def_headers = get_def_headers(url)
 
-    downloaded_size = 0
-    if rh.status_code == 200 and os.path.exists(filename_temp):
-        downloaded_size = os.path.getsize(filename_temp)
+      async with ClientSession() as session:
+        async with session.get(url, headers=def_headers, allow_redirects=False) as rh:
+          if not rh.ok:
+            raise ValueError(
+              "Unable to download! Request header status code: " +
+              str(rh.status)
+            )
 
-    headers = {"Range": "bytes=%d-" % downloaded_size}
-    headers["User-Agent"] = def_headers["User-Agent"]
-    headers["Authorization"] = def_headers.get("Authorization", None)
+          downloaded_size = 0
+          if rh.status == 200 and os.path.exists(filename_temp):
+            downloaded_size = os.path.getsize(filename_temp)
 
-    r = requests.get(
-        url=url, 
-        stream=True, 
-        verify=False, 
-        headers=headers, 
-        proxies=None, 
-        allow_redirects=False, 
-    )
-    if rh.status_code == 307 and r.status_code == 307:
-        # Civitai redirect
-        redirect_url = r.content.decode("utf-8")
-        if not redirect_url.startswith("http"):
-            # Civitai requires login (NSFW or user-required)
-            # TODO: inform user WHY download failed
-            raise ValueError("Unable to download from Civitai! Redirect url: " + str(redirect_url))
-        download_file(redirect_url, filename, overwrite)
-        return
-    if rh.status_code == 302 and r.status_code == 302:
-        # HuggingFace redirect
-        redirect_url = r.content.decode("utf-8")
-        redirect_url_index = redirect_url.find("http")
-        if redirect_url_index == -1:
-            raise ValueError("Unable to download from HuggingFace! Redirect url: " + str(redirect_url))
-        download_file(redirect_url[redirect_url_index:], filename, overwrite)
-        return
-    elif rh.status_code == 200 and r.status_code == 206:
-        # Civitai download link
-        pass
+          headers = {"Range": "bytes=%d-" % downloaded_size}
+          headers["User-Agent"] = def_headers["User-Agent"]
+          if "Authorization" in def_headers:
+            headers["Authorization"] = def_headers["Authorization"]
 
-    total_size = int(rh.headers.get("Content-Length", 0)) # TODO: pass in total size earlier
+          async with session.get(url, headers=headers, allow_redirects=False) as r:
+            if rh.status == 307 and r.status == 307:
+              # Civitai redirect
+              redirect_url = await r.text()
+              if not redirect_url.startswith("http"):
+                raise ValueError("Unable to download from Civitai! Redirect url: " + str(redirect_url))
+              await download_file(redirect_url, filename, overwrite)
+              return
+            if rh.status == 302 and r.status == 302:
+              # HuggingFace redirect
+              redirect_url = await r.text()
+              redirect_url_index = redirect_url.find("http")
+              if redirect_url_index == -1:
+                raise ValueError("Unable to download from HuggingFace! Redirect url: " + str(redirect_url))
+              await download_file(redirect_url[redirect_url_index:], filename, overwrite)
+              return
+            elif rh.status == 200 and r.status == 206:
+              # Civitai download link
+              pass
 
-    print("Downloading file: " + url)
-    if total_size != 0:
-        print("Download file size: " + str(total_size))
+            total_size = int(rh.headers.get("Content-Length", 0))
 
-    mode = "wb" if overwrite else "ab"
-    with open(filename_temp, mode) as f:
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk is not None:
-                downloaded_size += len(chunk)
-                f.write(chunk)
-                f.flush()
+            print("Downloading file: " + url)
+            if total_size != 0:
+              print("Download file size: " + str(total_size))
 
-                if total_size != 0:
+            mode = "wb" if overwrite else "ab"
+            async with aiofiles.open(filename_temp, mode) as f:
+              async for chunk in r.content.iter_chunked(8192):
+                if chunk:
+                  downloaded_size += len(chunk)
+                  await f.write(chunk)
+
+                  if total_size != 0:
                     fraction = 1 if downloaded_size == total_size else downloaded_size / total_size
                     progress = int(50 * fraction)
                     sys.stdout.reconfigure(encoding="utf-8")
                     sys.stdout.write(
-                        "\r[%s%s] %d%%"
-                        % (
-                            "-" * progress,
-                            " " * (50 - progress),
-                            100 * fraction,
-                        )
+                      "\r[%s%s] %d%%"
+                      % (
+                        "-" * progress,
+                        " " * (50 - progress),
+                        100 * fraction,
+                      )
                     )
                     sys.stdout.flush()
-    print()
+                await f.flush()
+            print()
 
-    if overwrite and os.path.isfile(filename):
-        os.remove(filename)
-    os.rename(filename_temp, filename)
-    print("Saved file: " + filename)
+            if overwrite and os.path.isfile(filename):
+              os.remove(filename)
+            os.rename(filename_temp, filename)
+            print("Saved file: " + filename)
 
 
 def bytes_to_size(total_bytes):
@@ -1043,7 +1030,7 @@ async def download_model(request):
         return web.json_response(result)
     file_name = os.path.join(directory, name)
     try:
-        download_file(download_uri, file_name, overwrite)
+        await download_file(download_uri, file_name, overwrite)
     except Exception as e:
         print(e, file=sys.stderr, flush=True)
         result["alert"] = "Failed to download model!\n\n" + str(e)
@@ -1052,7 +1039,7 @@ async def download_model(request):
     image = formdata.get("image")
     if image is not None and image != "":
         try:
-            download_model_preview({
+            await download_model_preview({
                 "path": model_path + os.sep + name,
                 "image": image,
                 "overwrite": formdata.get("overwrite"),
