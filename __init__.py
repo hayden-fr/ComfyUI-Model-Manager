@@ -9,7 +9,7 @@ import importlib
 import re
 import base64
 
-from aiohttp import ClientSession, web
+from aiohttp import ClientSession, ClientTimeout, web
 import aiofiles
 import server
 import urllib.parse
@@ -786,8 +786,9 @@ async def download_file(url, filename, overwrite):
       filename_temp = filename + ".download"
 
       def_headers = get_def_headers(url)
+      timeout = ClientTimeout(total=60*60*5)  # Set timeout to 5 hour
 
-      async with ClientSession() as session:
+      async with ClientSession(timeout=timeout) as session:
         async with session.get(url, headers=def_headers, allow_redirects=False) as rh:
           if not rh.ok:
             raise ValueError(
