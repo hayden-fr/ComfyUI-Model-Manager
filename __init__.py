@@ -806,24 +806,13 @@ async def download_file(url, filename, overwrite):
             headers["Authorization"] = def_headers["Authorization"]
 
           async with session.get(url, headers=headers, allow_redirects=False) as r:
-            if rh.status == 307 and r.status == 307:
-              # Civitai redirect
-              redirect_url = await r.text()
-              if not redirect_url.startswith("http"):
-                raise ValueError("Unable to download from Civitai! Redirect url: " + str(redirect_url))
-              await download_file(redirect_url, filename, overwrite)
+            if r.status in [301, 302, 303, 307, 308]:
+              redirect_url = r.headers.get("Location") or r.headers.get("location")
+              if redirect_url is None:
+                raise ValueError("Unable to download! Redirect URL is missing!")
+              print("Redirecting to: " + redirect_url)
+              await download_file(redirect_url, filename, overwrite, with_hash)
               return
-            if rh.status == 302 and r.status == 302:
-              # HuggingFace redirect
-              redirect_url = await r.text()
-              redirect_url_index = redirect_url.find("http")
-              if redirect_url_index == -1:
-                raise ValueError("Unable to download from HuggingFace! Redirect url: " + str(redirect_url))
-              await download_file(redirect_url[redirect_url_index:], filename, overwrite)
-              return
-            elif rh.status == 200 and r.status == 206:
-              # Civitai download link
-              pass
 
             total_size = int(rh.headers.get("Content-Length", 0))
 
