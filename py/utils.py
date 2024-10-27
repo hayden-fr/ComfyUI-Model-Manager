@@ -58,15 +58,21 @@ def recursive_search_files(directory: str):
     files, folder_all = folder_paths.recursive_search(
         directory, excluded_dir_names=[".git"]
     )
-    files.sort()
     return files
 
 
 def search_files(directory: str):
     entries = os.listdir(directory)
     files = [f for f in entries if os.path.isfile(os.path.join(directory, f))]
-    files.sort()
     return files
+
+
+def file_list_to_name_dict(files: list[str]):
+    file_dict: dict[str, str] = {}
+    for file in files:
+        filename = os.path.splitext(file)[0]
+        file_dict[filename] = file
+    return file_dict
 
 
 def get_model_metadata(filename: str):

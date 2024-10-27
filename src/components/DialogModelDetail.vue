@@ -14,7 +14,7 @@
       <div class="px-8">
         <ModelContent
           v-model:editable="editable"
-          :model="model"
+          :model="modelContent"
           @submit="handleSave"
           @reset="handleCancel"
         >
@@ -61,8 +61,9 @@ import ModelContent from 'components/ModelContent.vue'
 import DialogResizer from 'components/DialogResizer.vue'
 import ResponseScrollArea from 'components/ResponseScrollArea.vue'
 import { useConfig } from 'hooks/config'
-import { computed, ref } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useModelNodeAction, useModels } from 'hooks/model'
+import { useRequest } from 'hooks/request'
 
 const visible = defineModel<boolean>('visible')
 interface Props {
@@ -74,6 +75,24 @@ const { isMobile } = useConfig()
 const { remove, update } = useModels()
 
 const editable = ref(false)
+
+const { data: extraInfo, refresh: fetchExtraInfo } = useRequest(
+  `/model/${props.model.type}/${props.model.pathIndex}/${props.model.fullname}`,
+  {
+    method: 'GET',
+    manual: true,
+  },
+)
+
+const modelContent = computed(() => {
+  return Object.assign({}, props.model, extraInfo.value)
+})
+
+watchEffect(() => {
+  if (visible.value === true) {
+    fetchExtraInfo()
+  }
+})
 
 const filename = computed(() => {
   const basename = props.model.fullname.split('/').pop()!

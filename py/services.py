@@ -5,6 +5,7 @@ import folder_paths
 
 from typing import Any
 from multidict import MultiDictProxy
+from . import config
 from . import utils
 from . import socket
 from . import download
@@ -31,62 +32,39 @@ async def connect_websocket(request):
     return ws
 
 
-def scan_models_by_model_type(model_type: str):
-    """
-    Scans all models in the given model type and returns a list of models.
-    """
-    out = []
-    folders, extensions = folder_paths.folder_names_and_paths[model_type]
-    for path_index, base_path in enumerate(folders):
-        files = utils.recursive_search_files(base_path)
+def scan_models():
+    result = []
+    model_base_paths = config.model_base_paths
+    for model_type in model_base_paths:
 
-        models = folder_paths.filter_files_extensions(files, extensions)
+        folders, extensions = folder_paths.folder_names_and_paths[model_type]
+        for path_index, base_path in enumerate(folders):
+            files = utils.recursive_search_files(base_path)
 
-        for fullname in models:
-            """
-            fullname is model path relative to base_path
-            eg.
-                abs_path  is /path/to/models/stable-diffusion/custom_group/model_name.ckpt
-                base_path is /path/to/models/stable-diffusion
-                fullname  is custom_group/model_name.ckpt
-                basename  is custom_group/model_name
-                extension is .ckpt
-            """
+            models = folder_paths.filter_files_extensions(files, extensions)
+            images = folder_paths.filter_files_content_types(files, ["image"])
+            image_dict = utils.file_list_to_name_dict(images)
 
-            fullname = fullname.replace(os.path.sep, "/")
-            basename = os.path.splitext(fullname)[0]
-            extension = os.path.splitext(fullname)[1]
-            prefix_path = fullname.replace(os.path.basename(fullname), "")
+            for fullname in models:
+                fullname = fullname.replace(os.path.sep, "/")
+                basename = os.path.splitext(fullname)[0]
+                extension = os.path.splitext(fullname)[1]
 
-            abs_path = os.path.join(base_path, fullname)
-            file_stats = os.stat(abs_path)
+                abs_path = os.path.join(base_path, fullname)
+                file_stats = os.stat(abs_path)
 
-            # Resolve metadata
-            metadata = utils.get_model_metadata(abs_path)
+                # Resolve preview
+                image_name = image_dict.get(basename, "no-preview.png")
+                abs_image_path = os.path.join(base_path, image_name)
+                if os.path.isfile(abs_image_path):
+                    image_state = os.stat(abs_image_path)
+                    image_timestamp = round(image_state.st_mtime_ns / 1000000)
+                    image_name = f"{image_name}?ts={image_timestamp}"
+                model_preview = (
+                    f"/model-manager/preview/{model_type}/{path_index}/{image_name}"
+                )
 
-            # Resolve preview
-            image_name = utils.get_model_preview_name(abs_path)
-            image_name = os.path.join(prefix_path, image_name)
-            abs_image_path = os.path.join(base_path, image_name)
-            if os.path.isfile(abs_image_path):
-                image_state = os.stat(abs_image_path)
-                image_timestamp = round(image_state.st_mtime_ns / 1000000)
-                image_name = f"{image_name}?ts={image_timestamp}"
-            model_preview = (
-                f"/model-manager/preview/{model_type}/{path_index}/{image_name}"
-            )
-
-            # Resolve description
-            description_file = utils.get_model_description_name(abs_path)
-            description_file = os.path.join(prefix_path, description_file)
-            abs_desc_path = os.path.join(base_path, description_file)
-            description = None
-            if os.path.isfile(abs_desc_path):
-                with open(abs_desc_path, "r", encoding="utf-8") as f:
-                    description = f.read()
-
-            out.append(
-                {
+                model_info = {
                     "fullname": fullname,
                     "basename": basename,
                     "extension": extension,
@@ -94,14 +72,31 @@ def scan_models_by_model_type(model_type: str):
                     "pathIndex": path_index,
                     "sizeBytes": file_stats.st_size,
                     "preview": model_preview,
-                    "description": description,
                     "createdAt": round(file_stats.st_ctime_ns / 1000000),
                     "updatedAt": round(file_stats.st_mtime_ns / 1000000),
-                    "metadata": metadata,
                 }
-            )
 
-    return out
+                result.append(model_info)
+
+    return result
+
+
+def get_model_info(model_path: str):
+    directory = os.path.dirname(model_path)
+
+    metadata = utils.get_model_metadata(model_path)
+
+    description_file = utils.get_model_description_name(model_path)
+    description_file = os.path.join(directory, description_file)
+    description = None
+    if os.path.isfile(description_file):
+        with open(description_file, "r", encoding="utf-8") as f:
+            description = f.read()
+
+    return {
+        "metadata": metadata,
+        "description": description,
+    }
 
 
 def update_model(model_path: str, post: MultiDictProxy):

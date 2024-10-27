@@ -68,15 +68,30 @@ async def read_models(request):
     Scan all models and read their information.
     """
     try:
-
-        result = []
-        model_base_paths = config.model_base_paths
-        for model_type in model_base_paths:
-            result.extend(services.scan_models_by_model_type(model_type))
-        result = [{"id": i, **x} for i, x in enumerate(result)]
+        result = services.scan_models()
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
+        logging.error(error_msg)
+        logging.debug(traceback.format_exc())
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.get("/model-manager/model/{type}/{index}/{filename:.*}")
+async def read_model_info(request):
+    """
+    Get the information of the specified model.
+    """
+    model_type = request.match_info.get("type", None)
+    index = int(request.match_info.get("index", None))
+    filename = request.match_info.get("filename", None)
+
+    try:
+        model_path = utils.get_valid_full_path(model_type, index, filename)
+        result = services.get_model_info(model_path)
+        return web.json_response({"success": True, "data": result})
+    except Exception as e:
+        error_msg = f"Read model info failed: {str(e)}"
         logging.error(error_msg)
         logging.debug(traceback.format_exc())
         return web.json_response({"success": False, "error": error_msg})
