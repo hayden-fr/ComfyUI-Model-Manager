@@ -18,11 +18,11 @@ npm run build
 
 ## Freely adjust size and position
 
-<img src="demo/tab-models.gif" height="300" >
+<img src="demo/tab-models.gif" style="max-width: 100%; max-height: 300px" >
 
 ### Support Node Graph
 
-<img src="demo/tab-model-node-graph.gif" height="300" >
+<img src="demo/tab-model-node-graph.gif" style="max-width: 100%; max-height: 300px" >
 
 - Drag a model thumbnail onto the graph to add a new node.
 - Drag a model thumbnail onto an existing node to set the input field.
@@ -35,7 +35,7 @@ npm run build
 
 ### Download Tab
 
-<img src="demo/tab-download.png" height="300" >
+<img src="demo/tab-download.png" style="max-width: 100%; max-height: 300px" >
 
 - View multiple models associated with a url.
 - Select a save directory and input a filename.
@@ -43,18 +43,18 @@ npm run build
 - Optionally edit and save descriptions as a .md note.
 - Add Civitai and HuggingFace API tokens in ComfyUI's settings.
 
-<img src="demo/tab-settings.png" height="150" >
+<img src="demo/tab-settings.png" style="max-width: 100%; max-height: 150px" >
 
 ### Models Tab
 
-<img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" height="300"/>
+<img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
 
 - Search in real-time for models using the search bar.
 - Sort models by "Name", "File Size", "Date Created" and "Date Modified".
 
 ### Model Info View
 
-<img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" height="300"/>
+<img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
 
 - View file info and metadata.
 - Rename, move or **permanently** remove a model and all of it's related files.
