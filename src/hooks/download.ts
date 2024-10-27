@@ -182,9 +182,20 @@ class Civitai extends ModelSearch {
               pathIndex: 0,
               description: [
                 '---',
-                `website: Civitai`,
-                ``,
-                `modelPage: https://civitai.com/models/${modelId}?modelVersionId=${version.id}`,
+                ...[
+                  `website: Civitai`,
+                  `modelPage: https://civitai.com/models/${modelId}?modelVersionId=${version.id}`,
+                  `author: ${resData.creator?.username}`,
+                  version.baseModel && `baseModel: ${version.baseModel}`,
+                  file.hashes && `hashes:`,
+                  ...Object.entries(file.hashes ?? {}).map(
+                    ([key, value]) => `  ${key}: ${value}`,
+                  ),
+                  file.metadata && `metadata:`,
+                  ...Object.entries(file.metadata ?? {}).map(
+                    ([key, value]) => `  ${key}: ${value}`,
+                  ),
+                ].filter(Boolean),
                 '---',
                 '',
                 '# Trigger Words',
@@ -279,9 +290,11 @@ class Huggingface extends ModelSearch {
             pathIndex: 0,
             description: [
               '---',
-              `website: HuggingFace`,
-              `author: ${resData.author}`,
-              `modelPage: https://huggingface.co/${modelId}`,
+              ...[
+                `website: HuggingFace`,
+                `modelPage: https://huggingface.co/${modelId}`,
+                `author: ${resData.author}`,
+              ].filter(Boolean),
               '---',
               '',
               '# Trigger Words',
