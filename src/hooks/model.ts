@@ -8,7 +8,6 @@ import { app } from 'scripts/comfyAPI'
 import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
 import { resolveModelType } from 'utils/model'
-// import {}
 import {
   computed,
   inject,
@@ -22,10 +21,7 @@ import {
 import { useI18n } from 'vue-i18n'
 
 export const useModels = defineStore('models', () => {
-  const { data, refresh } = useRequest<(Model & { visible?: boolean })[]>(
-    '/models',
-    { defaultValue: [] },
-  )
+  const { data, refresh } = useRequest<Model[]>('/models', { defaultValue: [] })
   const { toast, confirm } = useToast()
   const { t } = useI18n()
   const loading = useLoading()

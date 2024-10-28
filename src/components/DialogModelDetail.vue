@@ -10,7 +10,7 @@
     pt:content:class="px-0"
     @after-hide="handleCancel"
   >
-    <ResponseScrollArea class="h-full">
+    <ResponseScroll class="h-full">
       <div class="px-8">
         <ModelContent
           v-model:editable="editable"
@@ -49,7 +49,7 @@
           </template>
         </ModelContent>
       </div>
-    </ResponseScrollArea>
+    </ResponseScroll>
     <DialogResizer :min-width="390"></DialogResizer>
   </Dialog>
 </template>
@@ -59,7 +59,7 @@ import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import ModelContent from 'components/ModelContent.vue'
 import DialogResizer from 'components/DialogResizer.vue'
-import ResponseScrollArea from 'components/ResponseScrollArea.vue'
+import ResponseScroll from 'components/ResponseScroll.vue'
 import { useConfig } from 'hooks/config'
 import { computed, ref, watchEffect } from 'vue'
 import { useModelNodeAction, useModels } from 'hooks/model'

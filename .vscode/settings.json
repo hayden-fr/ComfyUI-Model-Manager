@@ -35,6 +35,7 @@
     "inplace",
     "contentcontainer",
     "itemlist",
+    "virtualscroller"
   ],
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "files.associations": {

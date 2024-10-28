@@ -34,7 +34,7 @@
         </div>
       </div>
 
-      <ResponseScrollArea>
+      <ResponseScroll>
         <div class="w-full px-4">
           <ul class="m-0 flex list-none flex-col gap-4 p-0">
             <li
@@ -143,7 +143,7 @@
             </div>
           </li>
         </ul> -->
-      </ResponseScrollArea>
+      </ResponseScroll>
     </div>
 
     <DialogResizer :min-width="390" :min-height="390"></DialogResizer>
@@ -155,7 +155,7 @@
 <script setup lang="ts">
 import DialogCreateTask from 'components/DialogCreateTask.vue'
 import DialogResizer from 'components/DialogResizer.vue'
-import ResponseScrollArea from 'components/ResponseScrollArea.vue'
+import ResponseScroll from 'components/ResponseScroll.vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'
 import { useDownload } from 'hooks/download'

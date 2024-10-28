@@ -38,7 +38,7 @@
         </ResponseSelect>
       </div>
 
-      <ResponseScrollArea class="-mx-5 h-full">
+      <ResponseScroll class="-mx-5 h-full">
         <div class="px-5">
           <ModelContent
             v-for="{ item } in data"
@@ -64,7 +64,7 @@
             </div>
           </div>
         </div>
-      </ResponseScrollArea>
+      </ResponseScroll>
     </div>
 
     <DialogResizer :min-width="390"></DialogResizer>
@@ -75,7 +75,7 @@
 import DialogResizer from 'components/DialogResizer.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
-import ResponseScrollArea from 'components/ResponseScrollArea.vue'
+import ResponseScroll from 'components/ResponseScroll.vue'
 import ModelContent from 'components/ModelContent.vue'
 import Button from 'primevue/button'
 import Dialog from 'primevue/dialog'

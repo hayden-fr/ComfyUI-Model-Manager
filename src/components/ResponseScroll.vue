@@ -4,12 +4,30 @@
       ref="viewport"
       data-scroll-viewport
       class="h-full w-full overflow-auto scrollbar-none"
+      :style="{ contain: items ? 'strict' : undefined }"
       @scroll="onContentScroll"
       v-resize="onContainerResize"
     >
-      <div data-scroll-content style="min-width: 100%">
-        <slot name="default"></slot>
+      <div data-scroll-content class="relative min-w-full">
+        <slot name="default">
+          <div
+            v-for="(item, index) in loadedItems"
+            :key="genRowKey(item, index)"
+            :style="{ height: `${itemSize}px` }"
+          >
+            <slot name="item" :item="item"></slot>
+          </div>
+          <slot v-if="loadedItems.length === 0" name="empty">
+            <div class="absolute w-full py-20 text-center">No Data</div>
+          </slot>
+        </slot>
       </div>
+
+      <div
+        data-scroll-space
+        class="pointer-events-none absolute left-0 top-0 h-px w-px"
+        :style="spaceStyle"
+      ></div>
     </div>
 
     <div
@@ -41,12 +59,15 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { nextTick, onUnmounted, ref } from 'vue'
+<script setup lang="ts" generic="T">
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { clamp, throttle } from 'lodash'
 
 interface ScrollAreaProps {
+  items?: T[][]
+  itemSize?: number
   scrollbar?: boolean
+  rowKey?: string | ((item: T[]) => string)
 }
 
 const props = withDefaults(defineProps<ScrollAreaProps>(), {
@@ -105,25 +126,91 @@ const scrollbars = ref<Record<ScrollbarDirection, Scrollbar>>({
 
 const isDragging = ref(false)
 
-const onContainerResize: ResizeObserverCallback = throttle((entries) => {
-  emit('resize', entries)
-  if (isDragging.value) return
+const spaceStyle = ref({})
+const loadedItems = ref<T[][]>([])
 
-  const entry = entries[0]
-  const container = entry.target as HTMLElement
-  const content = container.querySelector('[data-scroll-content]')!
+const genRowKey = (item: any | any[], index: number) => {
+  if (typeof props.rowKey === 'function') {
+    return props.rowKey(item)
+  }
+  return item[props.rowKey ?? 'key'] ?? index
+}
+
+const setSpacerSize = () => {
+  const items = props.items
+  if (items) {
+    const itemSize = props.itemSize ?? 0
+    spaceStyle.value = { height: `${itemSize * items.length}px` }
+  } else {
+    spaceStyle.value = {}
+  }
+}
+
+const getContainerContent = (raw?: boolean): HTMLElement => {
+  const container = viewport.value as HTMLElement
+
+  if (props.items && !raw) {
+    return container.querySelector('[data-scroll-space]')!
+  }
+  return container.querySelector('[data-scroll-content]')!
+}
+
+const init = () => {
+  const container = viewport.value as HTMLElement
+  container.scrollTop = 0
+  getContainerContent().style.transform = ''
+}
+
+const calculateLoadItems = () => {
+  let visibleItems: any[] = []
+
+  if (props.items) {
+    const container = viewport.value as HTMLElement
+    const content = getContainerContent(true)
+
+    const resolveVisibleItems = (items: any[], attr: ScrollbarAttribute) => {
+      const containerSize = container[attr.clientSize]
+      const itemSize = props.itemSize!
+      const viewCount = Math.ceil(containerSize / itemSize)
+
+      let start = Math.floor(container[attr.scrollOffset] / itemSize)
+      const offset = start * itemSize
+
+      let end = start + viewCount
+      end = Math.min(end + viewCount, items.length)
+
+      content.style.transform = `translateY(${offset}px)`
+      return items.slice(start, end)
+    }
+
+    visibleItems = resolveVisibleItems(props.items, scrollbarAttrs.vertical)
+  }
+
+  loadedItems.value = visibleItems
+}
+
+const calculateScrollThumbSize = () => {
+  const container = viewport.value as HTMLElement
+  const content = getContainerContent()
 
   const resolveScrollbarSize = (item: Scrollbar, attr: ScrollbarAttribute) => {
     const containerSize: number = container[attr.clientSize]
     const contentSize: number = content[attr.clientSize]
     item.visible = props.scrollbar && contentSize > containerSize
-    item.size = Math.pow(containerSize, 2) / contentSize
+    item.size = Math.max(Math.pow(containerSize, 2) / contentSize, 16)
   }
 
   nextTick(() => {
     resolveScrollbarSize(scrollbars.value.horizontal, scrollbarAttrs.horizontal)
     resolveScrollbarSize(scrollbars.value.vertical, scrollbarAttrs.vertical)
   })
+}
+
+const onContainerResize: ResizeObserverCallback = throttle((entries) => {
+  emit('resize', entries)
+  if (isDragging.value) return
+
+  calculateScrollThumbSize()
 })
 
 const onContentScroll = throttle((event: Event) => {
@@ -131,7 +218,7 @@ const onContentScroll = throttle((event: Event) => {
   if (isDragging.value) return
 
   const container = event.target as HTMLDivElement
-  const content = container.querySelector('[data-scroll-content]')!
+  const content = getContainerContent()
 
   const resolveOffset = (item: Scrollbar, attr: ScrollbarAttribute) => {
     const containerSize = container[attr.clientSize]
@@ -145,6 +232,8 @@ const onContentScroll = throttle((event: Event) => {
 
   resolveOffset(scrollbars.value.horizontal, scrollbarAttrs.horizontal)
   resolveOffset(scrollbars.value.vertical, scrollbarAttrs.vertical)
+
+  calculateLoadItems()
 })
 
 const viewport = ref<HTMLElement>()
@@ -154,7 +243,7 @@ const prevDraggingEvent = ref<MouseEvent>()
 const moveThumb = throttle((event: MouseEvent) => {
   if (isDragging.value) {
     const container = viewport.value!
-    const content = container.querySelector('[data-scroll-content]')!
+    const content = getContainerContent()
 
     const resolveOffset = (item: Scrollbar, attr: ScrollbarAttribute) => {
       const containerSize = container[attr.clientSize]
@@ -180,6 +269,8 @@ const moveThumb = throttle((event: MouseEvent) => {
       scrollbarAttrs[scrollDirection],
     )
     prevDraggingEvent.value = event
+
+    calculateLoadItems()
   }
 })
 
@@ -203,6 +294,16 @@ const startDragThumb = (event: MouseEvent) => {
   document.body.style.userSelect = 'none'
   document.body.style.cursor = 'default'
 }
+
+watch(
+  () => props.items,
+  () => {
+    init()
+    setSpacerSize()
+    calculateScrollThumbSize()
+    calculateLoadItems()
+  },
+)
 
 onUnmounted(() => {
   stopMoveThumb()
