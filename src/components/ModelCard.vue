@@ -30,7 +30,7 @@
           <div class="flex flex-row items-start justify-between">
             <div class="flex items-center rounded-full bg-black/30 px-3 py-2">
               <div class="font-bold @lg:text-xs">
-                {{ displayType }}
+                {{ model.type }}
               </div>
             </div>
 
@@ -67,7 +67,7 @@
 <script setup lang="ts">
 import DialogModelDetail from 'components/DialogModelDetail.vue'
 import Button from 'primevue/button'
-import { genModelKey, resolveModelType } from 'utils/model'
+import { genModelKey } from 'utils/model'
 import { computed } from 'vue'
 import { useModelNodeAction } from 'hooks/model'
 import { useDialog } from 'hooks/dialog'
@@ -92,7 +92,6 @@ const openDetailDialog = () => {
   })
 }
 
-const displayType = computed(() => resolveModelType(props.model.type).display)
 const preview = computed(() =>
   Array.isArray(props.model.preview)
     ? props.model.preview[0]

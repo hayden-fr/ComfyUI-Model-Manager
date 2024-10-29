@@ -45,7 +45,6 @@ import ResponseInput from 'components/ResponseInput.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
 import { useConfig } from 'hooks/config'
 import { useModelBaseInfo } from 'hooks/model'
-import { resolveModelType } from 'utils/model'
 import { computed } from 'vue'
 
 const editable = defineModel<boolean>('editable')
@@ -58,7 +57,7 @@ const typeOptions = computed(() => {
   return Object.keys(modelFolders.value).map((curr) => {
     return {
       value: curr,
-      label: resolveModelType(curr).display,
+      label: curr,
       command: () => {
         type.value = curr
         pathIndex.value = 0

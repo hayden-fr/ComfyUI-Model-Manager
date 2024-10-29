@@ -86,7 +86,7 @@ import { chunk } from 'lodash'
 import { defineResizeCallback } from 'hooks/resize'
 import { genModelKey } from 'utils/model'
 
-const { isMobile, cardWidth, gutter, aspect } = useConfig()
+const { isMobile, cardWidth, gutter, aspect, modelFolders } = useConfig()
 
 const { data } = useModels()
 const { t } = useI18n()
@@ -94,32 +94,17 @@ const { t } = useI18n()
 const searchContent = ref<string>()
 
 const currentType = ref('all')
-const typeOptions = ref(
-  [
-    { label: 'ALL', value: 'all' },
-    { label: 'Checkpoint', value: 'checkpoints' },
-    { label: 'embedding', value: 'embeddings' },
-    { label: 'Hypernetwork', value: 'hypernetworks' },
-    { label: 'Lora', value: 'loras' },
-    { label: 'VAE', value: 'vae' },
-    { label: 'VAE approx', value: 'vae_approx' },
-    { label: 'Controlnet', value: 'controlnet' },
-    { label: 'Clip', value: 'clip' },
-    { label: 'Clip Vision', value: 'clip_vision' },
-    { label: 'Diffusers', value: 'diffusers' },
-    { label: 'Gligen', value: 'gligen' },
-    { label: 'Photomaker', value: 'photomaker' },
-    { label: 'Style Models', value: 'style_models' },
-    { label: 'Unet', value: 'unet' },
-  ].map((item) => {
+const typeOptions = computed(() => {
+  return ['all', ...Object.keys(modelFolders.value)].map((type) => {
     return {
-      ...item,
+      label: type,
+      value: type,
       command: () => {
-        currentType.value = item.value
+        currentType.value = type
       },
     }
-  }),
-)
+  })
+})
 
 const sortOrder = ref('name')
 const sortOrderOptions = ref(

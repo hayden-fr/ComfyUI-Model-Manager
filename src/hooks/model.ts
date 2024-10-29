@@ -7,7 +7,7 @@ import { cloneDeep } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
-import { resolveModelType } from 'utils/model'
+import { resolveModelTypeLoader } from 'utils/model'
 import {
   computed,
   inject,
@@ -237,7 +237,7 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
     const fields: FieldsItem[] = [
       {
         key: 'type',
-        formatter: () => resolveModelType(modelData.value.type).display,
+        formatter: () => modelData.value.type,
       },
       {
         key: 'fullname',
@@ -463,7 +463,7 @@ export const useModelNodeAction = (model: BaseModel) => {
   const { toast, wrapperToastError } = useToast()
 
   const createNode = (options: Record<string, any> = {}) => {
-    const nodeType = resolveModelType(model.type).loader
+    const nodeType = resolveModelTypeLoader(model.type)
     if (!nodeType) {
       throw new Error(t('unSupportedModelType', [model.type]))
     }
