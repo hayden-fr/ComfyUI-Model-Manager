@@ -126,7 +126,7 @@
   <slot v-else name="desktop">
     <slot name="container">
       <slot name="desktop:container">
-        <Menu ref="menu" :model="items" :popup="true">
+        <Menu ref="menu" :model="items" :popup="true" :base-z-index="1000">
           <template #item="{ item }">
             <slot name="item" :item="item">
               <slot name="desktop:container:item" :item="item">
