@@ -1,100 +1,130 @@
 <template>
-  <div v-if="allowResize" data-dialog-resizer>
-    <div
-      v-if="allow?.x"
-      data-resize-pos="left"
-      class="absolute -left-1 top-0 h-full w-2 cursor-ew-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.x"
-      data-resize-pos="right"
-      class="absolute -right-1 top-0 h-full w-2 cursor-ew-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.y"
-      data-resize-pos="top"
-      class="absolute -top-1 left-0 h-2 w-full cursor-ns-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.y"
-      data-resize-pos="bottom"
-      class="absolute -bottom-1 left-0 h-2 w-full cursor-ns-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.x && allow?.y"
-      data-resize-pos="top-left"
-      class="absolute -left-1 -top-1 h-2 w-2 cursor-se-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.x && allow?.y"
-      data-resize-pos="top-right"
-      class="absolute -right-1 -top-1 h-2 w-2 cursor-sw-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.x && allow?.y"
-      data-resize-pos="bottom-left"
-      class="absolute -bottom-1 -left-1 h-2 w-2 cursor-sw-resize"
-      @mousedown="startResize"
-    ></div>
-    <div
-      v-if="allow?.x && allow?.y"
-      data-resize-pos="bottom-right"
-      class="absolute -bottom-1 -right-1 h-2 w-2 cursor-se-resize"
-      @mousedown="startResize"
-    ></div>
-  </div>
+  <Dialog
+    ref="dialogRef"
+    :visible="true"
+    @update:visible="updateVisible"
+    :close-on-escape="false"
+    :maximizable="!isMobile"
+    maximizeIcon="pi pi-arrow-up-right-and-arrow-down-left-from-center"
+    minimizeIcon="pi pi-arrow-down-left-and-arrow-up-right-to-center"
+    :pt:mask:class="['group', { open: visible }]"
+    pt:root:class="max-h-full group-[:not(.open)]:!hidden"
+    pt:content:class="px-0 flex-1"
+    :base-z-index="1000"
+    :auto-z-index="isNil(zIndex)"
+    :pt:mask:style="isNil(zIndex) ? {} : { zIndex: 1000 + zIndex }"
+    v-bind="$attrs"
+  >
+    <template #header>
+      <slot name="header"></slot>
+    </template>
+
+    <slot name="default"></slot>
+
+    <div v-if="allowResize" data-dialog-resizer>
+      <div
+        v-if="resizeAllow?.x"
+        data-resize-pos="left"
+        class="absolute -left-1 top-0 h-full w-2 cursor-ew-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.x"
+        data-resize-pos="right"
+        class="absolute -right-1 top-0 h-full w-2 cursor-ew-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.y"
+        data-resize-pos="top"
+        class="absolute -top-1 left-0 h-2 w-full cursor-ns-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.y"
+        data-resize-pos="bottom"
+        class="absolute -bottom-1 left-0 h-2 w-full cursor-ns-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.x && resizeAllow?.y"
+        data-resize-pos="top-left"
+        class="absolute -left-1 -top-1 h-2 w-2 cursor-se-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.x && resizeAllow?.y"
+        data-resize-pos="top-right"
+        class="absolute -right-1 -top-1 h-2 w-2 cursor-sw-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.x && resizeAllow?.y"
+        data-resize-pos="bottom-left"
+        class="absolute -bottom-1 -left-1 h-2 w-2 cursor-sw-resize"
+        @mousedown="startResize"
+      ></div>
+      <div
+        v-if="resizeAllow?.x && resizeAllow?.y"
+        data-resize-pos="bottom-right"
+        class="absolute -bottom-1 -right-1 h-2 w-2 cursor-se-resize"
+        @mousedown="startResize"
+      ></div>
+    </div>
+  </Dialog>
 </template>
 
 <script setup lang="ts">
-import { clamp } from 'lodash'
+import Dialog from 'primevue/dialog'
+import { clamp, isNil } from 'lodash'
 import { useConfig } from 'hooks/config'
-import {
-  computed,
-  getCurrentInstance,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  watch,
-} from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
-type ContainerSize = { width: number; height: number }
-type ContainerPosition = { left: number; top: number }
-
-interface ResizableProps {
+interface Props {
+  keepAlive?: boolean
   defaultSize?: Partial<ContainerSize>
   defaultMobileSize?: Partial<ContainerSize>
-  allow?: { x?: boolean; y?: boolean }
+  resizeAllow?: { x?: boolean; y?: boolean }
   minWidth?: number
   maxWidth?: number
   minHeight?: number
   maxHeight?: number
+  zIndex?: number
 }
 
-const props = withDefaults(defineProps<ResizableProps>(), {
-  allow: () => ({ x: true, y: true }),
+const props = withDefaults(defineProps<Props>(), {
+  resizeAllow: () => ({ x: true, y: true }),
 })
 
-const config = useConfig()
+defineOptions({
+  inheritAttrs: false,
+})
+
+const visible = defineModel<boolean>('visible')
+
+const emit = defineEmits(['hide'])
+
+const updateVisible = (val: boolean) => {
+  visible.value = val
+  emit('hide')
+}
+
+const { isMobile } = useConfig()
+
+const dialogRef = ref()
+
 const allowResize = computed(() => {
-  return !config.isMobile.value
+  return !isMobile.value
 })
-
-const instance = getCurrentInstance()
 
 const resizeDirection = ref<string[]>([])
 
 const getContainer = () => {
-  return instance!.parent!.vnode.el as HTMLDivElement
+  return dialogRef.value.container
 }
 
 const minWidth = computed(() => {
-  const defaultMinWidth = 100
+  const defaultMinWidth = 390
   return props.minWidth ?? defaultMinWidth
 })
 
@@ -104,7 +134,7 @@ const maxWidth = computed(() => {
 })
 
 const minHeight = computed(() => {
-  const defaultMinHeight = 100
+  const defaultMinHeight = 390
   return props.minHeight ?? defaultMinHeight
 })
 
@@ -265,18 +295,19 @@ const startResize = (event: MouseEvent) => {
 }
 
 onMounted(() => {
-  if (allowResize.value) {
-    updateContainerSize(containerSize.value)
-  } else {
-    updateContainerSize({
-      width: props.defaultMobileSize?.width ?? window.innerWidth,
-      height: props.defaultMobileSize?.height ?? window.innerHeight,
-    })
-  }
-
-  recordContainerPosition()
-  updateContainerPosition(containerPosition.value)
-  getContainer().style.position = 'fixed'
+  nextTick(() => {
+    if (allowResize.value) {
+      updateContainerSize(containerSize.value)
+    } else {
+      updateContainerSize({
+        width: props.defaultMobileSize?.width ?? window.innerWidth,
+        height: props.defaultMobileSize?.height ?? window.innerHeight,
+      })
+    }
+    recordContainerPosition()
+    updateContainerPosition(containerPosition.value)
+    getContainer().style.position = 'fixed'
+  })
 })
 
 onBeforeUnmount(() => {

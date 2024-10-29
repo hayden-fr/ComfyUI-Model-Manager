@@ -1,143 +1,94 @@
 <template>
-  <Dialog
-    :visible="visible"
-    @update:visible="updateVisible"
-    :maximizable="!isMobile"
-    maximizeIcon="pi pi-arrow-up-right-and-arrow-down-left-from-center"
-    minimizeIcon="pi pi-arrow-down-left-and-arrow-up-right-to-center"
-    :pt:mask:class="['group', { open }]"
-    pt:root:class="max-h-full group-[:not(.open)]:!hidden"
-    pt:content:class="px-0 flex-1"
+  <div
+    class="flex h-full flex-col gap-4 overflow-hidden @container/content"
+    :style="{
+      ['--card-width']: `${cardWidth}px`,
+      ['--gutter']: `${gutter}px`,
+    }"
+    v-resize="onContainerResize"
   >
-    <template #header>
-      <div class="flex flex-1 items-center justify-between pr-2">
-        <span class="p-dialog-title select-none">{{ $t('modelManager') }}</span>
-        <div class="p-dialog-header-actions">
-          <Button
-            icon="pi pi-refresh"
-            severity="secondary"
-            text
-            rounded
-            @click="refreshModels"
-          ></Button>
-          <Button
-            icon="pi pi-download"
-            severity="secondary"
-            text
-            rounded
-            @click="download.toggle"
-          ></Button>
-        </div>
-      </div>
-    </template>
-
     <div
-      class="flex h-full flex-col gap-4 overflow-hidden @container/content"
-      :style="{
-        ['--card-width']: `${cardWidth}px`,
-        ['--gutter']: `${gutter}px`,
-      }"
-      v-resize="onContainerResize"
+      :class="[
+        'grid grid-cols-1 justify-center gap-4 px-8',
+        '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
+        '@lg/content:gap-[var(--gutter)]',
+        '@lg/content:px-4',
+      ]"
     >
-      <div
-        :class="[
-          'grid grid-cols-1 justify-center gap-4 px-8',
-          '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
-          '@lg/content:gap-[var(--gutter)]',
-          '@lg/content:px-4',
-        ]"
-      >
-        <div class="col-span-full @container/toolbar">
-          <div :class="['flex flex-col gap-4', '@2xl/toolbar:flex-row']">
-            <ResponseInput
-              v-model="searchContent"
-              :placeholder="$t('searchModels')"
-              :allow-clear="true"
-              suffix-icon="pi pi-search"
-            ></ResponseInput>
+      <div class="col-span-full @container/toolbar">
+        <div :class="['flex flex-col gap-4', '@2xl/toolbar:flex-row']">
+          <ResponseInput
+            v-model="searchContent"
+            :placeholder="$t('searchModels')"
+            :allow-clear="true"
+            suffix-icon="pi pi-search"
+          ></ResponseInput>
 
-            <div
-              class="flex items-center justify-between gap-4 overflow-hidden"
-            >
-              <ResponseSelect
-                v-model="currentType"
-                :items="typeOptions"
-                :type="isMobile ? 'drop' : 'button'"
-              ></ResponseSelect>
-              <ResponseSelect
-                v-model="sortOrder"
-                :items="sortOrderOptions"
-              ></ResponseSelect>
-            </div>
+          <div class="flex items-center justify-between gap-4 overflow-hidden">
+            <ResponseSelect
+              v-model="currentType"
+              :items="typeOptions"
+              :type="isMobile ? 'drop' : 'button'"
+            ></ResponseSelect>
+            <ResponseSelect
+              v-model="sortOrder"
+              :items="sortOrderOptions"
+            ></ResponseSelect>
           </div>
         </div>
       </div>
-
-      <ResponseScroll
-        :items="list"
-        :itemSize="cardWidth / aspect + gutter"
-        :row-key="(item) => item.map(genModelKey).join(',')"
-        class="h-full flex-1"
-      >
-        <template #item="{ item }">
-          <div
-            :class="[
-              'grid grid-cols-1 justify-center gap-8 px-8',
-              '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
-              '@lg/content:gap-[var(--gutter)]',
-              '@lg/content:px-4',
-            ]"
-          >
-            <DialogModelCard
-              v-for="model in item"
-              :key="genModelKey(model)"
-              :model="model"
-            ></DialogModelCard>
-            <div class="col-span-full"></div>
-          </div>
-        </template>
-
-        <template #empty>
-          <div class="flex flex-col items-center gap-4 pt-20 opacity-70">
-            <i class="pi pi-box text-4xl"></i>
-            <div class="select-none text-lg font-bold">No models found</div>
-          </div>
-        </template>
-      </ResponseScroll>
     </div>
 
-    <DialogResizer
-      :min-width="cardWidth * 2 + gutter + 42"
-      :min-height="(cardWidth / aspect) * 0.5 + 162"
-    ></DialogResizer>
-  </Dialog>
+    <ResponseScroll
+      :items="list"
+      :itemSize="cardWidth / aspect + gutter"
+      :row-key="(item) => item.map(genModelKey).join(',')"
+      class="h-full flex-1"
+    >
+      <template #item="{ item }">
+        <div
+          :class="[
+            'grid grid-cols-1 justify-center gap-8 px-8',
+            '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
+            '@lg/content:gap-[var(--gutter)]',
+            '@lg/content:px-4',
+          ]"
+        >
+          <ModelCard
+            v-for="model in item"
+            :key="genModelKey(model)"
+            :model="model"
+          ></ModelCard>
+          <div class="col-span-full"></div>
+        </div>
+      </template>
+
+      <template #empty>
+        <div class="flex flex-col items-center gap-4 pt-20 opacity-70">
+          <i class="pi pi-box text-4xl"></i>
+          <div class="select-none text-lg font-bold">No models found</div>
+        </div>
+      </template>
+    </ResponseScroll>
+  </div>
 </template>
 
 <script setup lang="ts" name="manager-dialog">
 import { useConfig } from 'hooks/config'
-import { useDialogManager } from 'hooks/manager'
 import { useModels } from 'hooks/model'
-import DialogResizer from 'components/DialogResizer.vue'
-import DialogModelCard from 'components/DialogModelCard.vue'
+import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import Dialog from 'primevue/dialog'
-import Button from 'primevue/button'
 import { computed, ref } from 'vue'
-import { useToast } from 'hooks/toast'
-import { useDownload } from 'hooks/download'
 import { useI18n } from 'vue-i18n'
 import { chunk } from 'lodash'
 import { defineResizeCallback } from 'hooks/resize'
+import { genModelKey } from 'utils/model'
 
-const { isMobile, cardWidth, gutter, aspect, refreshSetting } = useConfig()
+const { isMobile, cardWidth, gutter, aspect } = useConfig()
 
-const download = useDownload()
-
-const { visible, updateVisible, open } = useDialogManager()
-const { data, refresh } = useModels()
-const { toast } = useToast()
+const { data } = useModels()
 const { t } = useI18n()
 
 const searchContent = ref<string>()
@@ -222,15 +173,6 @@ const list = computed(() => {
   return chunk(sortedList, colSpan.value)
 })
 
-const refreshModels = async () => {
-  await Promise.all([refresh(), refreshSetting()])
-  toast.add({
-    severity: 'success',
-    summary: 'Refreshed Models',
-    life: 2000,
-  })
-}
-
 const onContainerResize = defineResizeCallback((entries) => {
   const entry = entries[0]
   if (isMobile.value) {
@@ -241,8 +183,4 @@ const onContainerResize = defineResizeCallback((entries) => {
     colSpanWidth.value = colSpan.value * (cardWidth + gutter) - gutter
   }
 })
-
-const genModelKey = (model: BaseModel) => {
-  return `${model.type}:${model.pathIndex}:${model.fullname}`
-}
 </script>

@@ -1,3 +1,6 @@
+type ContainerSize = { width: number; height: number }
+type ContainerPosition = { left: number; top: number }
+
 interface BaseModel {
   id: number | string
   fullname: string

@@ -3,13 +3,11 @@ import { MarkdownTool, useMarkdown } from 'hooks/markdown'
 import { socket } from 'hooks/socket'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
-import { useBoolean } from 'hooks/utils'
 import { bytesToSize } from 'utils/common'
 import { onBeforeMount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 export const useDownload = defineStore('download', (store) => {
-  const [visible, toggle] = useBoolean()
   const { toast, confirm } = useToast()
   const { t } = useI18n()
 
@@ -118,7 +116,7 @@ export const useDownload = defineStore('download', (store) => {
     refresh()
   })
 
-  return { visible, toggle, data: taskList, refresh }
+  return { data: taskList, refresh }
 })
 
 declare module 'hooks/store' {

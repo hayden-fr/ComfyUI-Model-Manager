@@ -23,7 +23,7 @@ export const useConfig = defineStore('config', () => {
     window.removeEventListener('resize', checkDeviceType)
   })
 
-  const refreshSetting = async () => {
+  const refresh = async () => {
     return Promise.all([refreshModelFolders()])
   }
 
@@ -33,7 +33,7 @@ export const useConfig = defineStore('config', () => {
     cardWidth: 240,
     aspect: 7 / 9,
     modelFolders,
-    refreshSetting,
+    refresh,
   }
 
   useAddConfigSettings(config)

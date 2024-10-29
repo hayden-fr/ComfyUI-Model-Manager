@@ -1,7 +1,7 @@
 <template>
   <div
     class="group/card relative w-full cursor-pointer select-none preview-aspect"
-    @click.stop.prevent="toggle"
+    @click.stop="openDetailDialog"
   >
     <div class="h-full overflow-hidden rounded-lg">
       <div class="h-full bg-gray-500 duration-300 group-hover/card:scale-110">
@@ -62,20 +62,15 @@
       </div>
     </div>
   </div>
-
-  <DialogModelDetail
-    v-model:visible="visible"
-    :model="model"
-  ></DialogModelDetail>
 </template>
 
 <script setup lang="ts">
-import { useBoolean } from 'hooks/utils'
 import DialogModelDetail from 'components/DialogModelDetail.vue'
 import Button from 'primevue/button'
-import { resolveModelType } from 'utils/model'
+import { genModelKey, resolveModelType } from 'utils/model'
 import { computed } from 'vue'
 import { useModelNodeAction } from 'hooks/model'
+import { useDialog } from 'hooks/dialog'
 
 interface Props {
   model: Model
@@ -83,7 +78,19 @@ interface Props {
 
 const props = defineProps<Props>()
 
-const [visible, toggle] = useBoolean()
+const dialog = useDialog()
+
+const openDetailDialog = () => {
+  const basename = props.model.fullname.split('/').pop()!
+  const filename = basename.replace(props.model.extension, '')
+
+  dialog.open({
+    key: genModelKey(props.model),
+    title: filename,
+    content: DialogModelDetail,
+    contentProps: { model: props.model },
+  })
+}
 
 const displayType = computed(() => resolveModelType(props.model.type).display)
 const preview = computed(() =>

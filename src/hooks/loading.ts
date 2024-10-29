@@ -1,5 +1,4 @@
 import { defineStore } from 'hooks/store'
-import { useBoolean } from 'hooks/utils'
 import { Ref, ref } from 'vue'
 
 class GlobalLoading {
@@ -25,7 +24,7 @@ class GlobalLoading {
 export const globalLoading = new GlobalLoading()
 
 export const useGlobalLoading = defineStore('loading', () => {
-  const [loading] = useBoolean()
+  const loading = ref(false)
 
   globalLoading.bind(loading)
 

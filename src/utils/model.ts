@@ -43,3 +43,7 @@ export const resolveModelType = (type: string) => {
     loader: loader[type],
   }
 }
+
+export const genModelKey = (model: BaseModel) => {
+  return `${model.type}:${model.pathIndex}:${model.fullname}`
+}
