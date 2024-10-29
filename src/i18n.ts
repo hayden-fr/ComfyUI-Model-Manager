@@ -16,7 +16,7 @@ const messages = {
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',
-    deleteAsk: 'Confirm delete this {0}？',
+    deleteAsk: 'Confirm delete this {0}?',
     modelType: 'Model Type',
     default: 'Default',
     network: 'Network',
@@ -77,12 +77,18 @@ const messages = {
   },
 }
 
-export const i18n = createI18n({
-  legacy: false,
-  locale:
+const getLocalLanguage = () => {
+  const local =
     localStorage.getItem('Comfy.Settings.Comfy.Locale') ||
     navigator.language.split('-')[0] ||
-    'en',
+    'en'
+
+  return local.replace(/['"]/g, '')
+}
+
+export const i18n = createI18n({
+  legacy: false,
+  locale: getLocalLanguage(),
   fallbackLocale: 'en',
   messages,
 })
