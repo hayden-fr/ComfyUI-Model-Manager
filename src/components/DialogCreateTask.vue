@@ -29,10 +29,9 @@
     <ResponseScroll class="-mx-5 h-full">
       <div class="px-5">
         <ModelContent
-          v-for="{ item } in data"
-          v-show="current == item.id"
-          :key="item.id"
-          :model="item"
+          v-if="currentModel"
+          :key="currentModel.id"
+          :model="currentModel"
           :editable="true"
           @submit="createDownTask"
         >
@@ -78,7 +77,7 @@ const dialog = useDialog()
 
 const modelUrl = ref<string>()
 
-const { current, data, search } = useModelSearch()
+const { current, currentModel, data, search } = useModelSearch()
 
 const searchModelsByUrl = async () => {
   if (modelUrl.value) {

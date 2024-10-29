@@ -4,7 +4,7 @@ import { socket } from 'hooks/socket'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import { bytesToSize } from 'utils/common'
-import { onBeforeMount, onMounted, ref } from 'vue'
+import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 export const useDownload = defineStore('download', (store) => {
@@ -375,6 +375,7 @@ export const useModelSearch = () => {
   const { toast } = useToast()
   const data = ref<(SelectOptions & { item: VersionModel })[]>([])
   const current = ref<string | number>()
+  const currentModel = ref<BaseModel>()
 
   const handleSearchByUrl = async (url: string) => {
     if (!url) {
@@ -406,6 +407,7 @@ export const useModelSearch = () => {
           },
         }))
         current.value = data.value[0]?.value
+        currentModel.value = data.value[0]?.item
 
         if (resData.length === 0) {
           toast.add({
@@ -430,5 +432,11 @@ export const useModelSearch = () => {
       .finally(() => loading.hide())
   }
 
-  return { data, current, search: handleSearchByUrl }
+  watch(current, () => {
+    currentModel.value = data.value.find(
+      (option) => option.value === current.value,
+    )?.item
+  })
+
+  return { data, current, currentModel, search: handleSearchByUrl }
 }
