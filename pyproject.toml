@@ -9,6 +9,6 @@ Repository = "https://github.com/hayden-fr/ComfyUI-Model-Manager"
 #  Used by Comfy Registry https://comfyregistry.org
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "hayden"
 DisplayName = "ComfyUI-Model-Manager"
 Icon = ""
