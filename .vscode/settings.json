@@ -1,20 +1,48 @@
 {
-    "cSpell.words": [
-        "apng",
-        "Civitai",
-        "ckpt",
-        "comfyui",
-        "FYUIKMNVB",
-        "gguf",
-        "gligen",
-        "jfif",
-        "locon",
-        "loras",
-        "noimage",
-        "onnx",
-        "rfilename",
-        "unet",
-        "upscaler"
-    ],
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  "cSpell.words": [
+    "tailwindcss",
+    "vnode",
+    "unref",
+    "civitai",
+    "huggingface",
+    "comfyui",
+    "ckpt",
+    "gligen",
+    "loras",
+    "safetensors",
+    "unet",
+    "controlnet",
+    "hypernetwork",
+    "hypernetworks",
+    "photomaker",
+    "upscaler",
+    "comfyorg",
+    "fullname",
+    "primevue",
+    "maximizable",
+    "inputgroup",
+    "inputgroupaddon",
+    "iconfield",
+    "inputicon",
+    "inputtext",
+    "overlaybadge",
+    "usetoast",
+    "toastservice",
+    "useconfirm",
+    "confirmationservice",
+    "confirmdialog",
+    "popupmenu",
+    "inplace",
+    "contentcontainer",
+    "itemlist",
+    "virtualscroller"
+  ],
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "css.lint.unknownAtRules": "ignore"
 }
