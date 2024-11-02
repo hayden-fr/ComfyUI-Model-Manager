@@ -41,7 +41,7 @@
 
     <ResponseScroll
       :items="list"
-      :itemSize="cardWidth / aspect + gutter"
+      :itemSize="itemSize"
       :row-key="(item) => item.map(genModelKey).join(',')"
       class="h-full flex-1"
     >
@@ -119,6 +119,17 @@ const sortOrderOptions = ref(
     }
   }),
 )
+
+const itemSize = computed(() => {
+  let itemWidth = cardWidth
+  let itemGutter = gutter
+  if (isMobile.value) {
+    const baseSize = 16
+    itemWidth = window.innerWidth - baseSize * 2 * 2
+    itemGutter = baseSize * 2
+  }
+  return itemWidth / aspect + itemGutter
+})
 
 const colSpan = ref(1)
 const colSpanWidth = ref(cardWidth)
