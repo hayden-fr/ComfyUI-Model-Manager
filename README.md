@@ -4,64 +4,60 @@ Download, browse and delete models in ComfyUI.
 
 Designed to support desktop, mobile and multi-screen devices.
 
-<img src="demo/beta-menu-model-manager-button-settings-group.png" alt="Model Manager Demo Screenshot" width="65%"/>
+# Usage
 
-<img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" width="65%"/>
+```bash
+cd /path/to/ComfyUI/custom_nodes
+git clone https://github.com/hayden-fr/ComfyUI-Model-Manager.git
+cd /path/to/ComfyUI/custom_nodes/ComfyUI-Model-Manager
+npm install
+npm run build
+```
 
 ## Features
 
-### Node Graph
+## Freely adjust size and position
 
-<img src="demo/tab-model-drag-add.gif" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-models.gif" style="max-width: 100%; max-height: 300px" >
+
+### Support Node Graph
+
+<img src="demo/tab-model-node-graph.gif" style="max-width: 100%; max-height: 300px" >
 
 - Drag a model thumbnail onto the graph to add a new node.
 - Drag a model thumbnail onto an existing node to set the input field.
   - If there are multiple valid possible fields, then the drag must be exact.
 - Drag an embedding thumbnail onto a text area, or highlight any number of nodes, to append it onto the end of the text.
 - Drag the preview image in a model's info view onto the graph to load the embedded workflow (if it exists).
-
-<img src="demo/tab-model-preview-thumbnail-buttons-example.png" alt="Model Manager Demo Screenshot" width="65%"/>
-
 - Press the "copy" button to copy a model to ComfyUI's clipboard or copy the embedding to the system clipboard. (Copying the embedding to the system clipboard requires a secure http connection.)
 - Press the "add" button to add the model to the ComfyUI graph or append the embedding to one or more selected nodes.
 - Press the "load workflow" button to try and load a workflow embedded in a model's preview image.
 
 ### Download Tab
 
-<img src="demo/tab-download.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-download.png" style="max-width: 100%; max-height: 300px" >
 
 - View multiple models associated with a url.
 - Select a save directory and input a filename.
 - Optionally set a model's preview image.
-- Optionally edit and save descriptions as a .txt note. (Default behavior can be set in the settings tab.)
-- Add Civitai and HuggingFace API tokens in `server_settings.yaml`.
+- Optionally edit and save descriptions as a .md note.
+- Add Civitai and HuggingFace API tokens in ComfyUI's settings.
+
+<img src="demo/tab-settings.png" style="max-width: 100%; max-height: 150px" >
 
 ### Models Tab
 
-<img src="demo/tab-models-dropdown.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-models.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
 
 - Search in real-time for models using the search bar.
-- Use advance keyword search by typing `"multiple words in quotes"` or a minus sign before to `-exclude` a word or phrase.
-- Add `/` at the start of a search to view a dropdown list of subdirectories (for example, `/0/1.5/styles/clothing`).
-  - Any directory paths in ComfyUI's `extra_model_paths.yaml` or directories added in `ComfyUI/models/` will automatically be detected.
-- Sort models by "Date Created", "Date Modified", "Name" and "File Size".
+- Sort models by "Name", "File Size", "Date Created" and "Date Modified".
 
 ### Model Info View
 
-<img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" width="65%"/>
+<img src="demo/tab-model-info-overview.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
 
 - View file info and metadata.
 - Rename, move or **permanently** remove a model and all of it's related files.
-- Read, edit and save notes. (Saved as a `.txt` file beside the model).
-  - `Ctrl+s` or `⌘+S` to save a note when the textarea is in focus.
-  - Autosave can be enabled in settings. (Note: Once the model info view is closed, the undo history is lost.)
+- Read, edit and save notes. (Saved as a `.md` file beside the model).
 - Change or remove a model's preview image.
 - View training tags and use the random tag generator to generate prompt ideas. (Inspired by the one in A1111.)
-
-### Settings Tab
-
-<img src="demo/tab-settings.png" alt="Model Manager Demo Screenshot" width="65%"/>
-
-- Settings are saved to `ui_settings.yaml`.
-- Most settings should update immediately, but a few may require a page reload to take effect.
-- Press the "Fix Extensions" button to correct all image file extensions in the model directories. (Note: This may take a minute or so to complete.)

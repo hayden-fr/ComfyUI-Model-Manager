@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-model-manager"
 description = "Manage models: browsing, download and delete."
-version = "1.0.0"
+version = "2.0.0"
 license = "LICENSE"
 
 [project.urls]
