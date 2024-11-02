@@ -8,6 +8,9 @@ from .py import utils
 config.extension_uri = os.path.dirname(__file__)
 utils.resolve_model_base_paths()
 
+version = utils.get_current_version()
+utils.download_web_distribution(version)
+
 
 import logging
 from aiohttp import web

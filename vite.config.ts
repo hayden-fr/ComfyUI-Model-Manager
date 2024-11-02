@@ -86,8 +86,29 @@ function dev(): Plugin {
   }
 }
 
+function createWebVersion(): Plugin {
+  return {
+    name: 'vite-plugin-web-version',
+    apply: 'build',
+    enforce: 'post',
+    writeBundle() {
+      const pyProjectContent = fs.readFileSync('pyproject.toml', 'utf8')
+      const [, version] = pyProjectContent.match(/version = "(.*)"/) ?? []
+
+      const metadata = [
+        `version: ${version}`,
+        `build_time: ${new Date().toISOString()}`,
+        '',
+      ].join('\n')
+
+      const metadataFilePath = path.join(__dirname, 'web', 'version.yaml')
+      fs.writeFileSync(metadataFilePath, metadata, 'utf-8')
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [vue(), css(), output(), dev()],
+  plugins: [vue(), css(), output(), dev(), createWebVersion()],
 
   build: {
     outDir: 'web',
