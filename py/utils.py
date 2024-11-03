@@ -137,6 +137,7 @@ def file_list_to_name_dict(files: list[str]):
     file_dict: dict[str, str] = {}
     for file in files:
         filename = os.path.splitext(file)[0]
+        filename = filename.replace(os.path.sep, "/")
         file_dict[filename] = file
     return file_dict
 
