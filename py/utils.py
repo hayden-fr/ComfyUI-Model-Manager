@@ -273,7 +273,7 @@ def rename_model(model_path: str, new_model_path: str):
         os.makedirs(new_model_dirname)
 
     # move model
-    os.rename(model_path, new_model_path)
+    shutil.move(model_path, new_model_path)
 
     # move preview
     previews = get_model_all_images(model_path)
@@ -288,14 +288,14 @@ def rename_model(model_path: str, new_model_path: str):
                 new_model_dirname, new_model_name + ".preview" + preview_ext
             )
         )
-        os.rename(preview_path, new_preview_path)
+        shutil.move(preview_path, new_preview_path)
 
     # move description
     description = get_model_description_name(model_path)
     description_path = os.path.join(model_dirname, description)
     if os.path.isfile(description_path):
         new_description_path = os.path.join(new_model_dirname, f"{new_model_name}.md")
-        os.rename(description_path, new_description_path)
+        shutil.move(description_path, new_description_path)
 
 
 import pickle
