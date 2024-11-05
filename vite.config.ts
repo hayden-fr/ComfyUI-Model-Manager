@@ -79,7 +79,7 @@ function dev(): Plugin {
         fs.mkdirSync(outDirPath)
 
         const port = server.config.server.port
-        const content = `import "http://127.0.0.1:${port}/src/main.ts";`
+        const content = `import "http://localhost:${port}/src/main.ts";`
         fs.writeFileSync(path.join(outDirPath, 'manager-dev.js'), content)
       })
     },
