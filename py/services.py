@@ -46,16 +46,16 @@ def scan_models():
             image_dict = utils.file_list_to_name_dict(images)
 
             for fullname in models:
-                fullname = fullname.replace(os.path.sep, "/")
+                fullname = utils.normalize_path(fullname)
                 basename = os.path.splitext(fullname)[0]
                 extension = os.path.splitext(fullname)[1]
 
-                abs_path = os.path.join(base_path, fullname)
+                abs_path = utils.join_path(base_path, fullname)
                 file_stats = os.stat(abs_path)
 
                 # Resolve preview
                 image_name = image_dict.get(basename, "no-preview.png")
-                abs_image_path = os.path.join(base_path, image_name)
+                abs_image_path = utils.join_path(base_path, image_name)
                 if os.path.isfile(abs_image_path):
                     image_state = os.stat(abs_image_path)
                     image_timestamp = round(image_state.st_mtime_ns / 1000000)
@@ -87,7 +87,7 @@ def get_model_info(model_path: str):
     metadata = utils.get_model_metadata(model_path)
 
     description_file = utils.get_model_description_name(model_path)
-    description_file = os.path.join(directory, description_file)
+    description_file = utils.join_path(directory, description_file)
     description = None
     if os.path.isfile(description_file):
         with open(description_file, "r", encoding="utf-8") as f:
@@ -128,11 +128,11 @@ def remove_model(model_path: str):
 
     model_previews = utils.get_model_all_images(model_path)
     for preview in model_previews:
-        os.remove(os.path.join(model_dirname, preview))
+        os.remove(utils.join_path(model_dirname, preview))
 
     model_descriptions = utils.get_model_all_descriptions(model_path)
     for description in model_descriptions:
-        os.remove(os.path.join(model_dirname, description))
+        os.remove(utils.join_path(model_dirname, description))
 
 
 async def create_model_download_task(post):
