@@ -1,3 +1,4 @@
+import { useConfig } from 'hooks/config'
 import { useLoading } from 'hooks/loading'
 import { useMarkdown } from 'hooks/markdown'
 import { request, useRequest } from 'hooks/request'
@@ -203,6 +204,8 @@ const baseInfoKey = Symbol('baseInfo') as InjectionKey<
 export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
   const { formData: model, modelData } = formInstance
 
+  const { modelFolders } = useConfig()
+
   const type = computed({
     get: () => {
       return model.value.type
@@ -250,6 +253,15 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
       {
         key: 'type',
         formatter: () => modelData.value.type,
+      },
+      {
+        key: 'pathIndex',
+        formatter: () => {
+          const modelType = modelData.value.type
+          const pathIndex = modelData.value.pathIndex
+          const folders = modelFolders.value[modelType] ?? []
+          return `${folders[pathIndex]}`
+        },
       },
       {
         key: 'fullname',

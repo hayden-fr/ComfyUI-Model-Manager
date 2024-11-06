@@ -29,11 +29,13 @@
         <col />
       </colgroup>
       <tbody>
-        <tr v-for="item in information" class="h-8 border-b">
+        <tr v-for="item in information" class="h-8 whitespace-nowrap border-b">
           <td class="border-r bg-gray-300 px-4 dark:bg-gray-800">
             {{ $t(`info.${item.key}`) }}
           </td>
-          <td class="break-all px-4">{{ item.display }}</td>
+          <td class="overflow-hidden text-ellipsis break-all px-4">
+            {{ item.display }}
+          </td>
         </tr>
       </tbody>
     </table>
@@ -81,7 +83,8 @@ const pathOptions = computed(() => {
 const information = computed(() => {
   return Object.values(baseInfo.value).filter((row) => {
     if (editable.value) {
-      return row.key !== 'fullname'
+      const hiddenKeys = ['fullname', 'pathIndex']
+      return !hiddenKeys.includes(row.key)
     }
     return true
   })
