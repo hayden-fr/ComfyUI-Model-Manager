@@ -44,7 +44,7 @@ def download_web_distribution(version: str):
     web_version = "0.0.0"
     version_file = join_path(web_path, "version.yaml")
     if os.path.exists(version_file):
-        with open(version_file, "r") as f:
+        with open(version_file, "r", encoding="utf-8", newline="") as f:
             version_content = yaml.safe_load(f)
             web_version = version_content.get("version", web_version)
 
@@ -262,7 +262,7 @@ def save_model_description(model_path: str, content: Any):
     extension = ".md"
     new_desc_path = join_path(base_dirname, f"{basename}{extension}")
 
-    with open(new_desc_path, "w", encoding="utf-8") as f:
+    with open(new_desc_path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
 
 

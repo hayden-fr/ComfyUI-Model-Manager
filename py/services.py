@@ -90,7 +90,7 @@ def get_model_info(model_path: str):
     description_file = utils.join_path(directory, description_file)
     description = None
     if os.path.isfile(description_file):
-        with open(description_file, "r", encoding="utf-8") as f:
+        with open(description_file, "r", encoding="utf-8", newline="") as f:
             description = f.read()
 
     return {

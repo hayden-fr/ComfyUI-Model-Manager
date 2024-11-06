@@ -265,7 +265,7 @@ async def download_model_file(
         # Write description file
         description = task_content.description
         description_file = utils.join_path(download_path, f"{task_id}.md")
-        with open(description_file, "w") as f:
+        with open(description_file, "w", encoding="utf-8", newline="") as f:
             f.write(description)
 
         model_path = utils.get_full_path(model_type, path_index, fullname)
