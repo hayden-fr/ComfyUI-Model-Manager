@@ -34,7 +34,7 @@
               </div>
             </div>
 
-            <div class="duration-300 group-hover/card:opacity-100">
+            <div class="opacity-0 duration-300 group-hover/card:opacity-100">
               <div class="flex flex-col gap-4 *:pointer-events-auto">
                 <Button
                   icon="pi pi-plus"
