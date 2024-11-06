@@ -44,7 +44,7 @@ const [content, modifiers] = defineModel<string, 'trim'>()
 const inputRef = ref()
 
 const innerValue = ref(content)
-const trigger = computed(() => props.updateTrigger ?? 'input')
+const trigger = computed(() => props.updateTrigger ?? 'change')
 const updateContent = () => {
   let value = innerValue.value
 
