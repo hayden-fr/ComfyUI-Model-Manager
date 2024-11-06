@@ -82,26 +82,69 @@
 
 .markdown-it {
   font-family: theme('fontFamily.sans');
+  font-size: theme('fontSize.base');
   line-height: theme('lineHeight.relaxed');
   word-break: break-word;
   margin: 0;
 
+  &::before {
+    display: table;
+    content: '';
+  }
+
+  &::after {
+    display: table;
+    content: '';
+    clear: both;
+  }
+
+  > *:first-child {
+    margin-top: 0 !important;
+  }
+
+  > *:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-top: 1.5em;
+    margin-bottom: 1em;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
   h1 {
-    font-size: theme('fontSize.2xl');
-    font-weight: theme('fontWeight.bold');
-    border-bottom: 1px solid #ddd;
-    margin-top: theme('margin.4');
-    margin-bottom: theme('margin.4');
-    padding-bottom: theme('padding[2.5]');
+    font-size: 2em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--p-surface-700);
   }
 
   h2 {
-    font-size: theme('fontSize.xl');
-    font-weight: theme('fontWeight.bold');
+    font-size: 1.5em;
+    padding-bottom: 0.3em;
+    border-bottom: 1px solid var(--p-surface-700);
   }
 
   h3 {
-    font-size: theme('fontSize.lg');
+    font-size: 1.25em;
+  }
+
+  h4 {
+    font-size: 1em;
+  }
+
+  h5 {
+    font-size: 0.875em;
+  }
+
+  h6 {
+    font-size: 0.85em;
+    color: var(--p-surface-500);
   }
 
   a {
@@ -114,8 +157,16 @@
     text-decoration: underline;
   }
 
-  p {
-    margin: 1em 0;
+  p,
+  blockquote,
+  ul,
+  ol,
+  dl,
+  table,
+  pre,
+  details {
+    margin-top: 0;
+    margin-bottom: 1em;
   }
 
   p img {
@@ -126,7 +177,6 @@
 
   ul,
   ol {
-    margin: 1em 0;
     padding-left: 2em;
   }
 
@@ -135,23 +185,38 @@
   }
 
   blockquote {
-    border-left: 5px solid #ddd;
-    padding: 10px 20px;
-    margin: 1.5em 0;
-    background: #f9f9f9;
+    padding: 0px 1em;
+    border-left: 0.25em solid var(--p-surface-500);
+    color: var(--p-surface-500);
+    margin: 1em 0;
   }
 
-  code,
-  pre {
-    background: #f9f9f9;
-    padding: 3px 5px;
-    border: 1px solid #ddd;
-    border-radius: 3px;
-    font-family: 'Courier New', Courier, monospace;
+  blockquote > *:first-child {
+    margin-top: 0;
+  }
+
+  blockquote > *:last-child {
+    margin-bottom: 0;
   }
 
   pre {
-    padding: 10px;
+    font-size: 85%;
+    border-radius: 6px;
+    padding: 8px 16px;
     overflow-x: auto;
+    background: var(--p-dialog-background);
+    filter: invert(10%);
+  }
+
+  pre code,
+  pre tt {
+    display: inline;
+    padding: 0;
+    margin: 0;
+    overflow: visible;
+    line-height: inherit;
+    word-wrap: normal;
+    background-color: transparent;
+    border: 0;
   }
 }
