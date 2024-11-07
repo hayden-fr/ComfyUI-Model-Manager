@@ -15,9 +15,18 @@ from typing import Any
 from . import config
 
 
+def normalize_path(path: str):
+    normpath = os.path.normpath(path)
+    return normpath.replace(os.path.sep, "/")
+
+
+def join_path(path: str, *paths: list[str]):
+    return normalize_path(os.path.join(path, *paths))
+
+
 def get_current_version():
     try:
-        pyproject_path = os.path.join(config.extension_uri, "pyproject.toml")
+        pyproject_path = join_path(config.extension_uri, "pyproject.toml")
         config_parser = configparser.ConfigParser()
         config_parser.read(pyproject_path)
         version = config_parser.get("project", "version")
@@ -27,15 +36,15 @@ def get_current_version():
 
 
 def download_web_distribution(version: str):
-    web_path = os.path.join(config.extension_uri, "web")
-    dev_web_file = os.path.join(web_path, "manager-dev.js")
+    web_path = join_path(config.extension_uri, "web")
+    dev_web_file = join_path(web_path, "manager-dev.js")
     if os.path.exists(dev_web_file):
         return
 
     web_version = "0.0.0"
-    version_file = os.path.join(web_path, "version.yaml")
+    version_file = join_path(web_path, "version.yaml")
     if os.path.exists(version_file):
-        with open(version_file, "r") as f:
+        with open(version_file, "r", encoding="utf-8", newline="") as f:
             version_content = yaml.safe_load(f)
             web_version = version_content.get("version", web_version)
 
@@ -49,7 +58,7 @@ def download_web_distribution(version: str):
         response = requests.get(download_url, stream=True)
         response.raise_for_status()
 
-        temp_file = os.path.join(config.extension_uri, "temp.tar.gz")
+        temp_file = join_path(config.extension_uri, "temp.tar.gz")
         with open(temp_file, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
@@ -82,7 +91,8 @@ def resolve_model_base_paths():
             continue
         if folder == "custom_nodes":
             continue
-        config.model_base_paths[folder] = folder_paths.get_folder_paths(folder)
+        folders = folder_paths.get_folder_paths(folder)
+        config.model_base_paths[folder] = [normalize_path(f) for f in folders]
 
 
 def get_full_path(model_type: str, path_index: int, filename: str):
@@ -93,7 +103,8 @@ def get_full_path(model_type: str, path_index: int, filename: str):
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
-    return os.path.join(base_path, filename)
+    full_path = join_path(base_path, filename)
+    return full_path
 
 
 def get_valid_full_path(model_type: str, path_index: int, filename: str):
@@ -104,7 +115,7 @@ def get_valid_full_path(model_type: str, path_index: int, filename: str):
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
-    full_path = os.path.join(base_path, filename)
+    full_path = join_path(base_path, filename)
     if os.path.isfile(full_path):
         return full_path
     elif os.path.islink(full_path):
@@ -114,7 +125,7 @@ def get_valid_full_path(model_type: str, path_index: int, filename: str):
 
 
 def get_download_path():
-    download_path = os.path.join(config.extension_uri, "downloads")
+    download_path = join_path(config.extension_uri, "downloads")
     if not os.path.exists(download_path):
         os.makedirs(download_path)
     return download_path
@@ -124,12 +135,12 @@ def recursive_search_files(directory: str):
     files, folder_all = folder_paths.recursive_search(
         directory, excluded_dir_names=[".git"]
     )
-    return files
+    return [normalize_path(f) for f in files]
 
 
 def search_files(directory: str):
     entries = os.listdir(directory)
-    files = [f for f in entries if os.path.isfile(os.path.join(directory, f))]
+    files = [f for f in entries if os.path.isfile(join_path(directory, f))]
     return files
 
 
@@ -137,7 +148,6 @@ def file_list_to_name_dict(files: list[str]):
     file_dict: dict[str, str] = {}
     for file in files:
         filename = os.path.splitext(file)[0]
-        filename = filename.replace(os.path.sep, "/")
         file_dict[filename] = file
     return file_dict
 
@@ -194,13 +204,13 @@ def save_model_preview_image(model_path: str, image_file: Any):
     for image in old_preview_images:
         if os.path.splitext(image)[1].endswith(".preview"):
             a1111_civitai_helper_image = True
-        image_path = os.path.join(base_dirname, image)
+        image_path = join_path(base_dirname, image)
         os.remove(image_path)
 
     # save new preview image
     basename = os.path.splitext(os.path.basename(model_path))[0]
     extension = f".{content_type.split('/')[1]}"
-    new_preview_path = os.path.join(base_dirname, f"{basename}{extension}")
+    new_preview_path = join_path(base_dirname, f"{basename}{extension}")
 
     with open(new_preview_path, "wb") as f:
         f.write(image_file.file.read())
@@ -210,7 +220,7 @@ def save_model_preview_image(model_path: str, image_file: Any):
         """
         Keep preview image of a1111_civitai_helper
         """
-        new_preview_path = os.path.join(base_dirname, f"{basename}.preview{extension}")
+        new_preview_path = join_path(base_dirname, f"{basename}.preview{extension}")
         with open(new_preview_path, "wb") as f:
             f.write(image_file.file.read())
 
@@ -244,15 +254,15 @@ def save_model_description(model_path: str, content: Any):
     # remove old descriptions
     old_descriptions = get_model_all_descriptions(model_path)
     for desc in old_descriptions:
-        description_path = os.path.join(base_dirname, desc)
+        description_path = join_path(base_dirname, desc)
         os.remove(description_path)
 
     # save new description
     basename = os.path.splitext(os.path.basename(model_path))[0]
     extension = ".md"
-    new_desc_path = os.path.join(base_dirname, f"{basename}{extension}")
+    new_desc_path = join_path(base_dirname, f"{basename}{extension}")
 
-    with open(new_desc_path, "w", encoding="utf-8") as f:
+    with open(new_desc_path, "w", encoding="utf-8", newline="") as f:
         f.write(content)
 
 
@@ -278,23 +288,21 @@ def rename_model(model_path: str, new_model_path: str):
     # move preview
     previews = get_model_all_images(model_path)
     for preview in previews:
-        preview_path = os.path.join(model_dirname, preview)
+        preview_path = join_path(model_dirname, preview)
         preview_name = os.path.splitext(preview)[0]
         preview_ext = os.path.splitext(preview)[1]
         new_preview_path = (
-            os.path.join(new_model_dirname, new_model_name + preview_ext)
+            join_path(new_model_dirname, new_model_name + preview_ext)
             if preview_name == model_name
-            else os.path.join(
-                new_model_dirname, new_model_name + ".preview" + preview_ext
-            )
+            else join_path(new_model_dirname, new_model_name + ".preview" + preview_ext)
         )
         shutil.move(preview_path, new_preview_path)
 
     # move description
     description = get_model_description_name(model_path)
-    description_path = os.path.join(model_dirname, description)
+    description_path = join_path(model_dirname, description)
     if os.path.isfile(description_path):
-        new_description_path = os.path.join(new_model_dirname, f"{new_model_name}.md")
+        new_description_path = join_path(new_model_dirname, f"{new_model_name}.md")
         shutil.move(description_path, new_description_path)
 
 

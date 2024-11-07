@@ -5,7 +5,7 @@ from .py import utils
 
 
 # Init config settings
-config.extension_uri = os.path.dirname(__file__)
+config.extension_uri = utils.normalize_path(os.path.dirname(__file__))
 utils.resolve_model_base_paths()
 
 version = utils.get_current_version()
@@ -173,12 +173,12 @@ async def read_model_preview(request):
     try:
         folders = folder_paths.get_folder_paths(model_type)
         base_path = folders[index]
-        abs_path = os.path.join(base_path, filename)
+        abs_path = utils.join_path(base_path, filename)
     except:
         abs_path = extension_uri
 
     if not os.path.isfile(abs_path):
-        abs_path = os.path.join(extension_uri, "assets", "no-preview.png")
+        abs_path = utils.join_path(extension_uri, "assets", "no-preview.png")
     return web.FileResponse(abs_path)
 
 
@@ -188,10 +188,10 @@ async def read_download_preview(request):
     extension_uri = config.extension_uri
 
     download_path = utils.get_download_path()
-    preview_path = os.path.join(download_path, filename)
+    preview_path = utils.join_path(download_path, filename)
 
     if not os.path.isfile(preview_path):
-        preview_path = os.path.join(extension_uri, "assets", "no-preview.png")
+        preview_path = utils.join_path(extension_uri, "assets", "no-preview.png")
 
     return web.FileResponse(preview_path)
 

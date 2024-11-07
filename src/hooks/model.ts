@@ -1,3 +1,4 @@
+import { useConfig } from 'hooks/config'
 import { useLoading } from 'hooks/loading'
 import { useMarkdown } from 'hooks/markdown'
 import { request, useRequest } from 'hooks/request'
@@ -7,7 +8,7 @@ import { cloneDeep } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
-import { resolveModelTypeLoader } from 'utils/model'
+import { genModelKey, resolveModelTypeLoader } from 'utils/model'
 import {
   computed,
   inject,
@@ -20,7 +21,7 @@ import {
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-export const useModels = defineStore('models', () => {
+export const useModels = defineStore('models', (store) => {
   const { data, refresh } = useRequest<Model[]>('/models', { defaultValue: [] })
   const { toast, confirm } = useToast()
   const { t } = useI18n()
@@ -28,6 +29,7 @@ export const useModels = defineStore('models', () => {
 
   const updateModel = async (model: BaseModel, data: BaseModel) => {
     const formData = new FormData()
+    let oldKey: string | null = null
 
     // Check current preview
     if (model.preview !== data.preview) {
@@ -45,6 +47,7 @@ export const useModels = defineStore('models', () => {
       model.fullname !== data.fullname ||
       model.pathIndex !== data.pathIndex
     ) {
+      oldKey = genModelKey(model)
       formData.append('type', data.type)
       formData.append('pathIndex', data.pathIndex.toString())
       formData.append('fullname', data.fullname)
@@ -59,19 +62,25 @@ export const useModels = defineStore('models', () => {
       method: 'PUT',
       body: formData,
     })
-      .catch(() => {
+      .catch((err) => {
+        const error_message = err.message ?? err.error
         toast.add({
           severity: 'error',
           summary: 'Error',
-          detail: 'Failed to update model',
+          detail: `Failed to update model: ${error_message}`,
           life: 15000,
         })
+        throw new Error(error_message)
       })
       .finally(() => {
         loading.hide()
       })
 
-    await refresh()
+    if (oldKey) {
+      store.dialog.close({ key: oldKey })
+    }
+
+    refresh()
   }
 
   const deleteModel = async (model: BaseModel) => {
@@ -90,6 +99,7 @@ export const useModels = defineStore('models', () => {
           severity: 'danger',
         },
         accept: () => {
+          const dialogKey = genModelKey(model)
           loading.show()
           request(`/model/${model.type}/${model.pathIndex}/${model.fullname}`, {
             method: 'DELETE',
@@ -101,6 +111,7 @@ export const useModels = defineStore('models', () => {
                 detail: `${model.fullname} Deleted`,
                 life: 2000,
               })
+              store.dialog.close({ key: dialogKey })
               return refresh()
             })
             .then(() => {
@@ -118,7 +129,9 @@ export const useModels = defineStore('models', () => {
               loading.hide()
             })
         },
-        reject: () => {},
+        reject: () => {
+          resolve(void 0)
+        },
       })
     })
   }
@@ -191,6 +204,8 @@ const baseInfoKey = Symbol('baseInfo') as InjectionKey<
 export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
   const { formData: model, modelData } = formInstance
 
+  const { modelFolders } = useConfig()
+
   const type = computed({
     get: () => {
       return model.value.type
@@ -238,6 +253,15 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
       {
         key: 'type',
         formatter: () => modelData.value.type,
+      },
+      {
+        key: 'pathIndex',
+        formatter: () => {
+          const modelType = modelData.value.type
+          const pathIndex = modelData.value.pathIndex
+          const folders = modelFolders.value[modelType] ?? []
+          return `${folders[pathIndex]}`
+        },
       },
       {
         key: 'fullname',

@@ -16,7 +16,7 @@
     ></textarea>
 
     <div v-show="!active">
-      <div v-show="editable" class="flex items-center gap-2 text-gray-600">
+      <div v-show="editable" class="mb-4 flex items-center gap-2 text-gray-600">
         <i class="pi pi-info-circle"></i>
         <span>
           {{ $t('tapToChange') }}

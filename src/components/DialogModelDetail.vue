@@ -72,8 +72,8 @@ const handleCancel = () => {
 }
 
 const handleSave = async (data: BaseModel) => {
+  await update(modelContent.value, data)
   editable.value = false
-  await update(props.model, data)
 }
 
 const handleDelete = async () => {
