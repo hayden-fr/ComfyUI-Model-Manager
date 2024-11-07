@@ -329,6 +329,13 @@ async def download_model_file(
     # If no token is carried, it will be redirected to the login page.
     content_type = response.headers.get("content-type")
     if content_type and content_type.startswith("text/html"):
+        # TODO More checks
+        # In addition to requiring login to download, there may be other restrictions.
+        # The currently one situation is early access??? issues#43
+        # Due to the lack of test data, let’s put it aside for now.
+        # If it cannot be downloaded, a redirect will definitely occur.
+        # Maybe consider getting the redirect url from response.history to make a judgment.
+        # Here we also need to consider how different websites are processed.
         raise RuntimeError(
             f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first."
         )
