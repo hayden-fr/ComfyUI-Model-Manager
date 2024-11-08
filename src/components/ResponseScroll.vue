@@ -298,7 +298,6 @@ const startDragThumb = (event: MouseEvent) => {
 watch(
   () => props.items,
   () => {
-    init()
     setSpacerSize()
     calculateScrollThumbSize()
     calculateLoadItems()
@@ -311,5 +310,6 @@ onUnmounted(() => {
 
 defineExpose({
   viewport,
+  init,
 })
 </script>
