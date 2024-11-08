@@ -334,18 +334,16 @@ def resolve_setting_key(key: str) -> str:
     return setting_id
 
 
-def set_setting_value(key: str, value: Any):
+def set_setting_value(request: web.Request, key: str, value: Any):
     setting_id = resolve_setting_key(key)
-    fake_request = config.FakeRequest()
-    settings = config.serverInstance.user_manager.settings.get_settings(fake_request)
+    settings = config.serverInstance.user_manager.settings.get_settings(request)
     settings[setting_id] = value
-    config.serverInstance.user_manager.settings.save_settings(fake_request, settings)
+    config.serverInstance.user_manager.settings.save_settings(request, settings)
 
 
-def get_setting_value(key: str, default: Any = None) -> Any:
+def get_setting_value(request: web.Request, key: str, default: Any = None) -> Any:
     setting_id = resolve_setting_key(key)
-    fake_request = config.FakeRequest()
-    settings = config.serverInstance.user_manager.settings.get_settings(fake_request)
+    settings = config.serverInstance.user_manager.settings.get_settings(request)
     return settings.get(setting_id, default)
 
 
@@ -361,3 +359,8 @@ def unpack_dataclass(data: Any):
         return asdict(data)
     else:
         return data
+
+
+async def send_json(event: str, data: Any, sid: str = None):
+    detail = unpack_dataclass(data)
+    await config.serverInstance.send_json(event, detail, sid)

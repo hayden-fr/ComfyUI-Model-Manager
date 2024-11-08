@@ -21,13 +21,61 @@ from .py import services
 routes = config.routes
 
 
-@routes.get("/model-manager/ws")
-async def socket_handler(request):
+@routes.get("/model-manager/download/task")
+async def scan_download_tasks(request):
     """
-    Handle websocket connection.
+    Read download task list.
     """
-    ws = await services.connect_websocket(request)
-    return ws
+    try:
+        result = await services.scan_model_download_task_list()
+        return web.json_response({"success": True, "data": result})
+    except Exception as e:
+        error_msg = f"Read download task list failed: {e}"
+        logging.error(error_msg)
+        logging.debug(traceback.format_exc())
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.put("/model-manager/download/{task_id}")
+async def resume_download_task(request):
+    """
+    Toggle download task status.
+    """
+    try:
+        task_id = request.match_info.get("task_id", None)
+        if task_id is None:
+            raise web.HTTPBadRequest(reason="Invalid task id")
+        json_data = await request.json()
+        status = json_data.get("status", None)
+        if status == "pause":
+            await services.pause_model_download_task(task_id)
+        elif status == "resume":
+            await services.resume_model_download_task(task_id, request)
+        else:
+            raise web.HTTPBadRequest(reason="Invalid status")
+
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Resume download task failed: {str(e)}"
+        logging.error(error_msg)
+        logging.debug(traceback.format_exc())
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.delete("/model-manager/download/{task_id}")
+async def delete_model_download_task(request):
+    """
+    Delete download task.
+    """
+    task_id = request.match_info.get("task_id", None)
+    try:
+        await services.delete_model_download_task(task_id)
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Delete download task failed: {str(e)}"
+        logging.error(error_msg)
+        logging.debug(traceback.format_exc())
+        return web.json_response({"success": False, "error": error_msg})
 
 
 @routes.get("/model-manager/base-folders")
@@ -56,7 +104,7 @@ async def create_model(request):
     """
     post = await request.post()
     try:
-        task_id = await services.create_model_download_task(post)
+        task_id = await services.create_model_download_task(post, request)
         return web.json_response({"success": True, "data": {"taskId": task_id}})
     except Exception as e:
         error_msg = f"Create model download task failed: {str(e)}"
