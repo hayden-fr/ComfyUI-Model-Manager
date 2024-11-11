@@ -40,6 +40,7 @@
     </div>
 
     <ResponseScroll
+      ref="responseScroll"
       :items="list"
       :itemSize="itemSize"
       :row-key="(item) => item.map(genModelKey).join(',')"
@@ -80,7 +81,7 @@ import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { chunk } from 'lodash'
 import { defineResizeCallback } from 'hooks/resize'
@@ -90,6 +91,8 @@ const { isMobile, cardWidth, gutter, aspect, modelFolders } = useConfig()
 
 const { data } = useModels()
 const { t } = useI18n()
+
+const responseScroll = ref()
 
 const searchContent = ref<string>()
 
@@ -119,6 +122,10 @@ const sortOrderOptions = ref(
     }
   }),
 )
+
+watch([searchContent, currentType], () => {
+  responseScroll.value.init()
+})
 
 const itemSize = computed(() => {
   let itemWidth = cardWidth

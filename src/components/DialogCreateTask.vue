@@ -28,21 +28,23 @@
 
     <ResponseScroll class="-mx-5 h-full">
       <div class="px-5">
-        <ModelContent
-          v-if="currentModel"
-          :key="currentModel.id"
-          :model="currentModel"
-          :editable="true"
-          @submit="createDownTask"
-        >
-          <template #action>
-            <Button
-              icon="pi pi-download"
-              :label="$t('download')"
-              type="submit"
-            ></Button>
-          </template>
-        </ModelContent>
+        <KeepAlive>
+          <ModelContent
+            v-if="currentModel"
+            :key="currentModel.id"
+            :model="currentModel"
+            :editable="true"
+            @submit="createDownTask"
+          >
+            <template #action>
+              <Button
+                icon="pi pi-download"
+                :label="$t('download')"
+                type="submit"
+              ></Button>
+            </template>
+          </ModelContent>
+        </KeepAlive>
 
         <div v-show="data.length === 0">
           <div class="flex flex-col items-center gap-4 py-8">
