@@ -66,11 +66,12 @@
 
 <script setup lang="ts">
 import DialogModelDetail from 'components/DialogModelDetail.vue'
+import { useDialog } from 'hooks/dialog'
+import { useModelNodeAction } from 'hooks/model'
 import Button from 'primevue/button'
+import { Model } from 'types/typings'
 import { genModelKey } from 'utils/model'
 import { computed } from 'vue'
-import { useModelNodeAction } from 'hooks/model'
-import { useDialog } from 'hooks/dialog'
 
 interface Props {
   model: Model

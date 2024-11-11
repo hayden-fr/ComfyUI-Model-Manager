@@ -1,7 +1,7 @@
-type ContainerSize = { width: number; height: number }
-type ContainerPosition = { left: number; top: number }
+export type ContainerSize = { width: number; height: number }
+export type ContainerPosition = { left: number; top: number }
 
-interface BaseModel {
+export interface BaseModel {
   id: number | string
   fullname: string
   basename: string
@@ -14,37 +14,37 @@ interface BaseModel {
   metadata: Record<string, string>
 }
 
-interface Model extends BaseModel {
+export interface Model extends BaseModel {
   createdAt: number
   updatedAt: number
 }
 
-interface VersionModel extends BaseModel {
+export interface VersionModel extends BaseModel {
   shortname: string
   downloadPlatform: string
   downloadUrl: string
   hashes?: Record<string, string>
 }
 
-type PassThrough<T = void> = T | object | undefined
+export type PassThrough<T = void> = T | object | undefined
 
-interface SelectOptions {
+export interface SelectOptions {
   label: string
   value: any
   icon?: string
   command: () => void
 }
 
-interface SelectFile extends File {
+export interface SelectFile extends File {
   objectURL: string
 }
 
-interface SelectEvent {
+export interface SelectEvent {
   files: SelectFile[]
   originalEvent: Event
 }
 
-interface DownloadTaskOptions {
+export interface DownloadTaskOptions {
   taskId: string
   type: string
   fullname: string
@@ -57,7 +57,7 @@ interface DownloadTaskOptions {
   error?: string
 }
 
-interface DownloadTask
+export interface DownloadTask
   extends Omit<
     DownloadTaskOptions,
     'downloadedSize' | 'totalSize' | 'bps' | 'error'
@@ -69,4 +69,4 @@ interface DownloadTask
   deleteTask: () => void
 }
 
-type CustomEventListener = (event: CustomEvent) => void
+export type CustomEventListener = (event: CustomEvent) => void

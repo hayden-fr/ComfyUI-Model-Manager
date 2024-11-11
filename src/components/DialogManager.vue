@@ -75,17 +75,18 @@
 </template>
 
 <script setup lang="ts" name="manager-dialog">
-import { useConfig } from 'hooks/config'
-import { useModels } from 'hooks/model'
 import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
-import ResponseSelect from 'components/ResponseSelect.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
+import ResponseSelect from 'components/ResponseSelect.vue'
+import { useConfig } from 'hooks/config'
+import { useModels } from 'hooks/model'
+import { defineResizeCallback } from 'hooks/resize'
+import { chunk } from 'lodash'
+import { Model } from 'types/typings'
+import { genModelKey } from 'utils/model'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { chunk } from 'lodash'
-import { defineResizeCallback } from 'hooks/resize'
-import { genModelKey } from 'utils/model'
 
 const { isMobile, cardWidth, gutter, aspect, modelFolders } = useConfig()
 
@@ -153,7 +154,7 @@ const list = computed(() => {
     return matchType && matchName
   })
 
-  let sortStrategy = (a: Model, b: Model) => 0
+  let sortStrategy: (a: Model, b: Model) => number = () => 0
   switch (sortOrder.value) {
     case 'name':
       sortStrategy = (a, b) => a.fullname.localeCompare(b.fullname)

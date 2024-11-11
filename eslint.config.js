@@ -1,18 +1,15 @@
-import globals from 'globals'
 import pluginJs from '@eslint/js'
-import tsEslint from 'typescript-eslint'
 import pluginVue from 'eslint-plugin-vue'
+import globals from 'globals'
+import tsEslint from 'typescript-eslint'
 
+/** @type {import('eslint').Linter.Config[]} */
 export default [
   {
     files: ['src/**/*.{js,mjs,cjs,ts,vue}'],
   },
   {
-    ignores: [
-      'src/scripts/*',
-      'src/extensions/core/*',
-      'src/types/vue-shim.d.ts',
-    ],
+    ignores: ['src/scripts/*', 'src/types/shims.d.ts', 'src/utils/legacy.ts'],
   },
   { languageOptions: { globals: globals.browser } },
   pluginJs.configs.recommended,
@@ -25,8 +22,6 @@ export default [
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': 'off',
-      '@typescript-eslint/prefer-as-const': 'off',
     },
   },
 ]

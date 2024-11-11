@@ -1,7 +1,7 @@
 <template>
   <table v-if="dataSource.length" class="w-full border-collapse border">
     <tbody>
-      <tr v-for="item in dataSource" class="h-8 border-b">
+      <tr v-for="item in dataSource" :key="item.key" class="h-8 border-b">
         <td class="border-r bg-gray-300 px-4 dark:bg-gray-800">
           {{ item.key }}
         </td>

@@ -29,7 +29,11 @@
         <col />
       </colgroup>
       <tbody>
-        <tr v-for="item in information" class="h-8 whitespace-nowrap border-b">
+        <tr
+          v-for="item in information"
+          :key="item.key"
+          class="h-8 whitespace-nowrap border-b"
+        >
           <td class="border-r bg-gray-300 px-4 dark:bg-gray-800">
             {{ $t(`info.${item.key}`) }}
           </td>

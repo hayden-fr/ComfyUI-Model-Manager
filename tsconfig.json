@@ -20,21 +20,13 @@
     "noFallthroughCasesInSwitch": true,
     "downlevelIteration": true,
 
-    /* AllowJs during migration phase */
-    "allowJs": true,
-    "baseUrl": ".",
-    "outDir": "./web",
-    "rootDir": "./",
     "paths": {
-      "components/*": ["src/components/*"],
-      "hooks/*": ["src/hooks/*"],
-      "scripts/*": ["src/scripts/*"],
-      "types/*": ["src/types/*"],
-      "utils/*": ["src/utils/*"],
+      "components/*": ["./src/components/*"],
+      "hooks/*": ["./src/hooks/*"],
+      "scripts/*": ["./src/scripts/*"],
+      "types/*": ["./src/types/*"],
+      "utils/*": ["./src/utils/*"]
     }
   },
-  "include": [
-    "src/**/*",
-    "src/**/*.vue",
-  ]
+  "include": ["./src/**/*"]
 }

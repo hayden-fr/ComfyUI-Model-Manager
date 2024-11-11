@@ -150,6 +150,7 @@ import { useConfig } from 'hooks/config'
 import Button, { ButtonProps } from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Menu from 'primevue/menu'
+import { SelectOptions } from 'types/typings'
 import { computed, ref } from 'vue'
 
 const current = defineModel()

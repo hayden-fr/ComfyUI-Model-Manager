@@ -1,3 +1,5 @@
+import { BaseModel } from 'types/typings'
+
 const loader = {
   checkpoints: 'CheckpointLoaderSimple',
   loras: 'LoraLoader',

@@ -19,6 +19,8 @@
 </template>
 
 <script setup lang="ts">
+import { SelectEvent, SelectFile } from 'types/typings'
+
 const emits = defineEmits<{
   select: [event: SelectEvent]
 }>()

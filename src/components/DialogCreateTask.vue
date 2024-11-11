@@ -60,15 +60,16 @@
 <script setup lang="ts">
 import ModelContent from 'components/ModelContent.vue'
 import ResponseInput from 'components/ResponseInput.vue'
-import ResponseSelect from 'components/ResponseSelect.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import Button from 'primevue/button'
+import ResponseSelect from 'components/ResponseSelect.vue'
 import { useConfig } from 'hooks/config'
 import { useDialog } from 'hooks/dialog'
 import { useModelSearch } from 'hooks/download'
 import { useLoading } from 'hooks/loading'
 import { request } from 'hooks/request'
 import { useToast } from 'hooks/toast'
+import Button from 'primevue/button'
+import { VersionModel } from 'types/typings'
 import { previewUrlToFile } from 'utils/common'
 import { ref } from 'vue'
 

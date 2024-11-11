@@ -12,7 +12,7 @@ export const useToast = () => {
 
   globalToast.value = toast
 
-  const wrapperToastError = <T extends Function>(callback: T): T => {
+  const wrapperToastError = <T extends CallableFunction>(callback: T): T => {
     const showToast = (error: Error) => {
       toast.add({
         severity: 'error',

@@ -36,7 +36,7 @@ export const useConfig = defineStore('config', () => {
     refresh,
   }
 
-  useAddConfigSettings(config)
+  useAddConfigSettings()
 
   return config
 })
@@ -49,7 +49,7 @@ declare module 'hooks/store' {
   }
 }
 
-function useAddConfigSettings(config: Config) {
+function useAddConfigSettings() {
   onMounted(() => {
     // API keys
     app.ui?.settings.addSetting({

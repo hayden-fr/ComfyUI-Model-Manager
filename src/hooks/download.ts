@@ -4,6 +4,13 @@ import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import { api } from 'scripts/comfyAPI'
+import {
+  BaseModel,
+  DownloadTask,
+  DownloadTaskOptions,
+  SelectOptions,
+  VersionModel,
+} from 'types/typings'
 import { bytesToSize } from 'utils/common'
 import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -385,7 +392,7 @@ class Huggingface extends ModelSearch {
 }
 
 class UnknownWebsite extends ModelSearch {
-  async search(searchUrl: string): Promise<VersionModel[]> {
+  async search(): Promise<VersionModel[]> {
     return Promise.reject(
       new Error(
         'Unknown Website, please input a URL from huggingface.co or civitai.com.',

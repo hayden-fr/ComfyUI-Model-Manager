@@ -1,7 +1,9 @@
 import { defineStore } from 'hooks/store'
+import { ContainerSize } from 'types/typings'
 import { Component, markRaw, ref } from 'vue'
 
 interface HeaderButton {
+  key: string
   icon: string
   command: () => void
 }

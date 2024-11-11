@@ -60,8 +60,9 @@
 </template>
 
 <script setup lang="ts" generic="T">
-import { nextTick, onUnmounted, ref, watch } from 'vue'
+import { defineResizeCallback } from 'hooks/resize'
 import { clamp, throttle } from 'lodash'
+import { nextTick, onUnmounted, ref, watch } from 'vue'
 
 interface ScrollAreaProps {
   items?: T[][]
@@ -206,7 +207,7 @@ const calculateScrollThumbSize = () => {
   })
 }
 
-const onContainerResize: ResizeObserverCallback = throttle((entries) => {
+const onContainerResize = defineResizeCallback((entries) => {
   emit('resize', entries)
   if (isDragging.value) return
 

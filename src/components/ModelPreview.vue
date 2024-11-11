@@ -88,13 +88,13 @@
 </template>
 
 <script setup lang="ts">
+import ResponseFileUpload from 'components/ResponseFileUpload.vue'
 import ResponseImage from 'components/ResponseImage.vue'
 import ResponseInput from 'components/ResponseInput.vue'
-import ResponseFileUpload from 'components/ResponseFileUpload.vue'
+import { useConfig } from 'hooks/config'
+import { useModelPreview } from 'hooks/model'
 import Button from 'primevue/button'
 import Carousel from 'primevue/carousel'
-import { useModelPreview } from 'hooks/model'
-import { useConfig } from 'hooks/config'
 
 const editable = defineModel<boolean>('editable')
 const { cardWidth } = useConfig()

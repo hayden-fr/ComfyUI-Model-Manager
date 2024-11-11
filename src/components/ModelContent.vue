@@ -39,15 +39,10 @@
 </template>
 
 <script setup lang="ts">
-import ModelPreview from 'components/ModelPreview.vue'
 import ModelBaseInfo from 'components/ModelBaseInfo.vue'
 import ModelDescription from 'components/ModelDescription.vue'
 import ModelMetadata from 'components/ModelMetadata.vue'
-import Tab from 'primevue/tab'
-import Tabs from 'primevue/tabs'
-import TabList from 'primevue/tablist'
-import TabPanel from 'primevue/tabpanel'
-import TabPanels from 'primevue/tabpanels'
+import ModelPreview from 'components/ModelPreview.vue'
 import {
   useModelBaseInfoEditor,
   useModelDescriptionEditor,
@@ -55,8 +50,14 @@ import {
   useModelMetadataEditor,
   useModelPreviewEditor,
 } from 'hooks/model'
-import { toRaw, watch } from 'vue'
 import { cloneDeep } from 'lodash'
+import Tab from 'primevue/tab'
+import TabList from 'primevue/tablist'
+import TabPanel from 'primevue/tabpanel'
+import TabPanels from 'primevue/tabpanels'
+import Tabs from 'primevue/tabs'
+import { BaseModel } from 'types/typings'
+import { toRaw, watch } from 'vue'
 
 interface Props {
   model: BaseModel

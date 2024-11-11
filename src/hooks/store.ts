@@ -13,7 +13,7 @@ export const useStoreProvider = () => {
   return storeEvent
 }
 
-const storeKeys = new Map<string, Symbol>()
+const storeKeys = new Map<string, symbol>()
 
 const getStoreKey = (key: string) => {
   let storeKey = storeKeys.get(key)

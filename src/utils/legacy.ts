@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { app } from 'scripts/comfyAPI'
 
 const LiteGraph = window.LiteGraph

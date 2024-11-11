@@ -44,9 +44,10 @@
 <script setup lang="ts">
 import ModelContent from 'components/ModelContent.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import Button from 'primevue/button'
 import { useModelNodeAction, useModels } from 'hooks/model'
 import { useRequest } from 'hooks/request'
+import Button from 'primevue/button'
+import { BaseModel, Model } from 'types/typings'
 import { computed, ref } from 'vue'
 
 interface Props {

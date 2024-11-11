@@ -6,17 +6,17 @@
 </template>
 
 <script setup lang="ts">
-import DialogManager from 'components/DialogManager.vue'
 import DialogDownload from 'components/DialogDownload.vue'
-import GlobalToast from 'components/GlobalToast.vue'
-import GlobalLoading from 'components/GlobalLoading.vue'
+import DialogManager from 'components/DialogManager.vue'
 import GlobalDialogStack from 'components/GlobalDialogStack.vue'
+import GlobalLoading from 'components/GlobalLoading.vue'
+import GlobalToast from 'components/GlobalToast.vue'
+import { useStoreProvider } from 'hooks/store'
+import { useToast } from 'hooks/toast'
 import GlobalConfirm from 'primevue/confirmdialog'
 import { $el, app, ComfyButton } from 'scripts/comfyAPI'
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useStoreProvider } from 'hooks/store'
-import { useToast } from 'hooks/toast'
 
 const { t } = useI18n()
 const { dialog, models, config, download } = useStoreProvider()
@@ -39,6 +39,7 @@ onMounted(() => {
       content: DialogDownload,
       headerButtons: [
         {
+          key: 'refresh',
           icon: 'pi pi-refresh',
           command: () => download.refresh(),
         },
@@ -56,10 +57,12 @@ onMounted(() => {
       keepAlive: true,
       headerButtons: [
         {
+          key: 'refresh',
           icon: 'pi pi-refresh',
           command: refreshModelsAndConfig,
         },
         {
+          key: 'download',
           icon: 'pi pi-download',
           command: openDownloadDialog,
         },
