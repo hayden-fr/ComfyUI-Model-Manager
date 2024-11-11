@@ -8,7 +8,7 @@
     maximizeIcon="pi pi-arrow-up-right-and-arrow-down-left-from-center"
     minimizeIcon="pi pi-arrow-down-left-and-arrow-up-right-to-center"
     :pt:mask:class="['group', { open: visible }]"
-    pt:root:class="max-h-full group-[:not(.open)]:!hidden"
+    :pt:root:class="['max-h-full group-[:not(.open)]:!hidden', $style.dialog]"
     pt:content:class="px-0 flex-1"
     :base-z-index="1000"
     :auto-z-index="isNil(zIndex)"
@@ -333,3 +333,16 @@ defineExpose({
   updateContainerPosition,
 })
 </script>
+
+<style lang="css" module>
+@layer tailwind-utilities {
+  :where(.dialog) {
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      border: 0 solid var(--p-surface-500);
+    }
+  }
+}
+</style>

@@ -37,8 +37,10 @@
         <div
           v-show="showControlButton && scrollPosition !== 'left'"
           :class="[
-            'pointer-events-none absolute left-0 top-1/2 z-10',
-            '-translate-y-1/2 bg-gradient-to-r from-current to-transparent pr-16',
+            'pointer-events-none absolute z-10 flex h-full items-center',
+            'top-1/2 [transform:translateY(-50%)]',
+            'left-0 pr-16',
+            '[background-image:linear-gradient(to_right,currentColor,transparent)]',
           ]"
           style="color: var(--p-dialog-background)"
         >
@@ -67,8 +69,10 @@
         <div
           v-show="showControlButton && scrollPosition !== 'right'"
           :class="[
-            'pointer-events-none absolute right-0 top-1/2 z-10',
-            '-translate-y-1/2 bg-gradient-to-l from-current to-transparent pl-16',
+            'pointer-events-none absolute z-10 flex h-full items-center',
+            'top-1/2 [transform:translateY(-50%)]',
+            'right-0 pl-16',
+            '[background-image:linear-gradient(to_left,currentColor,transparent)]',
           ]"
           style="color: var(--p-dialog-background)"
         >

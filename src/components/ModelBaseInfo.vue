@@ -16,7 +16,7 @@
         update-trigger="blur"
       >
         <template #suffix>
-          <span class="pi-inputicon">
+          <span class="text-base opacity-60">
             {{ extension }}
           </span>
         </template>

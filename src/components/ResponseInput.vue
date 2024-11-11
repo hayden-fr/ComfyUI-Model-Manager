@@ -1,7 +1,15 @@
 <template>
-  <div class="p-component p-inputtext flex items-center gap-2">
+  <div
+    :class="[
+      'p-component p-inputtext flex items-center gap-2 border',
+      'focus-within:border-[--p-inputtext-focus-border-color]',
+    ]"
+  >
     <slot name="prefix">
-      <span v-if="prefixIcon" :class="[prefixIcon, 'pi-inputicon']"></span>
+      <span
+        v-if="prefixIcon"
+        :class="[prefixIcon, 'text-base opacity-60']"
+      ></span>
     </slot>
 
     <input
@@ -18,11 +26,14 @@
     <span
       v-if="allowClear"
       v-show="content"
-      class="pi pi-times pi-inputicon"
+      class="pi pi-times text-base opacity-60"
       @click="clearContent"
     ></span>
     <slot name="suffix">
-      <span v-if="suffixIcon" :class="[suffixIcon, 'pi-inputicon']"></span>
+      <span
+        v-if="suffixIcon"
+        :class="[suffixIcon, 'text-base opacity-60']"
+      ></span>
     </slot>
   </div>
 </template>
@@ -65,18 +76,3 @@ const clearContent = () => {
   inputRef.value?.focus()
 }
 </script>
-
-<style>
-.p-inputtext:focus-within {
-  border-color: var(--p-inputtext-focus-border-color);
-  box-shadow: var(--p-inputtext-focus-ring-shadow);
-  outline: var(--p-inputtext-focus-ring-width)
-    var(--p-inputtext-focus-ring-style) var(--p-inputtext-focus-ring-color);
-  outline-offset: var(--p-inputtext-focus-ring-offset);
-}
-
-.p-inputtext .pi-inputicon {
-  font-size: 1rem;
-  opacity: 0.6;
-}
-</style>

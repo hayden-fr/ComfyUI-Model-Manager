@@ -8,7 +8,7 @@
     >
       <template #suffix>
         <span
-          class="pi pi-search pi-inputicon"
+          class="pi pi-search text-base opacity-60"
           @click="searchModelsByUrl"
         ></span>
       </template>
