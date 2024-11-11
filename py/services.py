@@ -2,7 +2,6 @@ import os
 
 import folder_paths
 
-from multidict import MultiDictProxy
 from . import config
 from . import utils
 from . import download
@@ -75,20 +74,20 @@ def get_model_info(model_path: str):
     }
 
 
-def update_model(model_path: str, post: MultiDictProxy):
+def update_model(model_path: str, model_data: dict):
 
-    if "previewFile" in post:
-        previewFile = post["previewFile"]
+    if "previewFile" in model_data:
+        previewFile = model_data["previewFile"]
         utils.save_model_preview_image(model_path, previewFile)
 
-    if "description" in post:
-        description = post["description"]
+    if "description" in model_data:
+        description = model_data["description"]
         utils.save_model_description(model_path, description)
 
-    if "type" in post and "pathIndex" in post and "fullname" in post:
-        model_type = post.get("type", None)
-        path_index = int(post.get("pathIndex", None))
-        fullname = post.get("fullname", None)
+    if "type" in model_data and "pathIndex" in model_data and "fullname" in model_data:
+        model_type = model_data.get("type", None)
+        path_index = int(model_data.get("pathIndex", None))
+        fullname = model_data.get("fullname", None)
         if model_type is None or path_index is None or fullname is None:
             raise RuntimeError("Invalid type or pathIndex or fullname")
 
@@ -111,9 +110,8 @@ def remove_model(model_path: str):
         os.remove(utils.join_path(model_dirname, description))
 
 
-async def create_model_download_task(post, request):
-    dict_post = dict(post)
-    return await download.create_model_download_task(dict_post, request)
+async def create_model_download_task(task_data, request):
+    return await download.create_model_download_task(task_data, request)
 
 
 async def scan_model_download_task_list():

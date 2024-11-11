@@ -99,7 +99,8 @@ async def create_model(request):
     """
     post = await request.post()
     try:
-        task_id = await services.create_model_download_task(post, request)
+        task_data = dict(post)
+        task_id = await services.create_model_download_task(task_data, request)
         return web.json_response({"success": True, "data": {"taskId": task_id}})
     except Exception as e:
         error_msg = f"Create model download task failed: {str(e)}"
@@ -163,7 +164,8 @@ async def update_model(request):
         model_path = utils.get_valid_full_path(model_type, index, filename)
         if model_path is None:
             raise RuntimeError(f"File {filename} not found")
-        services.update_model(model_path, post)
+        model_data = dict(post)
+        services.update_model(model_path, model_data)
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Update model failed: {str(e)}"

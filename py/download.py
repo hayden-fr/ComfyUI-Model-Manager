@@ -111,13 +111,13 @@ async def scan_model_download_task_list():
     return utils.unpack_dataclass(task_list)
 
 
-async def create_model_download_task(post: dict, request):
+async def create_model_download_task(task_data: dict, request):
     """
     Creates a download task for the given post.
     """
-    model_type = post.get("type", None)
-    path_index = int(post.get("pathIndex", None))
-    fullname = post.get("fullname", None)
+    model_type = task_data.get("type", None)
+    path_index = int(task_data.get("pathIndex", None))
+    fullname = task_data.get("fullname", None)
 
     model_path = utils.get_full_path(model_type, path_index, fullname)
     # Check if the model path is valid
@@ -132,16 +132,16 @@ async def create_model_download_task(post: dict, request):
         raise RuntimeError(f"Task {task_id} already exists")
 
     try:
-        previewFile = post.pop("previewFile", None)
+        previewFile = task_data.pop("previewFile", None)
         utils.save_model_preview_image(task_path, previewFile)
-        set_task_content(task_id, post)
+        set_task_content(task_id, task_data)
         task_status = TaskStatus(
             taskId=task_id,
             type=model_type,
             fullname=fullname,
             preview=utils.get_model_preview_name(task_path),
-            platform=post.get("downloadPlatform", None),
-            totalSize=float(post.get("sizeBytes", 0)),
+            platform=task_data.get("downloadPlatform", None),
+            totalSize=float(task_data.get("sizeBytes", 0)),
         )
         download_model_task_status[task_id] = task_status
         await utils.send_json("create_download_task", task_status)
