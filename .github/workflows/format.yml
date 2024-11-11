@@ -1,0 +1,40 @@
+name: Prettier Check
+
+on:
+  push:
+    paths:
+      - '**/*.vue'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+  pull_request:
+    paths:
+      - '**/*.vue'
+      - '**/*.ts'
+      - '**/*.tsx'
+      - '**/*.js'
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Run Prettier check
+        run: pnpm exec prettier --check './**/*.{js,ts,tsx,vue}'
