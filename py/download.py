@@ -1,10 +1,8 @@
 import os
 import uuid
 import time
-import logging
 import requests
 import folder_paths
-import traceback
 from typing import Callable, Awaitable, Any, Literal, Union, Optional
 from dataclasses import dataclass
 from . import config
@@ -225,7 +223,7 @@ async def download_model(task_id: str, request):
             task_status.error = str(e)
             await utils.send_json("update_download_task", task_status)
             task_status.error = None
-            logging.error(str(e))
+            utils.print_error(str(e))
 
     try:
         status = download_thread_pool.submit(download_task, task_id)
@@ -238,7 +236,7 @@ async def download_model(task_id: str, request):
         task_status.error = str(e)
         await utils.send_json("update_download_task", task_status)
         task_status.error = None
-        logging.error(traceback.format_exc())
+        utils.print_error(str(e))
 
 
 async def download_model_file(

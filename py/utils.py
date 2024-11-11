@@ -5,6 +5,7 @@ import shutil
 import tarfile
 import logging
 import requests
+import traceback
 import configparser
 
 import comfy.utils
@@ -13,6 +14,15 @@ import folder_paths
 from aiohttp import web
 from typing import Any
 from . import config
+
+
+def print_info(msg, *args, **kwargs):
+    logging.info(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+
+
+def print_error(msg, *args, **kwargs):
+    logging.error(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+    logging.debug(traceback.format_exc())
 
 
 def normalize_path(path: str):
@@ -52,8 +62,8 @@ def download_web_distribution(version: str):
         return
 
     try:
-        logging.info(f"current version {version}, web version {web_version}")
-        logging.info("Downloading web distribution...")
+        print_info(f"current version {version}, web version {web_version}")
+        print_info("Downloading web distribution...")
         download_url = f"https://github.com/hayden-fr/ComfyUI-Model-Manager/releases/download/v{version}/dist.tar.gz"
         response = requests.get(download_url, stream=True)
         response.raise_for_status()
@@ -66,7 +76,7 @@ def download_web_distribution(version: str):
         if os.path.exists(web_path):
             shutil.rmtree(web_path)
 
-        logging.info("Extracting web distribution...")
+        print_info("Extracting web distribution...")
         with tarfile.open(temp_file, "r:gz") as tar:
             members = [
                 member for member in tar.getmembers() if member.name.startswith("web/")
@@ -74,13 +84,13 @@ def download_web_distribution(version: str):
             tar.extractall(path=config.extension_uri, members=members)
 
         os.remove(temp_file)
-        logging.info("Web distribution downloaded successfully.")
+        print_info("Web distribution downloaded successfully.")
     except requests.exceptions.RequestException as e:
-        logging.error(f"Failed to download web distribution: {e}")
+        print_error(f"Failed to download web distribution: {e}")
     except tarfile.TarError as e:
-        logging.error(f"Failed to extract web distribution: {e}")
+        print_error(f"Failed to extract web distribution: {e}")
     except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
+        print_error(f"An unexpected error occurred: {e}")
 
 
 def resolve_model_base_paths():

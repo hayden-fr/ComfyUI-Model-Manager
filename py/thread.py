@@ -1,7 +1,8 @@
 import asyncio
 import threading
 import queue
-import logging
+
+from . import utils
 
 
 class DownloadThreadPool:
@@ -50,7 +51,7 @@ class DownloadThreadPool:
                 with self._lock:
                     self.running_tasks.remove(task_id)
             except Exception as e:
-                logging.error(f"worker run error: {str(e)}")
+                utils.print_error(f"worker run error: {str(e)}")
 
         with self._lock:
             self.workers_count -= 1

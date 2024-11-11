@@ -12,9 +12,7 @@ version = utils.get_current_version()
 utils.download_web_distribution(version)
 
 
-import logging
 from aiohttp import web
-import traceback
 from .py import services
 
 
@@ -31,8 +29,7 @@ async def scan_download_tasks(request):
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read download task list failed: {e}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -57,8 +54,7 @@ async def resume_download_task(request):
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Resume download task failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -73,8 +69,7 @@ async def delete_model_download_task(request):
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Delete download task failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -108,8 +103,7 @@ async def create_model(request):
         return web.json_response({"success": True, "data": {"taskId": task_id}})
     except Exception as e:
         error_msg = f"Create model download task failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -123,8 +117,7 @@ async def read_models(request):
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -143,8 +136,7 @@ async def read_model_info(request):
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read model info failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -175,8 +167,7 @@ async def update_model(request):
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Update model failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 
@@ -197,8 +188,7 @@ async def delete_model(request):
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Delete model failed: {str(e)}"
-        logging.error(error_msg)
-        logging.debug(traceback.format_exc())
+        utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
 

@@ -1,3 +1,5 @@
+extension_tag = "ComfyUI Model Manager"
+
 extension_uri: str = None
 model_base_paths: dict[str, list[str]] = {}
 
