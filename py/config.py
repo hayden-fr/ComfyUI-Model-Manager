@@ -19,15 +19,3 @@ from server import PromptServer
 
 serverInstance = PromptServer.instance
 routes = serverInstance.routes
-
-
-class FakeRequest:
-    def __init__(self):
-        self.headers = {}
-
-
-class CustomException(BaseException):
-    def __init__(self, type: str, message: str = None) -> None:
-        self.type = type
-        self.message = message
-        super().__init__(message)

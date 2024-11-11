@@ -9,7 +9,6 @@ from typing import Callable, Awaitable, Any, Literal, Union, Optional
 from dataclasses import dataclass
 from . import config
 from . import utils
-from . import socket
 from . import thread
 
 
@@ -93,33 +92,28 @@ def delete_task_status(task_id: str):
     download_model_task_status.pop(task_id, None)
 
 
-async def scan_model_download_task_list(sid: str):
+async def scan_model_download_task_list():
     """
     Scan the download directory and send the task list to the client.
     """
-    try:
-        download_dir = utils.get_download_path()
-        task_files = utils.search_files(download_dir)
-        task_files = folder_paths.filter_files_extensions(task_files, [".task"])
-        task_files = sorted(
-            task_files,
-            key=lambda x: os.stat(utils.join_path(download_dir, x)).st_ctime,
-            reverse=True,
-        )
-        task_list: list[dict] = []
-        for task_file in task_files:
-            task_id = task_file.replace(".task", "")
-            task_status = get_task_status(task_id)
-            task_list.append(task_status)
+    download_dir = utils.get_download_path()
+    task_files = utils.search_files(download_dir)
+    task_files = folder_paths.filter_files_extensions(task_files, [".task"])
+    task_files = sorted(
+        task_files,
+        key=lambda x: os.stat(utils.join_path(download_dir, x)).st_ctime,
+        reverse=True,
+    )
+    task_list: list[dict] = []
+    for task_file in task_files:
+        task_id = task_file.replace(".task", "")
+        task_status = get_task_status(task_id)
+        task_list.append(task_status)
 
-        await socket.send_json("downloadTaskList", task_list, sid)
-    except Exception as e:
-        error_msg = f"Refresh task list failed: {e}"
-        await socket.send_json("error", error_msg, sid)
-        logging.error(error_msg)
+    return utils.unpack_dataclass(task_list)
 
 
-async def create_model_download_task(post: dict):
+async def create_model_download_task(post: dict, request):
     """
     Creates a download task for the given post.
     """
@@ -152,12 +146,12 @@ async def create_model_download_task(post: dict):
             totalSize=float(post.get("sizeBytes", 0)),
         )
         download_model_task_status[task_id] = task_status
-        await socket.send_json("createDownloadTask", task_status)
+        await utils.send_json("create_download_task", task_status)
     except Exception as e:
         await delete_model_download_task(task_id)
         raise RuntimeError(str(e)) from e
 
-    await download_model(task_id)
+    await download_model(task_id, request)
     return task_id
 
 
@@ -170,7 +164,7 @@ async def delete_model_download_task(task_id: str):
     task_status = get_task_status(task_id)
     is_running = task_status.status == "doing"
     task_status.status = "waiting"
-    await socket.send_json("deleteDownloadTask", task_id)
+    await utils.send_json("delete_download_task", task_id)
 
     # Pause the task
     if is_running:
@@ -185,13 +179,13 @@ async def delete_model_download_task(task_id: str):
             delete_task_status(task_id)
             os.remove(utils.join_path(download_dir, task_file))
 
-    await socket.send_json("deleteDownloadTask", task_id)
+    await utils.send_json("delete_download_task", task_id)
 
 
-async def download_model(task_id: str):
+async def download_model(task_id: str, request):
     async def download_task(task_id: str):
         async def report_progress(task_status: TaskStatus):
-            await socket.send_json("updateDownloadTask", task_status)
+            await utils.send_json("update_download_task", task_status)
 
         try:
             # When starting a task from the queue, the task may not exist
@@ -201,7 +195,7 @@ async def download_model(task_id: str):
 
         # Update task status
         task_status.status = "doing"
-        await socket.send_json("updateDownloadTask", task_status)
+        await utils.send_json("update_download_task", task_status)
 
         try:
 
@@ -210,12 +204,12 @@ async def download_model(task_id: str):
 
             download_platform = task_status.platform
             if download_platform == "civitai":
-                api_key = utils.get_setting_value("api_key.civitai")
+                api_key = utils.get_setting_value(request, "api_key.civitai")
                 if api_key:
                     headers["Authorization"] = f"Bearer {api_key}"
 
             elif download_platform == "huggingface":
-                api_key = utils.get_setting_value("api_key.huggingface")
+                api_key = utils.get_setting_value(request, "api_key.huggingface")
                 if api_key:
                     headers["Authorization"] = f"Bearer {api_key}"
 
@@ -229,7 +223,7 @@ async def download_model(task_id: str):
         except Exception as e:
             task_status.status = "pause"
             task_status.error = str(e)
-            await socket.send_json("updateDownloadTask", task_status)
+            await utils.send_json("update_download_task", task_status)
             task_status.error = None
             logging.error(str(e))
 
@@ -238,11 +232,11 @@ async def download_model(task_id: str):
         if status == "Waiting":
             task_status = get_task_status(task_id)
             task_status.status = "waiting"
-            await socket.send_json("updateDownloadTask", task_status)
+            await utils.send_json("update_download_task", task_status)
     except Exception as e:
         task_status.status = "pause"
         task_status.error = str(e)
-        await socket.send_json("updateDownloadTask", task_status)
+        await utils.send_json("update_download_task", task_status)
         task_status.error = None
         logging.error(traceback.format_exc())
 
@@ -275,7 +269,7 @@ async def download_model_file(
         time.sleep(1)
         task_file = utils.join_path(download_path, f"{task_id}.task")
         os.remove(task_file)
-        await socket.send_json("completeDownloadTask", task_id)
+        await utils.send_json("complete_download_task", task_id)
 
     async def update_progress():
         nonlocal last_update_time
@@ -347,7 +341,7 @@ async def download_model_file(
         task_content.sizeBytes = total_size
         task_status.totalSize = total_size
         set_task_content(task_id, task_content)
-        await socket.send_json("updateDownloadTask", task_content)
+        await utils.send_json("update_download_task", task_content)
 
     with open(download_tmp_file, "ab") as f:
         for chunk in response.iter_content(chunk_size=8192):
@@ -366,4 +360,4 @@ async def download_model_file(
         await download_complete()
     else:
         task_status.status = "pause"
-        await socket.send_json("updateDownloadTask", task_status)
+        await utils.send_json("update_download_task", task_status)

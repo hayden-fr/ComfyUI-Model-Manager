@@ -1,8 +1,9 @@
 import { useLoading } from 'hooks/loading'
 import { MarkdownTool, useMarkdown } from 'hooks/markdown'
-import { socket } from 'hooks/socket'
+import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
+import { api } from 'scripts/comfyAPI'
 import { bytesToSize } from 'utils/common'
 import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -13,10 +14,6 @@ export const useDownload = defineStore('download', (store) => {
 
   const taskList = ref<DownloadTask[]>([])
 
-  const refresh = () => {
-    socket.send('downloadTaskList', null)
-  }
-
   const createTaskItem = (item: DownloadTaskOptions) => {
     const { downloadedSize, totalSize, bps, ...rest } = item
 
@@ -26,10 +23,20 @@ export const useDownload = defineStore('download', (store) => {
       downloadProgress: `${bytesToSize(downloadedSize)} / ${bytesToSize(totalSize)}`,
       downloadSpeed: `${bytesToSize(bps)}/s`,
       pauseTask() {
-        socket.send('pauseDownloadTask', item.taskId)
+        request(`/download/${item.taskId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            status: 'pause',
+          }),
+        })
       },
       resumeTask: () => {
-        socket.send('resumeDownloadTask', item.taskId)
+        request(`/download/${item.taskId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            status: 'resume',
+          }),
+        })
       },
       deleteTask: () => {
         confirm.require({
@@ -46,7 +53,9 @@ export const useDownload = defineStore('download', (store) => {
             severity: 'danger',
           },
           accept: () => {
-            socket.send('deleteDownloadTask', item.taskId)
+            request(`/download/${item.taskId}`, {
+              method: 'DELETE',
+            })
           },
           reject: () => {},
         })
@@ -56,12 +65,28 @@ export const useDownload = defineStore('download', (store) => {
     return task
   }
 
+  const refresh = async () => {
+    return request('/download/task')
+      .then((resData: DownloadTaskOptions[]) => {
+        taskList.value = resData.map((item) => createTaskItem(item))
+        return taskList.value
+      })
+      .catch((err) => {
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: err.message ?? 'Failed to refresh download task list',
+          life: 15000,
+        })
+      })
+  }
+
   onBeforeMount(() => {
-    socket.addEventListener('reconnected', () => {
+    api.addEventListener('reconnected', () => {
       refresh()
     })
 
-    socket.addEventListener('downloadTaskList', (event) => {
+    api.addEventListener('fetch_download_task_list', (event) => {
       const data = event.detail as DownloadTaskOptions[]
 
       taskList.value = data.map((item) => {
@@ -69,12 +94,12 @@ export const useDownload = defineStore('download', (store) => {
       })
     })
 
-    socket.addEventListener('createDownloadTask', (event) => {
+    api.addEventListener('create_download_task', (event) => {
       const item = event.detail as DownloadTaskOptions
       taskList.value.unshift(createTaskItem(item))
     })
 
-    socket.addEventListener('updateDownloadTask', (event) => {
+    api.addEventListener('update_download_task', (event) => {
       const item = event.detail as DownloadTaskOptions
 
       for (const task of taskList.value) {
@@ -93,12 +118,12 @@ export const useDownload = defineStore('download', (store) => {
       }
     })
 
-    socket.addEventListener('deleteDownloadTask', (event) => {
+    api.addEventListener('delete_download_task', (event) => {
       const taskId = event.detail as string
       taskList.value = taskList.value.filter((item) => item.taskId !== taskId)
     })
 
-    socket.addEventListener('completeDownloadTask', (event) => {
+    api.addEventListener('complete_download_task', (event) => {
       const taskId = event.detail as string
       const task = taskList.value.find((item) => item.taskId === taskId)
       taskList.value = taskList.value.filter((item) => item.taskId !== taskId)

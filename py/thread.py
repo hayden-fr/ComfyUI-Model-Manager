@@ -2,7 +2,6 @@ import asyncio
 import threading
 import queue
 import logging
-from . import utils
 
 
 class DownloadThreadPool:
@@ -13,14 +12,7 @@ class DownloadThreadPool:
         self._lock = threading.Lock()
 
         default_max_workers = 5
-        max_workers: int = utils.get_setting_value(
-            "download.max_task_count", default_max_workers
-        )
-
-        if max_workers <= 0:
-            max_workers = default_max_workers
-            utils.set_setting_value("download.max_task_count", max_workers)
-
+        max_workers: int = default_max_workers
         self.max_worker = max_workers
 
     def submit(self, task, task_id):
