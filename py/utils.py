@@ -25,6 +25,10 @@ def print_error(msg, *args, **kwargs):
     logging.debug(traceback.format_exc())
 
 
+def print_debug(msg, *args, **kwargs):
+    logging.debug(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+
+
 def normalize_path(path: str):
     normpath = os.path.normpath(path)
     return normpath.replace(os.path.sep, "/")
