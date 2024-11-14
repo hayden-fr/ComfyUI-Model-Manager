@@ -245,14 +245,17 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
 
   interface FieldsItem {
     key: keyof Model
-    formatter: (val: any) => string
+    formatter: (val: any) => string | undefined | null
   }
 
   const baseInfo = computed(() => {
     const fields: FieldsItem[] = [
       {
         key: 'type',
-        formatter: () => modelData.value.type,
+        formatter: () =>
+          modelData.value.type in modelFolders.value
+            ? modelData.value.type
+            : undefined,
       },
       {
         key: 'pathIndex',
