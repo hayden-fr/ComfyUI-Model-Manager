@@ -1,6 +1,5 @@
 import MarkdownIt from 'markdown-it'
 import metadata_block from 'markdown-it-metadata-block'
-import TurndownService from 'turndown'
 import yaml from 'yaml'
 
 interface MarkdownOptions {
@@ -31,19 +30,7 @@ export const useMarkdown = (opts?: MarkdownOptions) => {
     return self.renderToken(tokens, idx, options)
   }
 
-  const turndown = new TurndownService({
-    headingStyle: 'atx',
-    bulletListMarker: '-',
-  })
-
-  turndown.addRule('paragraph', {
-    filter: 'p',
-    replacement: function (content) {
-      return `\n\n${content}`
-    },
-  })
-
-  return { render: md.render.bind(md), parse: turndown.turndown.bind(turndown) }
+  return { render: md.render.bind(md) }
 }
 
 export type MarkdownTool = ReturnType<typeof useMarkdown>

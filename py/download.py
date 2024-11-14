@@ -24,6 +24,34 @@ class TaskStatus:
     bps: float = 0
     error: Optional[str] = None
 
+    def __init__(self, **kwargs):
+        self.taskId = kwargs.get("taskId", None)
+        self.type = kwargs.get("type", None)
+        self.fullname = kwargs.get("fullname", None)
+        self.preview = kwargs.get("preview", None)
+        self.status = kwargs.get("status", "pause")
+        self.platform = kwargs.get("platform", None)
+        self.downloadedSize = kwargs.get("downloadedSize", 0)
+        self.totalSize = kwargs.get("totalSize", 0)
+        self.progress = kwargs.get("progress", 0)
+        self.bps = kwargs.get("bps", 0)
+        self.error = kwargs.get("error", None)
+
+    def to_dict(self):
+        return {
+            "taskId": self.taskId,
+            "type": self.type,
+            "fullname": self.fullname,
+            "preview": self.preview,
+            "status": self.status,
+            "platform": self.platform,
+            "downloadedSize": self.downloadedSize,
+            "totalSize": self.totalSize,
+            "progress": self.progress,
+            "bps": self.bps,
+            "error": self.error,
+        }
+
 
 @dataclass
 class TaskContent:
@@ -33,8 +61,30 @@ class TaskContent:
     description: str
     downloadPlatform: str
     downloadUrl: str
-    sizeBytes: float
+    sizeBytes: int
     hashes: Optional[dict[str, str]] = None
+
+    def __init__(self, **kwargs):
+        self.type = kwargs.get("type", None)
+        self.pathIndex = int(kwargs.get("pathIndex", 0))
+        self.fullname = kwargs.get("fullname", None)
+        self.description = kwargs.get("description", None)
+        self.downloadPlatform = kwargs.get("downloadPlatform", None)
+        self.downloadUrl = kwargs.get("downloadUrl", None)
+        self.sizeBytes = int(kwargs.get("sizeBytes", 0))
+        self.hashes = kwargs.get("hashes", None)
+
+    def to_dict(self):
+        return {
+            "type": self.type,
+            "pathIndex": self.pathIndex,
+            "fullname": self.fullname,
+            "description": self.description,
+            "downloadPlatform": self.downloadPlatform,
+            "downloadUrl": self.downloadUrl,
+            "sizeBytes": self.sizeBytes,
+            "hashes": self.hashes,
+        }
 
 
 download_model_task_status: dict[str, TaskStatus] = {}
@@ -44,7 +94,7 @@ download_thread_pool = thread.DownloadThreadPool()
 def set_task_content(task_id: str, task_content: Union[TaskContent, dict]):
     download_path = utils.get_download_path()
     task_file_path = utils.join_path(download_path, f"{task_id}.task")
-    utils.save_dict_pickle_file(task_file_path, utils.unpack_dataclass(task_content))
+    utils.save_dict_pickle_file(task_file_path, task_content)
 
 
 def get_task_content(task_id: str):
@@ -53,8 +103,6 @@ def get_task_content(task_id: str):
     if not os.path.isfile(task_file):
         raise RuntimeError(f"Task {task_id} not found")
     task_content = utils.load_dict_pickle_file(task_file)
-    task_content["pathIndex"] = int(task_content.get("pathIndex", 0))
-    task_content["sizeBytes"] = float(task_content.get("sizeBytes", 0))
     return TaskContent(**task_content)
 
 
@@ -106,14 +154,14 @@ async def scan_model_download_task_list():
     for task_file in task_files:
         task_id = task_file.replace(".task", "")
         task_status = get_task_status(task_id)
-        task_list.append(task_status)
+        task_list.append(task_status.to_dict())
 
-    return utils.unpack_dataclass(task_list)
+    return task_list
 
 
 async def create_model_download_task(task_data: dict, request):
     """
-    Creates a download task for the given post.
+    Creates a download task for the given data.
     """
     model_type = task_data.get("type", None)
     path_index = int(task_data.get("pathIndex", None))
@@ -132,8 +180,8 @@ async def create_model_download_task(task_data: dict, request):
         raise RuntimeError(f"Task {task_id} already exists")
 
     try:
-        previewFile = task_data.pop("previewFile", None)
-        utils.save_model_preview_image(task_path, previewFile)
+        preview_url = task_data.pop("preview", None)
+        utils.save_model_preview_image(task_path, preview_url)
         set_task_content(task_id, task_data)
         task_status = TaskStatus(
             taskId=task_id,
@@ -144,7 +192,7 @@ async def create_model_download_task(task_data: dict, request):
             totalSize=float(task_data.get("sizeBytes", 0)),
         )
         download_model_task_status[task_id] = task_status
-        await utils.send_json("create_download_task", task_status)
+        await utils.send_json("create_download_task", task_status.to_dict())
     except Exception as e:
         await delete_model_download_task(task_id)
         raise RuntimeError(str(e)) from e
@@ -183,7 +231,7 @@ async def delete_model_download_task(task_id: str):
 async def download_model(task_id: str, request):
     async def download_task(task_id: str):
         async def report_progress(task_status: TaskStatus):
-            await utils.send_json("update_download_task", task_status)
+            await utils.send_json("update_download_task", task_status.to_dict())
 
         try:
             # When starting a task from the queue, the task may not exist
@@ -193,7 +241,7 @@ async def download_model(task_id: str, request):
 
         # Update task status
         task_status.status = "doing"
-        await utils.send_json("update_download_task", task_status)
+        await utils.send_json("update_download_task", task_status.to_dict())
 
         try:
 
@@ -221,7 +269,7 @@ async def download_model(task_id: str, request):
         except Exception as e:
             task_status.status = "pause"
             task_status.error = str(e)
-            await utils.send_json("update_download_task", task_status)
+            await utils.send_json("update_download_task", task_status.to_dict())
             task_status.error = None
             utils.print_error(str(e))
 
@@ -230,11 +278,11 @@ async def download_model(task_id: str, request):
         if status == "Waiting":
             task_status = get_task_status(task_id)
             task_status.status = "waiting"
-            await utils.send_json("update_download_task", task_status)
+            await utils.send_json("update_download_task", task_status.to_dict())
     except Exception as e:
         task_status.status = "pause"
         task_status.error = str(e)
-        await utils.send_json("update_download_task", task_status)
+        await utils.send_json("update_download_task", task_status.to_dict())
         task_status.error = None
         utils.print_error(str(e))
 
@@ -339,7 +387,7 @@ async def download_model_file(
         task_content.sizeBytes = total_size
         task_status.totalSize = total_size
         set_task_content(task_id, task_content)
-        await utils.send_json("update_download_task", task_content)
+        await utils.send_json("update_download_task", task_content.to_dict())
 
     with open(download_tmp_file, "ab") as f:
         for chunk in response.iter_content(chunk_size=8192):
@@ -358,4 +406,4 @@ async def download_model_file(
         await download_complete()
     else:
         task_status.status = "pause"
-        await utils.send_json("update_download_task", task_status)
+        await utils.send_json("update_download_task", task_status.to_dict())

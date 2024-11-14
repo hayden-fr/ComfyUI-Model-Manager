@@ -5,6 +5,7 @@ import folder_paths
 from . import config
 from . import utils
 from . import download
+from . import searcher
 
 
 def scan_models():
@@ -128,3 +129,12 @@ async def resume_model_download_task(task_id, request):
 
 async def delete_model_download_task(task_id):
     return await download.delete_model_download_task(task_id)
+
+
+def fetch_model_info(model_page: str):
+    if not model_page:
+        return []
+
+    model_searcher = searcher.get_model_searcher_by_url(model_page)
+    result = model_searcher.search_by_url(model_page)
+    return result

@@ -3,6 +3,7 @@ name = "comfyui-model-manager"
 description = "Manage models: browsing, download and delete."
 version = "2.0.3"
 license = "LICENSE"
+dependencies = ["markdownify"]
 
 [project.urls]
 Repository = "https://github.com/hayden-fr/ComfyUI-Model-Manager"

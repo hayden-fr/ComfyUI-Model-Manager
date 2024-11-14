@@ -7,7 +7,7 @@ import { useToast } from 'hooks/toast'
 import { cloneDeep } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { BaseModel, Model, SelectEvent } from 'types/typings'
-import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
+import { bytesToSize, formatDate } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
 import { genModelKey, resolveModelTypeLoader } from 'utils/model'
 import {
@@ -29,18 +29,17 @@ export const useModels = defineStore('models', (store) => {
   const loading = useLoading()
 
   const updateModel = async (model: BaseModel, data: BaseModel) => {
-    const formData = new FormData()
+    const updateData = new Map()
     let oldKey: string | null = null
 
     // Check current preview
     if (model.preview !== data.preview) {
-      const previewFile = await previewUrlToFile(data.preview as string)
-      formData.append('previewFile', previewFile)
+      updateData.set('previewFile', data.preview)
     }
 
     // Check current description
     if (model.description !== data.description) {
-      formData.append('description', data.description)
+      updateData.set('description', data.description)
     }
 
     // Check current name and pathIndex
@@ -49,19 +48,19 @@ export const useModels = defineStore('models', (store) => {
       model.pathIndex !== data.pathIndex
     ) {
       oldKey = genModelKey(model)
-      formData.append('type', data.type)
-      formData.append('pathIndex', data.pathIndex.toString())
-      formData.append('fullname', data.fullname)
+      updateData.set('type', data.type)
+      updateData.set('pathIndex', data.pathIndex.toString())
+      updateData.set('fullname', data.fullname)
     }
 
-    if (formData.keys().next().done) {
+    if (updateData.size === 0) {
       return
     }
 
     loading.show()
     await request(`/model/${model.type}/${model.pathIndex}/${model.fullname}`, {
       method: 'PUT',
-      body: formData,
+      body: JSON.stringify(Object.fromEntries(updateData.entries())),
     })
       .catch((err) => {
         const error_message = err.message ?? err.error
