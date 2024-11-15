@@ -43,6 +43,13 @@ def filter_with(list: list, predicate):
     return [item for item in list if predicate(item)]
 
 
+async def get_request_body(request) -> dict:
+    try:
+        return await request.json()
+    except:
+        return {}
+
+
 def normalize_path(path: str):
     normpath = os.path.normpath(path)
     return normpath.replace(os.path.sep, "/")
@@ -382,3 +389,17 @@ def is_installed(package_name: str):
 
 def pip_install(package_name: str):
     subprocess.run([sys.executable, "-m", "pip", "install", package_name], check=True)
+
+
+import hashlib
+
+
+def calculate_sha256(path, buffer_size=1024 * 1024):
+    sha256 = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            data = f.read(buffer_size)
+            if not data:
+                break
+            sha256.update(data)
+    return sha256.hexdigest()

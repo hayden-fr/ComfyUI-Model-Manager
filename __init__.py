@@ -224,6 +224,22 @@ async def fetch_model_info(request):
         return web.json_response({"success": False, "error": error_msg})
 
 
+@routes.post("/model-manager/model-info/scan")
+async def download_model_info(request):
+    """
+    Create a task to download model information.
+    """
+    post = await utils.get_request_body(request)
+    try:
+        scan_mode = post.get("scanMode", "supplement")
+        services.download_model_info(scan_mode)
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Download model info failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
+
+
 @routes.get("/model-manager/preview/{type}/{index}/{filename:.*}")
 async def read_model_preview(request):
     """

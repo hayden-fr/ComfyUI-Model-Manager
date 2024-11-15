@@ -6,6 +6,7 @@ from . import config
 from . import utils
 from . import download
 from . import searcher
+from . import thread
 
 
 def scan_models():
@@ -138,3 +139,86 @@ def fetch_model_info(model_page: str):
     model_searcher = searcher.get_model_searcher_by_url(model_page)
     result = model_searcher.search_by_url(model_page)
     return result
+
+
+def try_to_scan_model_and_download_information(scan_mode: str):
+    utils.print_debug(f"scan_mode: {scan_mode}")
+    model_base_paths = config.model_base_paths
+    for model_type in model_base_paths:
+
+        folders, extensions = folder_paths.folder_names_and_paths[model_type]
+        for path_index, base_path in enumerate(folders):
+            files = utils.recursive_search_files(base_path)
+
+            models = folder_paths.filter_files_extensions(files, extensions)
+            images = folder_paths.filter_files_content_types(files, ["image"])
+            image_dict = utils.file_list_to_name_dict(images)
+            descriptions = folder_paths.filter_files_extensions(files, [".md"])
+            description_dict = utils.file_list_to_name_dict(descriptions)
+
+            for fullname in models:
+                fullname = utils.normalize_path(fullname)
+                basename = os.path.splitext(fullname)[0]
+
+                abs_model_path = utils.join_path(base_path, fullname)
+
+                image_name = image_dict.get(basename, "no-preview.png")
+                abs_image_path = utils.join_path(base_path, image_name)
+
+                has_preview = os.path.isfile(abs_image_path)
+
+                description_name = description_dict.get(basename, None)
+                abs_description_path = (
+                    utils.join_path(base_path, description_name)
+                    if description_name
+                    else None
+                )
+                has_description = (
+                    os.path.isfile(abs_description_path)
+                    if abs_description_path
+                    else False
+                )
+
+                try:
+
+                    utils.print_debug(f"Checking model {abs_model_path}")
+                    utils.print_debug(f"Scan mode: {scan_mode}")
+                    utils.print_debug(f"Has preview: {has_preview}")
+                    utils.print_debug(f"Has description: {has_description}")
+
+                    if scan_mode != "full" and (has_preview and has_description):
+                        continue
+
+                    utils.print_debug(f"Calculate sha256 for {abs_model_path}")
+                    hash_value = utils.calculate_sha256(abs_model_path)
+                    utils.print_debug(f"Searching model info by hash {hash_value}")
+                    model_info = searcher.CivitaiModelSearcher().search_by_hash(
+                        hash_value
+                    )
+
+                    preview_url_list = model_info.get("preview", [])
+                    preview_image_url = (
+                        preview_url_list[0] if preview_url_list else None
+                    )
+                    if preview_image_url:
+                        utils.print_debug(f"Save preview image to {abs_image_path}")
+                        utils.save_model_preview_image(
+                            abs_model_path, preview_image_url
+                        )
+
+                    description = model_info.get("description", None)
+                    if description:
+                        utils.save_model_description(abs_model_path, description)
+                except Exception as e:
+                    utils.print_error(
+                        f"Failed to download model info for {abs_model_path}: {e}"
+                    )
+
+    utils.print_debug("Completed scan model information.")
+
+
+def download_model_info(scan_mode: str):
+    utils.print_debug(f"Download model info for {scan_mode}")
+    thread.start_threading(
+        try_to_scan_model_and_download_information, args=(scan_mode,)
+    )

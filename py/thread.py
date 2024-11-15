@@ -55,3 +55,17 @@ class DownloadThreadPool:
 
         with self._lock:
             self.workers_count -= 1
+
+
+def start_threading(target, *, group=None, name=None, args=(), kwargs=None):
+    utils.print_debug(f"args {args}")
+    t = threading.Thread(
+        target=target,
+        group=group,
+        name=name,
+        args=args,
+        kwargs=kwargs,
+        daemon=True,
+    )
+    t.start()
+    return t

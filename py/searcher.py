@@ -17,7 +17,11 @@ class ModelSearcher(ABC):
     """
 
     @abstractmethod
-    def search_by_url(self, url: str):
+    def search_by_url(self, url: str) -> list[dict]:
+        pass
+
+    @abstractmethod
+    def search_by_hash(self, hash: str) -> dict:
         pass
 
 
@@ -26,6 +30,9 @@ class UnknownWebsiteSearcher(ModelSearcher):
         raise RuntimeError(
             f"Unknown Website, please input a URL from huggingface.co or civitai.com."
         )
+
+    def search_by_hash(self, hash: str):
+        raise RuntimeError(f"Unknown Website, unable to search with hash value.")
 
 
 class CivitaiModelSearcher(ModelSearcher):
@@ -125,6 +132,32 @@ class CivitaiModelSearcher(ModelSearcher):
 
         return models
 
+    def search_by_hash(self, hash: str):
+        if not hash:
+            raise RuntimeError(f"Hash value is empty.")
+
+        response = requests.get(
+            f"https://civitai.com/api/v1/model-versions/by-hash/{hash}"
+        )
+        response.raise_for_status()
+        version: dict = response.json()
+
+        model_id = version.get("modelId")
+        version_id = version.get("id")
+
+        model_page = (
+            f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
+        )
+
+        models = self.search_by_url(model_page)
+
+        for model in models:
+            sha256 = model.get("hashes", {}).get("SHA256")
+            if sha256 == hash:
+                return model
+
+        return models[0]
+
     def _resolve_model_type(self, model_type: str):
         map_legacy = {
             "TextualInversion": "embeddings",
@@ -223,6 +256,9 @@ class HuggingfaceModelSearcher(ModelSearcher):
             models.append(model)
 
         return models
+
+    def search_by_hash(self, hash: str):
+        raise RuntimeError("Hash search is not supported by Huggingface.")
 
     def _match_model_files(self):
         extension = [
