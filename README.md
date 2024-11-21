@@ -4,15 +4,13 @@ Download, browse and delete models in ComfyUI.
 
 Designed to support desktop, mobile and multi-screen devices.
 
-# Usage
+# Installation
 
-```bash
-cd /path/to/ComfyUI/custom_nodes
-git clone https://github.com/hayden-fr/ComfyUI-Model-Manager.git
-cd /path/to/ComfyUI/custom_nodes/ComfyUI-Model-Manager
-npm install
-npm run build
-```
+There are three installation methods, choose one
+
+1. Clone the repository: `git clone https://github.com/hayden-fr/ComfyUI-Model-Manager.git` to your ComfyUI `custom_nodes` folder
+2. Download the [latest release](https://github.com/hayden-fr/ComfyUI-Model-Manager/releases/latest/download/dist.tar.gz) and extract it to your ComfyUI `custom_nodes` folder
+3. Use comfy cli: `comfy node registry-install comfyui-model-manager`
 
 ## Features
 
