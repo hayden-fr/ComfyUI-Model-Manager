@@ -141,7 +141,7 @@ def fetch_model_info(model_page: str):
 
 
 async def download_model_info(scan_mode: str):
-    utils.print_debug(f"Download model info for {scan_mode}")
+    utils.print_info(f"Download model info for {scan_mode}")
     model_base_paths = config.model_base_paths
     for model_type in model_base_paths:
 
@@ -180,7 +180,7 @@ async def download_model_info(scan_mode: str):
 
                 try:
 
-                    utils.print_debug(f"Checking model {abs_model_path}")
+                    utils.print_info(f"Checking model {abs_model_path}")
                     utils.print_debug(f"Scan mode: {scan_mode}")
                     utils.print_debug(f"Has preview: {has_preview}")
                     utils.print_debug(f"Has description: {has_description}")
@@ -190,7 +190,7 @@ async def download_model_info(scan_mode: str):
 
                     utils.print_debug(f"Calculate sha256 for {abs_model_path}")
                     hash_value = utils.calculate_sha256(abs_model_path)
-                    utils.print_debug(f"Searching model info by hash {hash_value}")
+                    utils.print_info(f"Searching model info by hash {hash_value}")
                     model_info = searcher.CivitaiModelSearcher().search_by_hash(
                         hash_value
                     )
@@ -221,6 +221,8 @@ async def migrate_legacy_information():
     import yaml
     from PIL import Image
 
+    utils.print_info(f"Migrating legacy information...")
+
     model_base_paths = config.model_base_paths
     for model_type in model_base_paths:
 
@@ -237,7 +239,7 @@ async def migrate_legacy_information():
 
                 base_file_name = os.path.splitext(abs_model_path)[0]
 
-                utils.print_debug(f"migrate legacy info for {abs_model_path}")
+                utils.print_debug(f"Try to migrate legacy info for {abs_model_path}")
 
                 preview_path = utils.join_path(
                     os.path.dirname(abs_model_path),
@@ -246,6 +248,7 @@ async def migrate_legacy_information():
                 new_preview_path = f"{base_file_name}.webp"
 
                 if os.path.isfile(preview_path) and preview_path != new_preview_path:
+                    utils.print_info(f"Migrate preview image from {fullname}")
                     with Image.open(preview_path) as image:
                         image.save(new_preview_path, format="WEBP")
                     os.remove(preview_path)
@@ -290,6 +293,7 @@ async def migrate_legacy_information():
                 description_path = f"{base_file_name}.md"
 
                 if os.path.isfile(text_info_path):
+                    utils.print_info(f"Migrate description from {fullname}")
                     with open(description_path, "w", encoding="utf-8", newline="") as f:
                         f.write("\n".join(description_parts))
 
