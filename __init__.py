@@ -231,8 +231,8 @@ async def download_model_info(request):
     """
     post = await utils.get_request_body(request)
     try:
-        scan_mode = post.get("scanMode", "supplement")
-        services.download_model_info(scan_mode)
+        scan_mode = post.get("scanMode", "diff")
+        await services.download_model_info(scan_mode)
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Download model info failed: {str(e)}"
@@ -280,6 +280,20 @@ async def read_download_preview(request):
         preview_path = utils.join_path(extension_uri, "assets", "no-preview.png")
 
     return web.FileResponse(preview_path)
+
+
+@routes.post("/model-manager/migrate")
+async def migrate_legacy_information(request):
+    """
+    Migrate legacy information.
+    """
+    try:
+        await services.migrate_legacy_information()
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Download model info failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
 
 
 WEB_DIRECTORY = "web"

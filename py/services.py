@@ -6,7 +6,6 @@ from . import config
 from . import utils
 from . import download
 from . import searcher
-from . import thread
 
 
 def scan_models():
@@ -141,8 +140,8 @@ def fetch_model_info(model_page: str):
     return result
 
 
-def try_to_scan_model_and_download_information(scan_mode: str):
-    utils.print_debug(f"scan_mode: {scan_mode}")
+async def download_model_info(scan_mode: str):
+    utils.print_debug(f"Download model info for {scan_mode}")
     model_base_paths = config.model_base_paths
     for model_type in model_base_paths:
 
@@ -217,8 +216,89 @@ def try_to_scan_model_and_download_information(scan_mode: str):
     utils.print_debug("Completed scan model information.")
 
 
-def download_model_info(scan_mode: str):
-    utils.print_debug(f"Download model info for {scan_mode}")
-    thread.start_threading(
-        try_to_scan_model_and_download_information, args=(scan_mode,)
-    )
+async def migrate_legacy_information():
+    import json
+    import yaml
+    from PIL import Image
+
+    model_base_paths = config.model_base_paths
+    for model_type in model_base_paths:
+
+        folders, extensions = folder_paths.folder_names_and_paths[model_type]
+        for path_index, base_path in enumerate(folders):
+            files = utils.recursive_search_files(base_path)
+
+            models = folder_paths.filter_files_extensions(files, extensions)
+
+            for fullname in models:
+                fullname = utils.normalize_path(fullname)
+
+                abs_model_path = utils.join_path(base_path, fullname)
+
+                base_file_name = os.path.splitext(abs_model_path)[0]
+
+                utils.print_debug(f"migrate legacy info for {abs_model_path}")
+
+                preview_path = utils.join_path(
+                    os.path.dirname(abs_model_path),
+                    utils.get_model_preview_name(abs_model_path),
+                )
+                new_preview_path = f"{base_file_name}.webp"
+
+                if os.path.isfile(preview_path) and preview_path != new_preview_path:
+                    with Image.open(preview_path) as image:
+                        image.save(new_preview_path, format="WEBP")
+                    os.remove(preview_path)
+
+                description_path = f"{base_file_name}.md"
+
+                metadata_info = {
+                    "website": "Civitai",
+                }
+
+                url_info_path = f"{base_file_name}.url"
+                if os.path.isfile(url_info_path):
+                    with open(url_info_path, "r", encoding="utf-8") as f:
+                        for line in f:
+                            if line.startswith("URL="):
+                                model_page_url = line[len("URL=") :].strip()
+                                metadata_info.update({"modelPage": model_page_url})
+
+                json_info_path = f"{base_file_name}.json"
+                if os.path.isfile(json_info_path):
+                    with open(json_info_path, "r", encoding="utf-8") as f:
+                        version = json.load(f)
+                        metadata_info.update(
+                            {
+                                "baseModel": version.get("baseModel"),
+                                "preview": [i["url"] for i in version["images"]],
+                            }
+                        )
+
+                description_parts: list[str] = [
+                    "---",
+                    yaml.dump(metadata_info).strip(),
+                    "---",
+                    "",
+                ]
+
+                text_info_path = f"{base_file_name}.txt"
+                if os.path.isfile(text_info_path):
+                    with open(text_info_path, "r", encoding="utf-8") as f:
+                        description_parts.append(f.read())
+
+                description_path = f"{base_file_name}.md"
+
+                if os.path.isfile(text_info_path):
+                    with open(description_path, "w", encoding="utf-8", newline="") as f:
+                        f.write("\n".join(description_parts))
+
+                def try_to_remove_file(file_path):
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+
+                try_to_remove_file(url_info_path)
+                try_to_remove_file(text_info_path)
+                try_to_remove_file(json_info_path)
+
+    utils.print_debug("Completed migrate model information.")

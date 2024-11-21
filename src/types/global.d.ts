@@ -112,6 +112,7 @@ declare namespace ComfyAPI {
       settings: ComfySettingsDialog
       menuHamburger?: HTMLDivElement
       menuContainer?: HTMLDivElement
+      dialog: dialog.ComfyDialog
     }
 
     type SettingInputType =
@@ -195,6 +196,15 @@ declare namespace ComfyAPI {
       remove(indexOrButton: ComfyButton | number): void
       update(): void
       constructor(...buttons: (HTMLElement | ComfyButton)[]): ComfyButtonGroup
+    }
+  }
+
+  namespace dialog {
+    class ComfyDialog {
+      constructor(type = 'div', buttons: HTMLElement[] = null)
+      element: HTMLElement
+      close(): void
+      show(html: string | HTMLElement | HTMLElement[]): void
     }
   }
 }

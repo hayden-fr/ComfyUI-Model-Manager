@@ -5,3 +5,4 @@ export const $el = window.comfyAPI.ui.$el
 
 export const ComfyApp = window.comfyAPI.app.ComfyApp
 export const ComfyButton = window.comfyAPI.button.ComfyButton
+export const ComfyDialog = window.comfyAPI.dialog.ComfyDialog
