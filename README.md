@@ -61,3 +61,10 @@ npm run build
 - Read, edit and save notes. (Saved as a `.md` file beside the model).
 - Change or remove a model's preview image.
 - View training tags and use the random tag generator to generate prompt ideas. (Inspired by the one in A1111.)
+
+### Scan Model Information
+
+<img src="demo/scan-model-info.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
+
+- Scan models and try to download information & preview.
+- Support migration from `cdb-boop/ComfyUI-Model-Manager/main`
