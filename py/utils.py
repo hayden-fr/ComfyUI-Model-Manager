@@ -29,6 +29,27 @@ def print_debug(msg, *args, **kwargs):
     logging.debug(f"[{config.extension_tag}] {msg}", *args, **kwargs)
 
 
+def _matches(predicate: dict):
+    def _filter(obj: dict):
+        return all(obj.get(key, None) == value for key, value in predicate.items())
+
+    return _filter
+
+
+def filter_with(list: list, predicate):
+    if isinstance(predicate, dict):
+        predicate = _matches(predicate)
+
+    return [item for item in list if predicate(item)]
+
+
+async def get_request_body(request) -> dict:
+    try:
+        return await request.json()
+    except:
+        return {}
+
+
 def normalize_path(path: str):
     normpath = os.path.normpath(path)
     return normpath.replace(os.path.sep, "/")
@@ -202,41 +223,22 @@ def get_model_preview_name(model_path: str):
     return images[0] if len(images) > 0 else "no-preview.png"
 
 
-def save_model_preview_image(model_path: str, image_file: Any):
-    if not isinstance(image_file, web.FileField):
-        raise RuntimeError("Invalid image file")
+from PIL import Image
+from io import BytesIO
 
-    content_type: str = image_file.content_type
-    if not content_type.startswith("image/"):
-        raise RuntimeError(f"FileTypeError: expected image, got {content_type}")
 
-    base_dirname = os.path.dirname(model_path)
+def save_model_preview_image(model_path: str, image_url: str):
+    try:
+        image_response = requests.get(image_url)
+        image_response.raise_for_status()
 
-    # remove old preview images
-    old_preview_images = get_model_all_images(model_path)
-    a1111_civitai_helper_image = False
-    for image in old_preview_images:
-        if os.path.splitext(image)[1].endswith(".preview"):
-            a1111_civitai_helper_image = True
-        image_path = join_path(base_dirname, image)
-        os.remove(image_path)
+        basename = os.path.splitext(model_path)[0]
+        preview_path = f"{basename}.webp"
+        image = Image.open(BytesIO(image_response.content))
+        image.save(preview_path, "WEBP")
 
-    # save new preview image
-    basename = os.path.splitext(os.path.basename(model_path))[0]
-    extension = f".{content_type.split('/')[1]}"
-    new_preview_path = join_path(base_dirname, f"{basename}{extension}")
-
-    with open(new_preview_path, "wb") as f:
-        f.write(image_file.file.read())
-
-    # TODO Is it possible to abandon the current rules and adopt the rules of a1111 civitai_helper?
-    if a1111_civitai_helper_image:
-        """
-        Keep preview image of a1111_civitai_helper
-        """
-        new_preview_path = join_path(base_dirname, f"{basename}.preview{extension}")
-        with open(new_preview_path, "wb") as f:
-            f.write(image_file.file.read())
+    except Exception as e:
+        print_error(f"Failed to download image: {e}")
 
 
 def get_model_all_descriptions(model_path: str):
@@ -361,20 +363,43 @@ def get_setting_value(request: web.Request, key: str, default: Any = None) -> An
     return settings.get(setting_id, default)
 
 
-from dataclasses import asdict, is_dataclass
-
-
-def unpack_dataclass(data: Any):
-    if isinstance(data, dict):
-        return {key: unpack_dataclass(value) for key, value in data.items()}
-    elif isinstance(data, list):
-        return [unpack_dataclass(x) for x in data]
-    elif is_dataclass(data):
-        return asdict(data)
-    else:
-        return data
-
-
 async def send_json(event: str, data: Any, sid: str = None):
-    detail = unpack_dataclass(data)
-    await config.serverInstance.send_json(event, detail, sid)
+    await config.serverInstance.send_json(event, data, sid)
+
+
+import sys
+import subprocess
+import importlib.util
+import importlib.metadata
+
+
+def is_installed(package_name: str):
+    try:
+        dist = importlib.metadata.distribution(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        try:
+            spec = importlib.util.find_spec(package_name)
+        except ModuleNotFoundError:
+            return False
+
+        return spec is not None
+
+    return dist is not None
+
+
+def pip_install(package_name: str):
+    subprocess.run([sys.executable, "-m", "pip", "install", package_name], check=True)
+
+
+import hashlib
+
+
+def calculate_sha256(path, buffer_size=1024 * 1024):
+    sha256 = hashlib.sha256()
+    with open(path, "rb") as f:
+        while True:
+            data = f.read(buffer_size)
+            if not data:
+                break
+            sha256.update(data)
+    return sha256.hexdigest()

@@ -14,7 +14,6 @@
     "@types/lodash": "^4.17.9",
     "@types/markdown-it": "^14.1.2",
     "@types/node": "^22.5.5",
-    "@types/turndown": "^5.0.5",
     "@vitejs/plugin-vue": "^5.1.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.10.0",
@@ -40,15 +39,13 @@
     "markdown-it": "^14.1.0",
     "markdown-it-metadata-block": "^1.0.6",
     "primevue": "^4.0.7",
-    "turndown": "^7.2.0",
     "vue": "^3.4.31",
     "vue-i18n": "^9.13.1",
     "yaml": "^2.6.0"
   },
   "lint-staged": {
     "./**/*.{js,ts,tsx,vue}": [
-      "prettier --write",
-      "git add"
+      "prettier --write"
     ]
   }
 }

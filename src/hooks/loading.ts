@@ -31,6 +31,12 @@ export const useGlobalLoading = defineStore('loading', () => {
   return { loading }
 })
 
+declare module 'hooks/store' {
+  interface StoreProvider {
+    loading: ReturnType<typeof useGlobalLoading>
+  }
+}
+
 export const useLoading = () => {
   const timer = ref<NodeJS.Timeout>()
 

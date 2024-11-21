@@ -70,7 +70,6 @@ import { request } from 'hooks/request'
 import { useToast } from 'hooks/toast'
 import Button from 'primevue/button'
 import { VersionModel } from 'types/typings'
-import { previewUrlToFile } from 'utils/common'
 import { ref } from 'vue'
 
 const { isMobile } = useConfig()
@@ -89,38 +88,11 @@ const searchModelsByUrl = async () => {
 }
 
 const createDownTask = async (data: VersionModel) => {
-  const formData = new FormData()
-
   loading.show()
-  // set base info
-  formData.append('type', data.type)
-  formData.append('pathIndex', data.pathIndex.toString())
-  formData.append('fullname', data.fullname)
-  // set preview
-  const previewFile = await previewUrlToFile(data.preview as string).catch(
-    () => {
-      loading.hide()
-      toast.add({
-        severity: 'error',
-        summary: 'Error',
-        detail: 'Failed to download preview',
-        life: 15000,
-      })
-      throw new Error('Failed to download preview')
-    },
-  )
-  formData.append('previewFile', previewFile)
-  // set description
-  formData.append('description', data.description)
-  // set model download info
-  formData.append('downloadPlatform', data.downloadPlatform)
-  formData.append('downloadUrl', data.downloadUrl)
-  formData.append('sizeBytes', data.sizeBytes.toString())
-  formData.append('hashes', JSON.stringify(data.hashes))
 
   await request('/model', {
     method: 'POST',
-    body: formData,
+    body: JSON.stringify(data),
   })
     .then(() => {
       dialog.close({ key: 'model-manager-create-task' })

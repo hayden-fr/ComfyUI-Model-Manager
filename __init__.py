@@ -3,9 +3,26 @@ import folder_paths
 from .py import config
 from .py import utils
 
+extension_uri = utils.normalize_path(os.path.dirname(__file__))
+
+requirements_path = utils.join_path(extension_uri, "requirements.txt")
+
+with open(requirements_path, "r", encoding="utf-8") as f:
+    requirements = f.readlines()
+
+requirements = [x.strip() for x in requirements]
+requirements = [x for x in requirements if not x.startswith("#")]
+
+uninstalled_package = [p for p in requirements if not utils.is_installed(p)]
+
+if len(uninstalled_package) > 0:
+    utils.print_info(f"Install dependencies...")
+    for p in uninstalled_package:
+        utils.pip_install(p)
+
 
 # Init config settings
-config.extension_uri = utils.normalize_path(os.path.dirname(__file__))
+config.extension_uri = extension_uri
 utils.resolve_model_base_paths()
 
 version = utils.get_current_version()
@@ -97,9 +114,8 @@ async def create_model(request):
     - downloadUrl: download url.
     - hash: a JSON string containing the hash value of the downloaded model.
     """
-    post = await request.post()
+    task_data = await request.json()
     try:
-        task_data = dict(post)
         task_id = await services.create_model_download_task(task_data, request)
         return web.json_response({"success": True, "data": {"taskId": task_id}})
     except Exception as e:
@@ -158,13 +174,12 @@ async def update_model(request):
     index = int(request.match_info.get("index", None))
     filename = request.match_info.get("filename", None)
 
-    post: dict = await request.post()
+    model_data: dict = await request.json()
 
     try:
         model_path = utils.get_valid_full_path(model_type, index, filename)
         if model_path is None:
             raise RuntimeError(f"File {filename} not found")
-        model_data = dict(post)
         services.update_model(model_path, model_data)
         return web.json_response({"success": True})
     except Exception as e:
@@ -190,6 +205,37 @@ async def delete_model(request):
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Delete model failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.get("/model-manager/model-info")
+async def fetch_model_info(request):
+    """
+    Fetch model information from network with model page.
+    """
+    try:
+        model_page = request.query.get("model-page", None)
+        result = services.fetch_model_info(model_page)
+        return web.json_response({"success": True, "data": result})
+    except Exception as e:
+        error_msg = f"Fetch model info failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.post("/model-manager/model-info/scan")
+async def download_model_info(request):
+    """
+    Create a task to download model information.
+    """
+    post = await utils.get_request_body(request)
+    try:
+        scan_mode = post.get("scanMode", "diff")
+        await services.download_model_info(scan_mode)
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Download model info failed: {str(e)}"
         utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 
@@ -234,6 +280,20 @@ async def read_download_preview(request):
         preview_path = utils.join_path(extension_uri, "assets", "no-preview.png")
 
     return web.FileResponse(preview_path)
+
+
+@routes.post("/model-manager/migrate")
+async def migrate_legacy_information(request):
+    """
+    Migrate legacy information.
+    """
+    try:
+        await services.migrate_legacy_information()
+        return web.json_response({"success": True})
+    except Exception as e:
+        error_msg = f"Download model info failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
 
 
 WEB_DIRECTORY = "web"
