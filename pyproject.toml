@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-model-manager"
 description = "Manage models: browsing, download and delete."
-version = "2.1.0"
+version = "2.1.1"
 license = "LICENSE"
 dependencies = ["markdownify"]
 
