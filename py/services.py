@@ -18,8 +18,6 @@ def scan_models():
             files = utils.recursive_search_files(base_path)
 
             models = folder_paths.filter_files_extensions(files, extensions)
-            images = folder_paths.filter_files_content_types(files, ["image"])
-            image_dict = utils.file_list_to_name_dict(images)
 
             for fullname in models:
                 fullname = utils.normalize_path(fullname)
@@ -30,7 +28,7 @@ def scan_models():
                 file_stats = os.stat(abs_path)
 
                 # Resolve preview
-                image_name = image_dict.get(basename, "no-preview.png")
+                image_name = utils.get_model_preview_name(abs_path)
                 abs_image_path = utils.join_path(base_path, image_name)
                 if os.path.isfile(abs_image_path):
                     image_state = os.stat(abs_image_path)
@@ -150,10 +148,6 @@ async def download_model_info(scan_mode: str):
             files = utils.recursive_search_files(base_path)
 
             models = folder_paths.filter_files_extensions(files, extensions)
-            images = folder_paths.filter_files_content_types(files, ["image"])
-            image_dict = utils.file_list_to_name_dict(images)
-            descriptions = folder_paths.filter_files_extensions(files, [".md"])
-            description_dict = utils.file_list_to_name_dict(descriptions)
 
             for fullname in models:
                 fullname = utils.normalize_path(fullname)
@@ -161,12 +155,12 @@ async def download_model_info(scan_mode: str):
 
                 abs_model_path = utils.join_path(base_path, fullname)
 
-                image_name = image_dict.get(basename, "no-preview.png")
+                image_name = utils.get_model_preview_name(abs_model_path)
                 abs_image_path = utils.join_path(base_path, image_name)
 
                 has_preview = os.path.isfile(abs_image_path)
 
-                description_name = description_dict.get(basename, None)
+                description_name = utils.get_model_description_name(abs_model_path)
                 abs_description_path = (
                     utils.join_path(base_path, description_name)
                     if description_name
@@ -251,7 +245,6 @@ async def migrate_legacy_information():
                     utils.print_info(f"Migrate preview image from {fullname}")
                     with Image.open(preview_path) as image:
                         image.save(new_preview_path, format="WEBP")
-                    os.remove(preview_path)
 
                 description_path = f"{base_file_name}.md"
 
@@ -297,12 +290,5 @@ async def migrate_legacy_information():
                     with open(description_path, "w", encoding="utf-8", newline="") as f:
                         f.write("\n".join(description_parts))
 
-                def try_to_remove_file(file_path):
-                    if os.path.isfile(file_path):
-                        os.remove(file_path)
-
-                try_to_remove_file(url_info_path)
-                try_to_remove_file(text_info_path)
-                try_to_remove_file(json_info_path)
 
     utils.print_debug("Completed migrate model information.")
