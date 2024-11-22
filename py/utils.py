@@ -220,6 +220,14 @@ def get_model_all_images(model_path: str):
 
 def get_model_preview_name(model_path: str):
     images = get_model_all_images(model_path)
+    basename = os.path.splitext(os.path.basename(model_path))[0]
+
+    for image in images:
+        image_name = os.path.splitext(image)[0]
+        image_ext = os.path.splitext(image)[1]
+        if image_name == basename and image_ext.lower() == ".webp":
+            return image
+
     return images[0] if len(images) > 0 else "no-preview.png"
 
 
@@ -266,12 +274,6 @@ def save_model_description(model_path: str, content: Any):
         raise RuntimeError("Invalid description")
 
     base_dirname = os.path.dirname(model_path)
-
-    # remove old descriptions
-    old_descriptions = get_model_all_descriptions(model_path)
-    for desc in old_descriptions:
-        description_path = join_path(base_dirname, desc)
-        os.remove(description_path)
 
     # save new description
     basename = os.path.splitext(os.path.basename(model_path))[0]
