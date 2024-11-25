@@ -291,7 +291,7 @@ async def migrate_legacy_information(request):
         await services.migrate_legacy_information()
         return web.json_response({"success": True})
     except Exception as e:
-        error_msg = f"Download model info failed: {str(e)}"
+        error_msg = f"Migrate model info failed: {str(e)}"
         utils.print_error(error_msg)
         return web.json_response({"success": False, "error": error_msg})
 

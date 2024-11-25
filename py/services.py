@@ -290,5 +290,4 @@ async def migrate_legacy_information():
                     with open(description_path, "w", encoding="utf-8", newline="") as f:
                         f.write("\n".join(description_parts))
 
-
     utils.print_debug("Completed migrate model information.")
