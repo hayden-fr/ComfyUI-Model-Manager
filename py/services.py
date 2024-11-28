@@ -8,14 +8,14 @@ from . import download
 from . import searcher
 
 
-def scan_models():
+def scan_models(request):
     result = []
     model_base_paths = utils.resolve_model_base_paths()
     for model_type in model_base_paths:
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
@@ -136,14 +136,14 @@ def fetch_model_info(model_page: str):
     return result
 
 
-async def download_model_info(scan_mode: str):
+async def download_model_info(scan_mode: str, request):
     utils.print_info(f"Download model info for {scan_mode}")
     model_base_paths = utils.resolve_model_base_paths()
     for model_type in model_base_paths:
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
@@ -192,7 +192,7 @@ async def download_model_info(scan_mode: str):
     utils.print_debug("Completed scan model information.")
 
 
-async def migrate_legacy_information():
+async def migrate_legacy_information(request):
     import json
     import yaml
     from PIL import Image
@@ -204,7 +204,7 @@ async def migrate_legacy_information():
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
