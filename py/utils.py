@@ -103,9 +103,7 @@ def download_web_distribution(version: str):
 
         print_info("Extracting web distribution...")
         with tarfile.open(temp_file, "r:gz") as tar:
-            members = [
-                member for member in tar.getmembers() if member.name.startswith("web/")
-            ]
+            members = [member for member in tar.getmembers() if member.name.startswith("web/")]
             tar.extractall(path=config.extension_uri, members=members)
 
         os.remove(temp_file)
@@ -154,9 +152,7 @@ def get_valid_full_path(model_type: str, path_index: int, filename: str):
     if os.path.isfile(full_path):
         return full_path
     elif os.path.islink(full_path):
-        raise RuntimeError(
-            f"WARNING path {full_path} exists but doesn't link anywhere, skipping."
-        )
+        raise RuntimeError(f"WARNING path {full_path} exists but doesn't link anywhere, skipping.")
 
 
 def get_download_path():
@@ -166,11 +162,29 @@ def get_download_path():
     return download_path
 
 
-def recursive_search_files(directory: str):
-    files, folder_all = folder_paths.recursive_search(
-        directory, excluded_dir_names=[".git"]
-    )
-    return [normalize_path(f) for f in files]
+def recursive_search_files(directory: str, request):
+    if not os.path.isdir(directory):
+        return []
+
+    excluded_dir_names = [".git"]
+    result = []
+    include_hidden_files = get_setting_value(request, "scan.include_hidden_files", False)
+
+    for dirpath, subdirs, filenames in os.walk(directory, followlinks=True, topdown=True):
+        subdirs[:] = [d for d in subdirs if d not in excluded_dir_names]
+        if not include_hidden_files:
+            subdirs[:] = [d for d in subdirs if not d.startswith(".")]
+            filenames[:] = [f for f in filenames if not f.startswith(".")]
+
+        for file_name in filenames:
+            try:
+                relative_path = os.path.relpath(os.path.join(dirpath, file_name), directory)
+                result.append(relative_path)
+            except:
+                logging.warning(f"Warning: Unable to access {file_name}. Skipping this file.")
+                continue
+
+    return [normalize_path(f) for f in result]
 
 
 def search_files(directory: str):

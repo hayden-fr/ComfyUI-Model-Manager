@@ -8,14 +8,14 @@ from . import download
 from . import searcher
 
 
-def scan_models():
+def scan_models(request):
     result = []
     model_base_paths = config.model_base_paths
     for model_type in model_base_paths:
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, extensions)
 
@@ -34,9 +34,7 @@ def scan_models():
                     image_state = os.stat(abs_image_path)
                     image_timestamp = round(image_state.st_mtime_ns / 1000000)
                     image_name = f"{image_name}?ts={image_timestamp}"
-                model_preview = (
-                    f"/model-manager/preview/{model_type}/{path_index}/{image_name}"
-                )
+                model_preview = f"/model-manager/preview/{model_type}/{path_index}/{image_name}"
 
                 model_info = {
                     "fullname": fullname,
@@ -138,14 +136,14 @@ def fetch_model_info(model_page: str):
     return result
 
 
-async def download_model_info(scan_mode: str):
+async def download_model_info(scan_mode: str, request):
     utils.print_info(f"Download model info for {scan_mode}")
     model_base_paths = config.model_base_paths
     for model_type in model_base_paths:
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, extensions)
 
@@ -161,16 +159,8 @@ async def download_model_info(scan_mode: str):
                 has_preview = os.path.isfile(abs_image_path)
 
                 description_name = utils.get_model_description_name(abs_model_path)
-                abs_description_path = (
-                    utils.join_path(base_path, description_name)
-                    if description_name
-                    else None
-                )
-                has_description = (
-                    os.path.isfile(abs_description_path)
-                    if abs_description_path
-                    else False
-                )
+                abs_description_path = utils.join_path(base_path, description_name) if description_name else None
+                has_description = os.path.isfile(abs_description_path) if abs_description_path else False
 
                 try:
 
@@ -185,32 +175,24 @@ async def download_model_info(scan_mode: str):
                     utils.print_debug(f"Calculate sha256 for {abs_model_path}")
                     hash_value = utils.calculate_sha256(abs_model_path)
                     utils.print_info(f"Searching model info by hash {hash_value}")
-                    model_info = searcher.CivitaiModelSearcher().search_by_hash(
-                        hash_value
-                    )
+                    model_info = searcher.CivitaiModelSearcher().search_by_hash(hash_value)
 
                     preview_url_list = model_info.get("preview", [])
-                    preview_image_url = (
-                        preview_url_list[0] if preview_url_list else None
-                    )
+                    preview_image_url = preview_url_list[0] if preview_url_list else None
                     if preview_image_url:
                         utils.print_debug(f"Save preview image to {abs_image_path}")
-                        utils.save_model_preview_image(
-                            abs_model_path, preview_image_url
-                        )
+                        utils.save_model_preview_image(abs_model_path, preview_image_url)
 
                     description = model_info.get("description", None)
                     if description:
                         utils.save_model_description(abs_model_path, description)
                 except Exception as e:
-                    utils.print_error(
-                        f"Failed to download model info for {abs_model_path}: {e}"
-                    )
+                    utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
 
     utils.print_debug("Completed scan model information.")
 
 
-async def migrate_legacy_information():
+async def migrate_legacy_information(request):
     import json
     import yaml
     from PIL import Image
@@ -222,7 +204,7 @@ async def migrate_legacy_information():
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]
         for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path)
+            files = utils.recursive_search_files(base_path, request)
 
             models = folder_paths.filter_files_extensions(files, extensions)
 
