@@ -17,7 +17,7 @@ def scan_models():
         for path_index, base_path in enumerate(folders):
             files = utils.recursive_search_files(base_path)
 
-            models = folder_paths.filter_files_extensions(files, extensions)
+            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
             for fullname in models:
                 fullname = utils.normalize_path(fullname)
@@ -145,7 +145,7 @@ async def download_model_info(scan_mode: str):
         for path_index, base_path in enumerate(folders):
             files = utils.recursive_search_files(base_path)
 
-            models = folder_paths.filter_files_extensions(files, extensions)
+            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
             for fullname in models:
                 fullname = utils.normalize_path(fullname)
@@ -206,7 +206,7 @@ async def migrate_legacy_information():
         for path_index, base_path in enumerate(folders):
             files = utils.recursive_search_files(base_path)
 
-            models = folder_paths.filter_files_extensions(files, extensions)
+            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
             for fullname in models:
                 fullname = utils.normalize_path(fullname)
