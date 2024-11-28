@@ -29,6 +29,7 @@ def scan_models(request):
 
                 # Resolve preview
                 image_name = utils.get_model_preview_name(abs_path)
+                image_name = utils.join_path(os.path.dirname(fullname), image_name)
                 abs_image_path = utils.join_path(base_path, image_name)
                 if os.path.isfile(abs_image_path):
                     image_state = os.stat(abs_image_path)
