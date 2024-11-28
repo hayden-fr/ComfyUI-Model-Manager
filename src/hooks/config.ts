@@ -239,5 +239,12 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
         })
       },
     })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.Scan.IncludeHiddenFiles',
+      name: 'Include hidden files(start with .)',
+      defaultValue: false,
+      type: 'boolean',
+    })
   })
 }

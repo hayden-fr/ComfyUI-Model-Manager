@@ -130,7 +130,7 @@ async def read_models(request):
     Scan all models and read their information.
     """
     try:
-        result = services.scan_models()
+        result = services.scan_models(request)
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
@@ -232,7 +232,7 @@ async def download_model_info(request):
     post = await utils.get_request_body(request)
     try:
         scan_mode = post.get("scanMode", "diff")
-        await services.download_model_info(scan_mode)
+        await services.download_model_info(scan_mode, request)
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Download model info failed: {str(e)}"
@@ -288,7 +288,7 @@ async def migrate_legacy_information(request):
     Migrate legacy information.
     """
     try:
-        await services.migrate_legacy_information()
+        await services.migrate_legacy_information(request)
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Migrate model info failed: {str(e)}"
