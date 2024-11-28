@@ -118,21 +118,21 @@ def download_web_distribution(version: str):
 
 def resolve_model_base_paths():
     folders = list(folder_paths.folder_names_and_paths.keys())
-    config.model_base_paths = {}
+    model_base_paths = {}
+    folder_black_list = ["configs", "custom_nodes"]
     for folder in folders:
-        if folder == "configs":
-            continue
-        if folder == "custom_nodes":
+        if folder in folder_black_list:
             continue
         folders = folder_paths.get_folder_paths(folder)
-        config.model_base_paths[folder] = [normalize_path(f) for f in folders]
+        model_base_paths[folder] = [normalize_path(f) for f in folders]
+    return model_base_paths
 
 
 def get_full_path(model_type: str, path_index: int, filename: str):
     """
     Get the absolute path in the model type through string concatenation.
     """
-    folders = config.model_base_paths.get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
@@ -144,7 +144,7 @@ def get_valid_full_path(model_type: str, path_index: int, filename: str):
     """
     Like get_full_path but it will check whether the file is valid.
     """
-    folders = config.model_base_paths.get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]

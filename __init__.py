@@ -23,7 +23,6 @@ if len(uninstalled_package) > 0:
 
 # Init config settings
 config.extension_uri = extension_uri
-utils.resolve_model_base_paths()
 
 version = utils.get_current_version()
 utils.download_web_distribution(version)
@@ -95,7 +94,7 @@ async def get_model_paths(request):
     """
     Returns the base folders for models.
     """
-    model_base_paths = config.model_base_paths
+    model_base_paths = utils.resolve_model_base_paths()
     return web.json_response({"success": True, "data": model_base_paths})
 
 
