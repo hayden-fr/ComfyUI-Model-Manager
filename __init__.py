@@ -89,6 +89,7 @@ async def delete_model_download_task(request):
         return web.json_response({"success": False, "error": error_msg})
 
 
+# @deprecated
 @routes.get("/model-manager/base-folders")
 async def get_model_paths(request):
     """
@@ -124,13 +125,25 @@ async def create_model(request):
 
 
 @routes.get("/model-manager/models")
-async def read_models(request):
+async def list_model_types(request):
     """
     Scan all models and read their information.
     """
     try:
-        result = services.scan_models(request)
+        result = utils.resolve_model_base_paths()
         return web.json_response({"success": True, "data": result})
+    except Exception as e:
+        error_msg = f"Read models failed: {str(e)}"
+        utils.print_error(error_msg)
+        return web.json_response({"success": False, "error": error_msg})
+
+
+@routes.get("/model-manager/models/{folder}")
+async def read_models(request):
+    try:
+        folder = request.match_info.get("folder", None)
+        results = services.scan_models(folder, request)
+        return web.json_response({"success": True, "data": results})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
         utils.print_error(error_msg)

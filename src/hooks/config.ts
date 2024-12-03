@@ -1,4 +1,4 @@
-import { request, useRequest } from 'hooks/request'
+import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
 import { onMounted, onUnmounted, ref } from 'vue'
@@ -7,10 +7,6 @@ import { useToast } from './toast'
 export const useConfig = defineStore('config', (store) => {
   const mobileDeviceBreakPoint = 759
   const isMobile = ref(window.innerWidth < mobileDeviceBreakPoint)
-
-  type ModelFolder = Record<string, string[]>
-  const { data: modelFolders, refresh: refreshModelFolders } =
-    useRequest<ModelFolder>('/base-folders')
 
   const checkDeviceType = () => {
     isMobile.value = window.innerWidth < mobileDeviceBreakPoint
@@ -24,17 +20,11 @@ export const useConfig = defineStore('config', (store) => {
     window.removeEventListener('resize', checkDeviceType)
   })
 
-  const refresh = async () => {
-    return Promise.all([refreshModelFolders()])
-  }
-
   const config = {
     isMobile,
     gutter: 16,
     cardWidth: 240,
     aspect: 7 / 9,
-    modelFolders,
-    refresh,
   }
 
   useAddConfigSettings(store)

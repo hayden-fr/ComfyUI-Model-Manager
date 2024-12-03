@@ -15,16 +15,18 @@ import { useStoreProvider } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import GlobalConfirm from 'primevue/confirmdialog'
 import { $el, app, ComfyButton } from 'scripts/comfyAPI'
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { t } = useI18n()
 const { dialog, models, config, download } = useStoreProvider()
 const { toast } = useToast()
 
+const firstOpenManager = ref(true)
+
 onMounted(() => {
   const refreshModelsAndConfig = async () => {
-    await Promise.all([models.refresh(), config.refresh()])
+    await Promise.all([models.refresh(true)])
     toast.add({
       severity: 'success',
       summary: 'Refreshed Models',
@@ -49,6 +51,11 @@ onMounted(() => {
 
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect } = config
+
+    if (firstOpenManager.value) {
+      models.refresh(true)
+      firstOpenManager.value = false
+    }
 
     dialog.open({
       key: 'model-manager',

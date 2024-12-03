@@ -1,7 +1,6 @@
-import { useConfig } from 'hooks/config'
 import { useLoading } from 'hooks/loading'
 import { useMarkdown } from 'hooks/markdown'
-import { request, useRequest } from 'hooks/request'
+import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import { cloneDeep } from 'lodash'
@@ -22,11 +21,44 @@ import {
 } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+type ModelFolder = Record<string, string[]>
+
+const modelFolderProvideKey = Symbol('modelFolder')
+
 export const useModels = defineStore('models', (store) => {
-  const { data, refresh } = useRequest<Model[]>('/models', { defaultValue: [] })
   const { toast, confirm } = useToast()
   const { t } = useI18n()
   const loading = useLoading()
+
+  const folders = ref<ModelFolder>({})
+  const refreshFolders = async () => {
+    return request('/models').then((resData) => {
+      folders.value = resData
+    })
+  }
+
+  provide(modelFolderProvideKey, folders)
+
+  const models = ref<Record<string, Model[]>>({})
+
+  const refreshModels = async (folder: string) => {
+    loading.show()
+    return request(`/models/${folder}`)
+      .then((resData) => {
+        models.value[folder] = resData
+        return resData
+      })
+      .finally(() => {
+        loading.hide()
+      })
+  }
+
+  const refreshAllModels = async (force = false) => {
+    const forceRefresh = force ? refreshFolders() : Promise.resolve()
+    return forceRefresh.then(() =>
+      Promise.allSettled(Object.keys(folders.value).map(refreshModels)),
+    )
+  }
 
   const updateModel = async (model: BaseModel, data: BaseModel) => {
     const updateData = new Map()
@@ -80,7 +112,7 @@ export const useModels = defineStore('models', (store) => {
       store.dialog.close({ key: oldKey })
     }
 
-    refresh()
+    refreshModels(data.type)
   }
 
   const deleteModel = async (model: BaseModel) => {
@@ -112,7 +144,7 @@ export const useModels = defineStore('models', (store) => {
                 life: 2000,
               })
               store.dialog.close({ key: dialogKey })
-              return refresh()
+              return refreshModels(model.type)
             })
             .then(() => {
               resolve(void 0)
@@ -136,7 +168,13 @@ export const useModels = defineStore('models', (store) => {
     })
   }
 
-  return { data, refresh, remove: deleteModel, update: updateModel }
+  return {
+    folders: folders,
+    data: models,
+    refresh: refreshAllModels,
+    remove: deleteModel,
+    update: updateModel,
+  }
 })
 
 declare module 'hooks/store' {
@@ -204,7 +242,10 @@ const baseInfoKey = Symbol('baseInfo') as InjectionKey<
 export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
   const { formData: model, modelData } = formInstance
 
-  const { modelFolders } = useConfig()
+  const provideModelFolders = inject<any>(modelFolderProvideKey)
+  const modelFolders = computed<ModelFolder>(() => {
+    return provideModelFolders?.value ?? {}
+  })
 
   const type = computed({
     get: () => {
@@ -304,6 +345,7 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
     basename,
     extension,
     pathIndex,
+    modelFolders,
   }
 
   provide(baseInfoKey, result)
