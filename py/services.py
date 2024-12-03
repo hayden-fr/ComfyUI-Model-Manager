@@ -8,48 +8,46 @@ from . import download
 from . import searcher
 
 
-def scan_models(request):
+def scan_models(folder: str, request):
     result = []
-    model_base_paths = utils.resolve_model_base_paths()
-    for model_type in model_base_paths:
 
-        folders, extensions = folder_paths.folder_names_and_paths[model_type]
-        for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path, request)
+    folders, extensions = folder_paths.folder_names_and_paths[folder]
+    for path_index, base_path in enumerate(folders):
+        files = utils.recursive_search_files(base_path, request)
 
-            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
+        models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
 
-            for fullname in models:
-                fullname = utils.normalize_path(fullname)
-                basename = os.path.splitext(fullname)[0]
-                extension = os.path.splitext(fullname)[1]
+        for fullname in models:
+            fullname = utils.normalize_path(fullname)
+            basename = os.path.splitext(fullname)[0]
+            extension = os.path.splitext(fullname)[1]
 
-                abs_path = utils.join_path(base_path, fullname)
-                file_stats = os.stat(abs_path)
+            abs_path = utils.join_path(base_path, fullname)
+            file_stats = os.stat(abs_path)
 
-                # Resolve preview
-                image_name = utils.get_model_preview_name(abs_path)
-                image_name = utils.join_path(os.path.dirname(fullname), image_name)
-                abs_image_path = utils.join_path(base_path, image_name)
-                if os.path.isfile(abs_image_path):
-                    image_state = os.stat(abs_image_path)
-                    image_timestamp = round(image_state.st_mtime_ns / 1000000)
-                    image_name = f"{image_name}?ts={image_timestamp}"
-                model_preview = f"/model-manager/preview/{model_type}/{path_index}/{image_name}"
+            # Resolve preview
+            image_name = utils.get_model_preview_name(abs_path)
+            image_name = utils.join_path(os.path.dirname(fullname), image_name)
+            abs_image_path = utils.join_path(base_path, image_name)
+            if os.path.isfile(abs_image_path):
+                image_state = os.stat(abs_image_path)
+                image_timestamp = round(image_state.st_mtime_ns / 1000000)
+                image_name = f"{image_name}?ts={image_timestamp}"
+            model_preview = f"/model-manager/preview/{folder}/{path_index}/{image_name}"
 
-                model_info = {
-                    "fullname": fullname,
-                    "basename": basename,
-                    "extension": extension,
-                    "type": model_type,
-                    "pathIndex": path_index,
-                    "sizeBytes": file_stats.st_size,
-                    "preview": model_preview,
-                    "createdAt": round(file_stats.st_ctime_ns / 1000000),
-                    "updatedAt": round(file_stats.st_mtime_ns / 1000000),
-                }
+            model_info = {
+                "fullname": fullname,
+                "basename": basename,
+                "extension": extension,
+                "type": folder,
+                "pathIndex": path_index,
+                "sizeBytes": file_stats.st_size,
+                "preview": model_preview,
+                "createdAt": round(file_stats.st_ctime_ns / 1000000),
+                "updatedAt": round(file_stats.st_mtime_ns / 1000000),
+            }
 
-                result.append(model_info)
+            result.append(model_info)
 
     return result
 

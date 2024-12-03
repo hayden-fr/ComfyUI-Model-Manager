@@ -49,15 +49,13 @@
 <script setup lang="ts">
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
-import { useConfig } from 'hooks/config'
 import { useModelBaseInfo } from 'hooks/model'
 import { computed } from 'vue'
 
 const editable = defineModel<boolean>('editable')
 
-const { modelFolders } = useConfig()
-
-const { baseInfo, pathIndex, basename, extension, type } = useModelBaseInfo()
+const { baseInfo, pathIndex, basename, extension, type, modelFolders } =
+  useModelBaseInfo()
 
 const typeOptions = computed(() => {
   return Object.keys(modelFolders.value).map((curr) => {

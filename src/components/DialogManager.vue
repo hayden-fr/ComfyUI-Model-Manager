@@ -88,9 +88,9 @@ import { genModelKey } from 'utils/model'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { isMobile, cardWidth, gutter, aspect, modelFolders } = useConfig()
+const { isMobile, cardWidth, gutter, aspect } = useConfig()
 
-const { data } = useModels()
+const { data, folders } = useModels()
 const { t } = useI18n()
 
 const responseScroll = ref()
@@ -99,7 +99,7 @@ const searchContent = ref<string>()
 
 const currentType = ref('all')
 const typeOptions = computed(() => {
-  return ['all', ...Object.keys(modelFolders.value)].map((type) => {
+  return ['all', ...Object.keys(folders.value)].map((type) => {
     return {
       label: type,
       value: type,
@@ -143,7 +143,9 @@ const colSpan = ref(1)
 const colSpanWidth = ref(cardWidth)
 
 const list = computed(() => {
-  const filterList = data.value.filter((model) => {
+  const mergedList = Object.values(data.value).flat()
+
+  const filterList = mergedList.filter((model) => {
     const showAllModel = currentType.value === 'all'
 
     const matchType = showAllModel || model.type === currentType.value
