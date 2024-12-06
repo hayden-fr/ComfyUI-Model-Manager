@@ -38,19 +38,19 @@ declare module 'hooks/store' {
 }
 
 export const useLoading = () => {
-  const timer = ref<NodeJS.Timeout>()
+  const targetTimer = ref<Record<string, NodeJS.Timeout | undefined>>({})
 
-  const show = () => {
-    timer.value = setTimeout(() => {
-      timer.value = undefined
+  const show = (target: string = '_default') => {
+    targetTimer.value[target] = setTimeout(() => {
+      targetTimer.value[target] = undefined
       globalLoading.show()
     }, 200)
   }
 
-  const hide = () => {
-    if (timer.value) {
-      clearTimeout(timer.value)
-      timer.value = undefined
+  const hide = (target: string = '_default') => {
+    if (targetTimer.value) {
+      clearTimeout(targetTimer.value[target])
+      targetTimer.value[target] = undefined
     } else {
       globalLoading.hide()
     }

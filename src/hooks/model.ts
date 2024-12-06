@@ -42,14 +42,14 @@ export const useModels = defineStore('models', (store) => {
   const models = ref<Record<string, Model[]>>({})
 
   const refreshModels = async (folder: string) => {
-    loading.show()
+    loading.show(folder)
     return request(`/models/${folder}`)
       .then((resData) => {
         models.value[folder] = resData
         return resData
       })
       .finally(() => {
-        loading.hide()
+        loading.hide(folder)
       })
   }
 
