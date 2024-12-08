@@ -48,7 +48,7 @@ export const useLoading = () => {
   }
 
   const hide = (target: string = '_default') => {
-    if (targetTimer.value) {
+    if (targetTimer.value[target]) {
       clearTimeout(targetTimer.value[target])
       targetTimer.value[target] = undefined
     } else {
