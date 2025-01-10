@@ -2,7 +2,6 @@ import os
 
 import folder_paths
 
-from . import config
 from . import utils
 from . import download
 from . import searcher
@@ -189,86 +188,3 @@ async def download_model_info(scan_mode: str, request):
                     utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
 
     utils.print_debug("Completed scan model information.")
-
-
-async def migrate_legacy_information(request):
-    import json
-    import yaml
-    from PIL import Image
-
-    utils.print_info(f"Migrating legacy information...")
-
-    model_base_paths = utils.resolve_model_base_paths()
-    for model_type in model_base_paths:
-
-        folders, extensions = folder_paths.folder_names_and_paths[model_type]
-        for path_index, base_path in enumerate(folders):
-            files = utils.recursive_search_files(base_path, request)
-
-            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
-
-            for fullname in models:
-                fullname = utils.normalize_path(fullname)
-
-                abs_model_path = utils.join_path(base_path, fullname)
-
-                base_file_name = os.path.splitext(abs_model_path)[0]
-
-                utils.print_debug(f"Try to migrate legacy info for {abs_model_path}")
-
-                preview_path = utils.join_path(
-                    os.path.dirname(abs_model_path),
-                    utils.get_model_preview_name(abs_model_path),
-                )
-                new_preview_path = f"{base_file_name}.webp"
-
-                if os.path.isfile(preview_path) and preview_path != new_preview_path:
-                    utils.print_info(f"Migrate preview image from {fullname}")
-                    with Image.open(preview_path) as image:
-                        image.save(new_preview_path, format="WEBP")
-
-                description_path = f"{base_file_name}.md"
-
-                metadata_info = {
-                    "website": "Civitai",
-                }
-
-                url_info_path = f"{base_file_name}.url"
-                if os.path.isfile(url_info_path):
-                    with open(url_info_path, "r", encoding="utf-8") as f:
-                        for line in f:
-                            if line.startswith("URL="):
-                                model_page_url = line[len("URL=") :].strip()
-                                metadata_info.update({"modelPage": model_page_url})
-
-                json_info_path = f"{base_file_name}.json"
-                if os.path.isfile(json_info_path):
-                    with open(json_info_path, "r", encoding="utf-8") as f:
-                        version = json.load(f)
-                        metadata_info.update(
-                            {
-                                "baseModel": version.get("baseModel"),
-                                "preview": [i["url"] for i in version["images"]],
-                            }
-                        )
-
-                description_parts: list[str] = [
-                    "---",
-                    yaml.dump(metadata_info).strip(),
-                    "---",
-                    "",
-                ]
-
-                text_info_path = f"{base_file_name}.txt"
-                if os.path.isfile(text_info_path):
-                    with open(text_info_path, "r", encoding="utf-8") as f:
-                        description_parts.append(f.read())
-
-                description_path = f"{base_file_name}.md"
-
-                if os.path.isfile(text_info_path):
-                    utils.print_info(f"Migrate description from {fullname}")
-                    with open(description_path, "w", encoding="utf-8", newline="") as f:
-                        f.write("\n".join(description_parts))
-
-    utils.print_debug("Completed migrate model information.")
