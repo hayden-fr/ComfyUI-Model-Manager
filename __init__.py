@@ -294,20 +294,6 @@ async def read_download_preview(request):
     return web.FileResponse(preview_path)
 
 
-@routes.post("/model-manager/migrate")
-async def migrate_legacy_information(request):
-    """
-    Migrate legacy information.
-    """
-    try:
-        await services.migrate_legacy_information(request)
-        return web.json_response({"success": True})
-    except Exception as e:
-        error_msg = f"Migrate model info failed: {str(e)}"
-        utils.print_error(error_msg)
-        return web.json_response({"success": False, "error": error_msg})
-
-
 WEB_DIRECTORY = "web"
 NODE_CLASS_MAPPINGS = {}
 __all__ = ["WEB_DIRECTORY", "NODE_CLASS_MAPPINGS"]

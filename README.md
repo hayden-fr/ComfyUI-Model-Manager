@@ -65,4 +65,3 @@ There are three installation methods, choose one
 <img src="demo/scan-model-info.png" alt="Model Manager Demo Screenshot" style="max-width: 100%; max-height: 300px"/>
 
 - Scan models and try to download information & preview.
-- Support migration from `cdb-boop/ComfyUI-Model-Manager/main`

@@ -91,52 +91,6 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       defaultValue: undefined,
     })
 
-    // Migrate
-    app.ui?.settings.addSetting({
-      id: 'ModelManager.Migrate.Migrate',
-      name: 'Migrate information from cdb-boop/main',
-      defaultValue: '',
-      type: () => {
-        return $el('button.p-button.p-component.p-button-secondary', {
-          textContent: 'Migrate',
-          onclick: () => {
-            confirm({
-              message: [
-                'This operation will delete old files and override current files if it exists.',
-                // 'This may take a while and generate MANY server requests!',
-                'Continue?',
-              ].join('\n'),
-              accept: () => {
-                store.loading.loading.value = true
-                request('/migrate', {
-                  method: 'POST',
-                })
-                  .then(() => {
-                    toast.add({
-                      severity: 'success',
-                      summary: 'Complete migration',
-                      life: 2000,
-                    })
-                    store.models.refresh()
-                  })
-                  .catch((err) => {
-                    toast.add({
-                      severity: 'error',
-                      summary: 'Error',
-                      detail: err.message ?? 'Failed to migrate information',
-                      life: 15000,
-                    })
-                  })
-                  .finally(() => {
-                    store.loading.loading.value = false
-                  })
-              },
-            })
-          },
-        })
-      },
-    })
-
     // Scan information
     app.ui?.settings.addSetting({
       id: 'ModelManager.ScanFiles.Full',
