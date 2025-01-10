@@ -1,15 +1,9 @@
 <template>
-  <div
-    class="flex flex-col gap-4"
-    :style="{ ['--preview-width']: `${cardWidth}px` }"
-  >
+  <div class="flex flex-col gap-4">
     <div>
       <div
-        :class="[
-          'relative mx-auto w-full',
-          '@sm:w-[var(--preview-width)]',
-          'overflow-hidden rounded-lg preview-aspect',
-        ]"
+        class="relative mx-auto w-full overflow-hidden rounded-lg preview-aspect"
+        :style="$sm({ width: `${cardWidth}px` })"
       >
         <ResponseImage :src="preview" :error="noPreviewContent"></ResponseImage>
 
@@ -52,7 +46,7 @@
         :class="[
           'flex h-10 items-center gap-4',
           'absolute left-1/2 -translate-x-1/2',
-          '@xl:left-0 @xl:translate-x-0',
+          $xl('left-0 translate-x-0'),
         ]"
       >
         <Button
@@ -92,6 +86,7 @@ import ResponseFileUpload from 'components/ResponseFileUpload.vue'
 import ResponseImage from 'components/ResponseImage.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import { useConfig } from 'hooks/config'
+import { useContainerQueries } from 'hooks/container'
 import { useModelPreview } from 'hooks/model'
 import Button from 'primevue/button'
 import Carousel from 'primevue/carousel'
@@ -109,4 +104,6 @@ const {
   updateLocalContent,
   noPreviewContent,
 } = useModelPreview()
+
+const { $sm, $xl } = useContainerQueries()
 </script>

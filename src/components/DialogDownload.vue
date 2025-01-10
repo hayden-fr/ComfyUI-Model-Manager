@@ -1,9 +1,9 @@
 <template>
   <div class="flex h-full flex-col gap-4">
-    <div class="whitespace-nowrap px-4 @container">
-      <div class="flex gap-4 @sm:justify-end">
+    <div class="whitespace-nowrap px-4" v-container="container">
+      <div :class="['flex gap-4', $sm('justify-end')]">
         <Button
-          class="w-full @sm:w-auto"
+          :class="[$sm('w-auto', 'w-full')]"
           :label="$t('createDownloadTask')"
           @click="openCreateTask"
         ></Button>
@@ -73,6 +73,7 @@
 <script setup lang="ts">
 import DialogCreateTask from 'components/DialogCreateTask.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
+import { useContainerQueries } from 'hooks/container'
 import { useDialog } from 'hooks/dialog'
 import { useDownload } from 'hooks/download'
 import Button from 'primevue/button'
@@ -90,4 +91,7 @@ const openCreateTask = () => {
     content: DialogCreateTask,
   })
 }
+
+const container = Symbol('container')
+const { $sm } = useContainerQueries(container)
 </script>
