@@ -20,7 +20,12 @@
       <div class="relative h-full w-full text-white">
         <div class="absolute bottom-0 left-0">
           <div class="drop-shadow-[0px_2px_2px_rgba(0,0,0,0.75)]">
-            <div class="line-clamp-3 break-all text-2xl font-bold @lg:text-lg">
+            <div
+              :class="[
+                'line-clamp-3 break-all font-bold',
+                $lg('text-lg', 'text-2xl'),
+              ]"
+            >
               {{ model.basename }}
             </div>
           </div>
@@ -29,7 +34,7 @@
         <div class="absolute left-0 top-0 w-full">
           <div class="flex flex-row items-start justify-between">
             <div class="flex items-center rounded-full bg-black/30 px-3 py-2">
-              <div class="font-bold @lg:text-xs">
+              <div :class="['font-bold', $lg('text-xs')]">
                 {{ model.type }}
               </div>
             </div>
@@ -66,6 +71,7 @@
 
 <script setup lang="ts">
 import DialogModelDetail from 'components/DialogModelDetail.vue'
+import { useContainerQueries } from 'hooks/container'
 import { useDialog } from 'hooks/dialog'
 import { useModelNodeAction } from 'hooks/model'
 import Button from 'primevue/button'
@@ -101,4 +107,6 @@ const preview = computed(() =>
 
 const { addModelNode, dragToAddModelNode, copyModelNode, loadPreviewWorkflow } =
   useModelNodeAction(props.model)
+
+const { $lg } = useContainerQueries()
 </script>

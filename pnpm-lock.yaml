@@ -36,9 +36,6 @@ importers:
         specifier: ^2.6.0
         version: 2.6.0
     devDependencies:
-      '@tailwindcss/container-queries':
-        specifier: ^0.1.1
-        version: 0.1.1(tailwindcss@3.4.12)
       '@types/lodash':
         specifier: ^4.17.9
         version: 4.17.9
@@ -469,11 +466,6 @@ packages:
     resolution: {integrity: sha512-YdicNOSJONVx/vuPkgPTyRoAPx3GbknBZRCOUkK84FJ/YTfs/F0vl/YsMscrB6Y177d+yDRcj+JWMPMCgshwrA==}
     cpu: [x64]
     os: [win32]
-
-  '@tailwindcss/container-queries@0.1.1':
-    resolution: {integrity: sha512-p18dswChx6WnTSaJCSGx6lTmrGzNNvm2FtXmiO6AuA1V4U5REyoqwmT6kgAsIMdjo07QdAfYXHJ4hnMtfHzWgA==}
-    peerDependencies:
-      tailwindcss: '>=3.2.0'
 
   '@types/estree@1.0.5':
     resolution: {integrity: sha512-/kYRxGDLWzHOB7q+wtSUQlFrtcdUccpfy+X+9iMBpHK8QLLhx2wIPYuS5DYtR9Wa/YlZAbIovy7qVdB1Aq6Lyw==}
@@ -1999,10 +1991,6 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.22.0':
     optional: true
-
-  '@tailwindcss/container-queries@0.1.1(tailwindcss@3.4.12)':
-    dependencies:
-      tailwindcss: 3.4.12
 
   '@types/estree@1.0.5': {}
 

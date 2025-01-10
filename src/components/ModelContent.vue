@@ -1,11 +1,16 @@
 <template>
   <form
-    class="@container"
     @submit.prevent="handleSubmit"
     @reset.prevent="handleReset"
+    v-container="container"
   >
     <div class="mx-auto w-full max-w-[50rem]">
-      <div class="relative flex flex-col gap-4 overflow-hidden @xl:flex-row">
+      <div
+        :class="[
+          'relative flex gap-4 overflow-hidden',
+          $xl('flex-row', 'flex-col'),
+        ]"
+      >
         <ModelPreview
           class="shrink-0"
           v-model:editable="editable"
@@ -43,6 +48,7 @@ import ModelBaseInfo from 'components/ModelBaseInfo.vue'
 import ModelDescription from 'components/ModelDescription.vue'
 import ModelMetadata from 'components/ModelMetadata.vue'
 import ModelPreview from 'components/ModelPreview.vue'
+import { useContainerQueries } from 'hooks/container'
 import {
   useModelBaseInfoEditor,
   useModelDescriptionEditor,
@@ -94,4 +100,7 @@ watch(
     handleReset()
   },
 )
+
+const container = Symbol('container')
+const { $xl } = useContainerQueries(container)
 </script>

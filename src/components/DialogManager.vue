@@ -1,22 +1,15 @@
 <template>
   <div
-    class="flex h-full flex-col gap-4 overflow-hidden @container/content"
-    :style="{
-      ['--card-width']: `${cardWidth}px`,
-      ['--gutter']: `${gutter}px`,
-    }"
+    class="flex h-full flex-col gap-4 overflow-hidden"
     v-resize="onContainerResize"
+    v-container="contentContainer"
   >
     <div
-      :class="[
-        'grid grid-cols-1 justify-center gap-4 px-8',
-        '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
-        '@lg/content:gap-[var(--gutter)]',
-        '@lg/content:px-4',
-      ]"
+      class="grid grid-cols-1 justify-center gap-4 px-8"
+      :style="$content_lg(contentStyle)"
     >
-      <div class="col-span-full @container/toolbar">
-        <div :class="['flex flex-col gap-4', '@2xl/toolbar:flex-row']">
+      <div class="col-span-full" v-container="toolbarContainer">
+        <div class="flex flex-col gap-4" :style="$toolbar_2xl(toolbarStyle)">
           <ResponseInput
             v-model="searchContent"
             :placeholder="$t('searchModels')"
@@ -48,12 +41,8 @@
     >
       <template #item="{ item }">
         <div
-          :class="[
-            'grid grid-cols-1 justify-center gap-8 px-8',
-            '@lg/content:grid-cols-[repeat(auto-fit,var(--card-width))]',
-            '@lg/content:gap-[var(--gutter)]',
-            '@lg/content:px-4',
-          ]"
+          class="grid grid-cols-1 justify-center gap-8 px-8"
+          :style="contentStyle"
         >
           <ModelCard
             v-for="model in item"
@@ -80,6 +69,7 @@ import ResponseInput from 'components/ResponseInput.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
 import { useConfig } from 'hooks/config'
+import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
 import { defineResizeCallback } from 'hooks/resize'
 import { chunk } from 'lodash'
@@ -178,6 +168,22 @@ const list = computed(() => {
 
   return chunk(sortedList, colSpan.value)
 })
+
+const toolbarContainer = Symbol('toolbar')
+const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
+
+const contentContainer = Symbol('content')
+const { $lg: $content_lg } = useContainerQueries(contentContainer)
+
+const contentStyle = {
+  gridTemplateColumns: `repeat(auto-fit, ${cardWidth}px)`,
+  gap: `${gutter}px`,
+  paddingLeft: `1rem`,
+  paddingRight: `1rem`,
+}
+const toolbarStyle = {
+  flexDirection: 'row',
+}
 
 const onContainerResize = defineResizeCallback((entries) => {
   const entry = entries[0]

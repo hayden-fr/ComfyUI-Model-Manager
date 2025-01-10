@@ -1,4 +1,3 @@
-import container from '@tailwindcss/container-queries'
 import plugin from 'tailwindcss/plugin'
 
 /** @type {import('tailwindcss').Config} */
@@ -8,7 +7,6 @@ export default {
   darkMode: ['selector', '.dark-theme'],
 
   plugins: [
-    container,
     plugin(({ addUtilities }) => {
       addUtilities({
         '.scrollbar-none': {
