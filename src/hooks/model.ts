@@ -55,6 +55,7 @@ export const useModels = defineStore('models', (store) => {
 
   const refreshAllModels = async (force = false) => {
     const forceRefresh = force ? refreshFolders() : Promise.resolve()
+    models.value = {}
     return forceRefresh.then(() =>
       Promise.allSettled(Object.keys(folders.value).map(refreshModels)),
     )
