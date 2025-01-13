@@ -2,6 +2,7 @@ import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
 import { onMounted, onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useToast } from './toast'
 
 export const useConfig = defineStore('config', (store) => {
@@ -42,6 +43,7 @@ declare module 'hooks/store' {
 
 function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
   const { toast } = useToast()
+  const { t } = useI18n()
 
   const confirm = (opts: {
     message?: string
@@ -79,6 +81,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
     // API keys
     app.ui?.settings.addSetting({
       id: 'ModelManager.APIKey.HuggingFace',
+      category: [t('modelManager'), t('setting.apiKey'), 'HuggingFace'],
       name: 'HuggingFace API Key',
       type: 'text',
       defaultValue: undefined,
@@ -86,6 +89,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
 
     app.ui?.settings.addSetting({
       id: 'ModelManager.APIKey.Civitai',
+      category: [t('modelManager'), t('setting.apiKey'), 'Civitai'],
       name: 'Civitai API Key',
       type: 'text',
       defaultValue: undefined,
@@ -94,7 +98,8 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
     // Scan information
     app.ui?.settings.addSetting({
       id: 'ModelManager.ScanFiles.Full',
-      name: "Override all models' information and preview",
+      category: [t('modelManager'), t('setting.scan'), 'Full'],
+      name: t('setting.scanAll'),
       defaultValue: '',
       type: () => {
         return $el('button.p-button.p-component.p-button-secondary', {
@@ -140,7 +145,8 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
 
     app.ui?.settings.addSetting({
       id: 'ModelManager.ScanFiles.Incremental',
-      name: 'Download missing information or preview',
+      category: [t('modelManager'), t('setting.scan'), 'Incremental'],
+      name: t('setting.scanMissing'),
       defaultValue: '',
       type: () => {
         return $el('button.p-button.p-component.p-button-secondary', {
@@ -186,7 +192,8 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
 
     app.ui?.settings.addSetting({
       id: 'ModelManager.Scan.IncludeHiddenFiles',
-      name: 'Include hidden files(start with .)',
+      category: [t('modelManager'), t('setting.scan'), 'IncludeHiddenFiles'],
+      name: t('setting.includeHiddenFiles'),
       defaultValue: false,
       type: 'boolean',
     })

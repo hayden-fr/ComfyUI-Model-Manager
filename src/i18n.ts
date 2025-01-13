@@ -39,6 +39,13 @@ const messages = {
       createdAt: 'Created At',
       updatedAt: 'Updated At',
     },
+    setting: {
+      apiKey: 'API Key',
+      scan: 'Scan',
+      scanMissing: 'Download missing information or preview',
+      scanAll: "Override all models' information and preview",
+      includeHiddenFiles: 'Include hidden files(start with .)',
+    },
   },
   zh: {
     model: '模型',
@@ -76,6 +83,13 @@ const messages = {
       sizeBytes: '文件大小',
       createdAt: '创建时间',
       updatedAt: '更新时间',
+    },
+    setting: {
+      apiKey: '密钥',
+      scan: '扫描',
+      scanMissing: '下载缺失的信息或预览图片',
+      scanAll: '覆盖所有模型信息和预览图片',
+      includeHiddenFiles: '包含隐藏文件(以 . 开头的文件或文件夹)',
     },
   },
 }
