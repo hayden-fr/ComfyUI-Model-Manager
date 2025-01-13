@@ -12,7 +12,8 @@ setting_key = {
         "max_task_count": "ModelManager.Download.MaxTaskCount",
     },
     "scan": {
-        "include_hidden_files": "ModelManager.Scan.IncludeHiddenFiles"
+        "include_hidden_files": "ModelManager.Scan.IncludeHiddenFiles",
+        "exclude_scan_types": "ModelManager.Scan.excludeScanTypes",
     },
 }
 

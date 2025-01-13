@@ -191,6 +191,14 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
     })
 
     app.ui?.settings.addSetting({
+      id: 'ModelManager.Scan.excludeScanTypes',
+      category: [t('modelManager'), t('setting.scan'), 'ExcludeScanTypes'],
+      name: t('setting.excludeScanTypes'),
+      defaultValue: undefined,
+      type: 'text',
+    })
+
+    app.ui?.settings.addSetting({
       id: 'ModelManager.Scan.IncludeHiddenFiles',
       category: [t('modelManager'), t('setting.scan'), 'IncludeHiddenFiles'],
       name: t('setting.includeHiddenFiles'),

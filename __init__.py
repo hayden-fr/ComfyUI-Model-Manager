@@ -130,7 +130,7 @@ async def list_model_types(request):
     Scan all models and read their information.
     """
     try:
-        result = utils.resolve_model_base_paths()
+        result = utils.resolve_model_base_paths(request)
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
