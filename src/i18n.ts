@@ -1,3 +1,4 @@
+import { app } from 'scripts/comfyAPI'
 import { createI18n } from 'vue-i18n'
 
 const messages = {
@@ -38,6 +39,13 @@ const messages = {
       createdAt: 'Created At',
       updatedAt: 'Updated At',
     },
+    setting: {
+      apiKey: 'API Key',
+      scan: 'Scan',
+      scanMissing: 'Download missing information or preview',
+      scanAll: "Override all models' information and preview",
+      includeHiddenFiles: 'Include hidden files(start with .)',
+    },
   },
   zh: {
     model: '模型',
@@ -76,16 +84,23 @@ const messages = {
       createdAt: '创建时间',
       updatedAt: '更新时间',
     },
+    setting: {
+      apiKey: '密钥',
+      scan: '扫描',
+      scanMissing: '下载缺失的信息或预览图片',
+      scanAll: '覆盖所有模型信息和预览图片',
+      includeHiddenFiles: '包含隐藏文件(以 . 开头的文件或文件夹)',
+    },
   },
 }
 
 const getLocalLanguage = () => {
   const local =
-    localStorage.getItem('Comfy.Settings.Comfy.Locale') ||
+    app.ui?.settings.getSettingValue<string>('Comfy.Locale') ||
     navigator.language.split('-')[0] ||
     'en'
 
-  return local.replace(/['"]/g, '')
+  return local
 }
 
 export const i18n = createI18n({
