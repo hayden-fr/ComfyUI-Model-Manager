@@ -44,9 +44,8 @@
       <div class="h-10"></div>
       <div
         :class="[
-          'flex h-10 items-center gap-4',
-          'absolute left-1/2 -translate-x-1/2',
-          $xl('left-0 translate-x-0'),
+          'absolute flex h-10 items-center gap-4',
+          $xl('left-0 translate-x-0', 'left-1/2 -translate-x-1/2'),
         ]"
       >
         <Button
