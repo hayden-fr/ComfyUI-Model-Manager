@@ -20,6 +20,7 @@ import {
   unref,
 } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { configSetting } from './config'
 
 type ModelFolder = Record<string, string[]>
 
@@ -56,8 +57,20 @@ export const useModels = defineStore('models', (store) => {
   const refreshAllModels = async (force = false) => {
     const forceRefresh = force ? refreshFolders() : Promise.resolve()
     models.value = {}
+    const excludeScanTypes = app.ui?.settings.getSettingValue<string>(
+      configSetting.excludeScanTypes,
+    )
+    const customBlackList =
+      excludeScanTypes
+        ?.split(',')
+        .map((type) => type.trim())
+        .filter(Boolean) ?? []
     return forceRefresh.then(() =>
-      Promise.allSettled(Object.keys(folders.value).map(refreshModels)),
+      Promise.allSettled(
+        Object.keys(folders.value)
+          .filter((folder) => !customBlackList.includes(folder))
+          .map(refreshModels),
+      ),
     )
   }
 

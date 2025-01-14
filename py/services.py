@@ -69,7 +69,7 @@ def get_model_info(model_path: str):
     }
 
 
-def update_model(model_path: str, model_data: dict, request):
+def update_model(model_path: str, model_data: dict):
 
     if "previewFile" in model_data:
         previewFile = model_data["previewFile"]
@@ -87,7 +87,7 @@ def update_model(model_path: str, model_data: dict, request):
             raise RuntimeError("Invalid type or pathIndex or fullname")
 
         # get new path
-        new_model_path = utils.get_full_path(model_type, path_index, fullname, request)
+        new_model_path = utils.get_full_path(model_type, path_index, fullname)
 
         utils.rename_model(model_path, new_model_path)
 
@@ -136,7 +136,7 @@ def fetch_model_info(model_page: str):
 
 async def download_model_info(scan_mode: str, request):
     utils.print_info(f"Download model info for {scan_mode}")
-    model_base_paths = utils.resolve_model_base_paths(request)
+    model_base_paths = utils.resolve_model_base_paths()
     for model_type in model_base_paths:
 
         folders, extensions = folder_paths.folder_names_and_paths[model_type]

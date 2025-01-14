@@ -167,7 +167,7 @@ async def create_model_download_task(task_data: dict, request):
     path_index = int(task_data.get("pathIndex", None))
     fullname = task_data.get("fullname", None)
 
-    model_path = utils.get_full_path(model_type, path_index, fullname, request)
+    model_path = utils.get_full_path(model_type, path_index, fullname)
     # Check if the model path is valid
     if os.path.exists(model_path):
         raise RuntimeError(f"File already exists: {model_path}")
@@ -261,7 +261,6 @@ async def download_model(task_id: str, request):
 
             progress_interval = 1.0
             await download_model_file(
-                request,
                 task_id=task_id,
                 headers=headers,
                 progress_callback=report_progress,
@@ -289,7 +288,6 @@ async def download_model(task_id: str, request):
 
 
 async def download_model_file(
-    request,
     task_id: str,
     headers: dict,
     progress_callback: Callable[[TaskStatus], Awaitable[Any]],
@@ -310,7 +308,7 @@ async def download_model_file(
         with open(description_file, "w", encoding="utf-8", newline="") as f:
             f.write(description)
 
-        model_path = utils.get_full_path(model_type, path_index, fullname, request)
+        model_path = utils.get_full_path(model_type, path_index, fullname)
 
         utils.rename_model(download_tmp_file, model_path)
 
@@ -363,7 +361,9 @@ async def download_model_file(
     )
 
     if response.status_code not in (200, 206):
-        raise RuntimeError(f"Failed to download {task_content.fullname}, status code: {response.status_code}")
+        raise RuntimeError(
+            f"Failed to download {task_content.fullname}, status code: {response.status_code}"
+        )
 
     # Some models require logging in before they can be downloaded.
     # If no token is carried, it will be redirected to the login page.
@@ -376,7 +376,9 @@ async def download_model_file(
         # If it cannot be downloaded, a redirect will definitely occur.
         # Maybe consider getting the redirect url from response.history to make a judgment.
         # Here we also need to consider how different websites are processed.
-        raise RuntimeError(f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first.")
+        raise RuntimeError(
+            f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first."
+        )
 
     # When parsing model information from HuggingFace API,
     # the file size was not found and needs to be obtained from the response header.

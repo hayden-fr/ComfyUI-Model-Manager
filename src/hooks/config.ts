@@ -41,6 +41,10 @@ declare module 'hooks/store' {
   }
 }
 
+export const configSetting = {
+  excludeScanTypes: 'ModelManager.Scan.excludeScanTypes',
+}
+
 function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
   const { toast } = useToast()
   const { t } = useI18n()
@@ -191,7 +195,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
     })
 
     app.ui?.settings.addSetting({
-      id: 'ModelManager.Scan.excludeScanTypes',
+      id: configSetting.excludeScanTypes,
       category: [t('modelManager'), t('setting.scan'), 'ExcludeScanTypes'],
       name: t('setting.excludeScanTypes'),
       defaultValue: undefined,

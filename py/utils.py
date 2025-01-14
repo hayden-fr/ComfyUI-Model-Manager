@@ -116,13 +116,10 @@ def download_web_distribution(version: str):
         print_error(f"An unexpected error occurred: {e}")
 
 
-def resolve_model_base_paths(request):
+def resolve_model_base_paths():
     folders = list(folder_paths.folder_names_and_paths.keys())
     model_base_paths = {}
     folder_black_list = ["configs", "custom_nodes"]
-    custom_folders = get_setting_value(request, "scan.exclude_scan_types", "")
-    custom_black_list = [f.strip() for f in custom_folders.split(",") if f.strip()]
-    folder_black_list.extend(custom_black_list)
     for folder in folders:
         if folder in folder_black_list:
             continue
@@ -131,11 +128,11 @@ def resolve_model_base_paths(request):
     return model_base_paths
 
 
-def get_full_path(model_type: str, path_index: int, filename: str, request):
+def get_full_path(model_type: str, path_index: int, filename: str):
     """
     Get the absolute path in the model type through string concatenation.
     """
-    folders = resolve_model_base_paths(request).get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
@@ -143,11 +140,11 @@ def get_full_path(model_type: str, path_index: int, filename: str, request):
     return full_path
 
 
-def get_valid_full_path(model_type: str, path_index: int, filename: str, request):
+def get_valid_full_path(model_type: str, path_index: int, filename: str):
     """
     Like get_full_path but it will check whether the file is valid.
     """
-    folders = resolve_model_base_paths(request).get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]

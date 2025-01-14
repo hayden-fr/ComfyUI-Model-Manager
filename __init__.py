@@ -95,7 +95,7 @@ async def get_model_paths(request):
     """
     Returns the base folders for models.
     """
-    model_base_paths = utils.resolve_model_base_paths(request)
+    model_base_paths = utils.resolve_model_base_paths()
     return web.json_response({"success": True, "data": model_base_paths})
 
 
@@ -130,7 +130,7 @@ async def list_model_types(request):
     Scan all models and read their information.
     """
     try:
-        result = utils.resolve_model_base_paths(request)
+        result = utils.resolve_model_base_paths()
         return web.json_response({"success": True, "data": result})
     except Exception as e:
         error_msg = f"Read models failed: {str(e)}"
@@ -160,7 +160,7 @@ async def read_model_info(request):
     filename = request.match_info.get("filename", None)
 
     try:
-        model_path = utils.get_valid_full_path(model_type, index, filename, request)
+        model_path = utils.get_valid_full_path(model_type, index, filename)
         result = services.get_model_info(model_path)
         return web.json_response({"success": True, "data": result})
     except Exception as e:
@@ -189,10 +189,10 @@ async def update_model(request):
     model_data: dict = await request.json()
 
     try:
-        model_path = utils.get_valid_full_path(model_type, index, filename, request)
+        model_path = utils.get_valid_full_path(model_type, index, filename)
         if model_path is None:
             raise RuntimeError(f"File {filename} not found")
-        services.update_model(model_path, model_data, request)
+        services.update_model(model_path, model_data)
         return web.json_response({"success": True})
     except Exception as e:
         error_msg = f"Update model failed: {str(e)}"
@@ -210,7 +210,7 @@ async def delete_model(request):
     filename = request.match_info.get("filename", None)
 
     try:
-        model_path = utils.get_valid_full_path(model_type, index, filename, request)
+        model_path = utils.get_valid_full_path(model_type, index, filename)
         if model_path is None:
             raise RuntimeError(f"File {filename} not found")
         services.remove_model(model_path)
