@@ -131,11 +131,11 @@ def resolve_model_base_paths(request):
     return model_base_paths
 
 
-def get_full_path(model_type: str, path_index: int, filename: str, request):
+def get_full_path(model_type: str, path_index: int, filename: str):
     """
     Get the absolute path in the model type through string concatenation.
     """
-    folders = resolve_model_base_paths(request).get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
@@ -143,11 +143,11 @@ def get_full_path(model_type: str, path_index: int, filename: str, request):
     return full_path
 
 
-def get_valid_full_path(model_type: str, path_index: int, filename: str, request):
+def get_valid_full_path(model_type: str, path_index: int, filename: str):
     """
     Like get_full_path but it will check whether the file is valid.
     """
-    folders = resolve_model_base_paths(request).get(model_type, [])
+    folders = resolve_model_base_paths().get(model_type, [])
     if not path_index < len(folders):
         raise RuntimeError(f"PathIndex {path_index} is not in {model_type}")
     base_path = folders[path_index]
