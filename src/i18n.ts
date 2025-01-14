@@ -45,6 +45,7 @@ const messages = {
       scanMissing: 'Download missing information or preview',
       scanAll: "Override all models' information and preview",
       includeHiddenFiles: 'Include hidden files(start with .)',
+      excludeScanTypes: 'Exclude scan types (separate with commas)',
     },
   },
   zh: {
@@ -90,6 +91,7 @@ const messages = {
       scanMissing: '下载缺失的信息或预览图片',
       scanAll: '覆盖所有模型信息和预览图片',
       includeHiddenFiles: '包含隐藏文件(以 . 开头的文件或文件夹)',
+      excludeScanTypes: '排除扫描类型(使用英文逗号隔开)',
     },
   },
 }

@@ -68,11 +68,12 @@ import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
-import { useConfig } from 'hooks/config'
+import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
 import { defineResizeCallback } from 'hooks/resize'
 import { chunk } from 'lodash'
+import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
 import { genModelKey } from 'utils/model'
 import { computed, ref, watch } from 'vue'
@@ -89,7 +90,20 @@ const searchContent = ref<string>()
 
 const currentType = ref('all')
 const typeOptions = computed(() => {
-  return ['all', ...Object.keys(folders.value)].map((type) => {
+  const excludeScanTypes = app.ui?.settings.getSettingValue<string>(
+    configSetting.excludeScanTypes,
+  )
+  const customBlackList =
+    excludeScanTypes
+      ?.split(',')
+      .map((type) => type.trim())
+      .filter(Boolean) ?? []
+  return [
+    'all',
+    ...Object.keys(folders.value).filter(
+      (folder) => !customBlackList.includes(folder),
+    ),
+  ].map((type) => {
     return {
       label: type,
       value: type,
