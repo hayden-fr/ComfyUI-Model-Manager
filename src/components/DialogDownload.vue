@@ -86,7 +86,7 @@ const dialog = useDialog()
 
 const openCreateTask = () => {
   dialog.open({
-    key: 'model-manager-create-task',
+    key: `model-manager-create-task-${Date.now()}`,
     title: t('parseModelUrl'),
     content: DialogCreateTask,
   })
