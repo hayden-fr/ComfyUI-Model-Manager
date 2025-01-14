@@ -116,13 +116,10 @@ def download_web_distribution(version: str):
         print_error(f"An unexpected error occurred: {e}")
 
 
-def resolve_model_base_paths(request):
+def resolve_model_base_paths():
     folders = list(folder_paths.folder_names_and_paths.keys())
     model_base_paths = {}
     folder_black_list = ["configs", "custom_nodes"]
-    custom_folders = get_setting_value(request, "scan.exclude_scan_types", "")
-    custom_black_list = [f.strip() for f in custom_folders.split(",") if f.strip()]
-    folder_black_list.extend(custom_black_list)
     for folder in folders:
         if folder in folder_black_list:
             continue
