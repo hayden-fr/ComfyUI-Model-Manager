@@ -3,10 +3,10 @@ import { useMarkdown } from 'hooks/markdown'
 import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
-import { cloneDeep } from 'lodash'
+import { castArray, cloneDeep } from 'lodash'
 import { app } from 'scripts/comfyAPI'
-import { BaseModel, Model, SelectEvent } from 'types/typings'
-import { bytesToSize, formatDate } from 'utils/common'
+import { BaseModel, Model, SelectEvent, WithResolved } from 'types/typings'
+import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
 import { genModelKey, resolveModelTypeLoader } from 'utils/model'
 import {
@@ -74,18 +74,30 @@ export const useModels = defineStore('models', (store) => {
     )
   }
 
-  const updateModel = async (model: BaseModel, data: BaseModel) => {
-    const updateData = new Map()
+  const updateModel = async (
+    model: BaseModel,
+    data: WithResolved<BaseModel>,
+  ) => {
+    const updateData = new FormData()
     let oldKey: string | null = null
+    let needUpdate = false
 
     // Check current preview
     if (model.preview !== data.preview) {
-      updateData.set('previewFile', data.preview)
+      const preview = data.preview
+      if (preview) {
+        const previewFile = await previewUrlToFile(data.preview as string)
+        updateData.set('previewFile', previewFile)
+      } else {
+        updateData.set('previewFile', 'undefined')
+      }
+      needUpdate = true
     }
 
     // Check current description
     if (model.description !== data.description) {
       updateData.set('description', data.description)
+      needUpdate = true
     }
 
     // Check current name and pathIndex
@@ -97,16 +109,17 @@ export const useModels = defineStore('models', (store) => {
       updateData.set('type', data.type)
       updateData.set('pathIndex', data.pathIndex.toString())
       updateData.set('fullname', data.fullname)
+      needUpdate = true
     }
 
-    if (updateData.size === 0) {
+    if (!needUpdate) {
       return
     }
 
     loading.show()
     await request(`/model/${model.type}/${model.pathIndex}/${model.fullname}`, {
       method: 'PUT',
-      body: JSON.stringify(Object.fromEntries(updateData.entries())),
+      body: updateData,
     })
       .catch((err) => {
         const error_message = err.message ?? err.error
@@ -216,15 +229,15 @@ export const useModelFormData = (getFormData: () => BaseModel) => {
     }
   }
 
-  type SubmitCallback = (data: BaseModel) => void
+  type SubmitCallback = (data: WithResolved<BaseModel>) => void
   const submitCallback = ref<SubmitCallback[]>([])
 
   const registerSubmit = (callback: SubmitCallback) => {
     submitCallback.value.push(callback)
   }
 
-  const submit = () => {
-    const data = cloneDeep(toRaw(unref(formData)))
+  const submit = (): WithResolved<BaseModel> => {
+    const data: any = cloneDeep(toRaw(unref(formData)))
     for (const callback of submitCallback.value) {
       callback(data)
     }
@@ -394,9 +407,7 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
    * Default images
    */
   const defaultContent = computed(() => {
-    return Array.isArray(model.value.preview)
-      ? model.value.preview
-      : [model.value.preview]
+    return model.value.preview ? castArray(model.value.preview) : []
   })
   const defaultContentPage = ref(0)
 
@@ -435,7 +446,7 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
         content = localContent.value
         break
       default:
-        content = noPreviewContent.value
+        content = undefined
         break
     }
 
@@ -451,7 +462,7 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
     })
 
     registerSubmit((data) => {
-      data.preview = preview.value ?? noPreviewContent.value
+      data.preview = preview.value
     })
   })
 

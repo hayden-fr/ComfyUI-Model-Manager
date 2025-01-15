@@ -47,7 +47,7 @@ import ResponseScroll from 'components/ResponseScroll.vue'
 import { useModelNodeAction, useModels } from 'hooks/model'
 import { useRequest } from 'hooks/request'
 import Button from 'primevue/button'
-import { BaseModel, Model } from 'types/typings'
+import { BaseModel, Model, WithResolved } from 'types/typings'
 import { computed, ref } from 'vue'
 
 interface Props {
@@ -72,7 +72,7 @@ const handleCancel = () => {
   editable.value = false
 }
 
-const handleSave = async (data: BaseModel) => {
+const handleSave = async (data: WithResolved<BaseModel>) => {
   await update(modelContent.value, data)
   editable.value = false
 }

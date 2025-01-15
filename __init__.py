@@ -114,7 +114,8 @@ async def create_model(request):
     - downloadUrl: download url.
     - hash: a JSON string containing the hash value of the downloaded model.
     """
-    task_data = await request.json()
+    task_data = await request.post()
+    task_data = dict(task_data)
     try:
         task_id = await services.create_model_download_task(task_data, request)
         return web.json_response({"success": True, "data": {"taskId": task_id}})
@@ -186,7 +187,8 @@ async def update_model(request):
     index = int(request.match_info.get("index", None))
     filename = request.match_info.get("filename", None)
 
-    model_data: dict = await request.json()
+    model_data = await request.post()
+    model_data = dict(model_data)
 
     try:
         model_path = utils.get_valid_full_path(model_type, index, filename)

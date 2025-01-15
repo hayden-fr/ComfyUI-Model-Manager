@@ -69,7 +69,8 @@ import { useLoading } from 'hooks/loading'
 import { request } from 'hooks/request'
 import { useToast } from 'hooks/toast'
 import Button from 'primevue/button'
-import { VersionModel } from 'types/typings'
+import { VersionModel, WithResolved } from 'types/typings'
+import { previewUrlToFile } from 'utils/common'
 import { ref } from 'vue'
 
 const { isMobile } = useConfig()
@@ -87,12 +88,49 @@ const searchModelsByUrl = async () => {
   }
 }
 
-const createDownTask = async (data: VersionModel) => {
+const createDownTask = async (data: WithResolved<VersionModel>) => {
   loading.show()
+
+  const formData = new FormData()
+  for (const key in data) {
+    if (Object.prototype.hasOwnProperty.call(data, key)) {
+      let value = data[key]
+
+      // set preview file
+      if (key === 'preview') {
+        if (value) {
+          const previewFile = await previewUrlToFile(value).catch(() => {
+            loading.hide()
+            toast.add({
+              severity: 'error',
+              summary: 'Error',
+              detail: 'Failed to download preview',
+              life: 5000,
+            })
+            throw new Error('Failed to download preview')
+          })
+          formData.append('previewFile', previewFile)
+        } else {
+          formData.append('previewFile', value)
+        }
+        continue
+      }
+
+      if (typeof value === 'object') {
+        value = JSON.stringify(value)
+      }
+
+      if (typeof value === 'number') {
+        value = value.toString()
+      }
+
+      formData.append(key, value)
+    }
+  }
 
   await request('/model', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: formData,
   })
     .then(() => {
       dialog.close()

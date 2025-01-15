@@ -73,7 +73,10 @@ def update_model(model_path: str, model_data: dict):
 
     if "previewFile" in model_data:
         previewFile = model_data["previewFile"]
-        utils.save_model_preview_image(model_path, previewFile)
+        if type(previewFile) is str and previewFile == "undefined":
+            utils.remove_model_preview_image(model_path)
+        else:
+            utils.save_model_preview_image(model_path, previewFile)
 
     if "description" in model_data:
         description = model_data["description"]
