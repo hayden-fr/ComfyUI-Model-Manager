@@ -26,6 +26,10 @@ export interface VersionModel extends BaseModel {
   hashes?: Record<string, string>
 }
 
+export type WithResolved<T> = Omit<T, 'preview'> & {
+  preview: string | undefined
+}
+
 export type PassThrough<T = void> = T | object | undefined
 
 export interface SelectOptions {

@@ -26,3 +26,14 @@ export const bytesToSize = (
 export const formatDate = (date: number | string | Date) => {
   return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
 }
+
+export const previewUrlToFile = async (url: string) => {
+  return fetch(url)
+    .then((res) => res.blob())
+    .then((blob) => {
+      const type = blob.type
+      const extension = type.split('/')[1]
+      const file = new File([blob], `preview.${extension}`, { type })
+      return file
+    })
+}

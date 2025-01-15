@@ -180,8 +180,8 @@ async def create_model_download_task(task_data: dict, request):
         raise RuntimeError(f"Task {task_id} already exists")
 
     try:
-        preview_url = task_data.pop("preview", None)
-        utils.save_model_preview_image(task_path, preview_url)
+        previewFile = task_data.pop("previewFile", None)
+        utils.save_model_preview_image(task_path, previewFile)
         set_task_content(task_id, task_data)
         task_status = TaskStatus(
             taskId=task_id,
@@ -361,9 +361,7 @@ async def download_model_file(
     )
 
     if response.status_code not in (200, 206):
-        raise RuntimeError(
-            f"Failed to download {task_content.fullname}, status code: {response.status_code}"
-        )
+        raise RuntimeError(f"Failed to download {task_content.fullname}, status code: {response.status_code}")
 
     # Some models require logging in before they can be downloaded.
     # If no token is carried, it will be redirected to the login page.
@@ -376,9 +374,7 @@ async def download_model_file(
         # If it cannot be downloaded, a redirect will definitely occur.
         # Maybe consider getting the redirect url from response.history to make a judgment.
         # Here we also need to consider how different websites are processed.
-        raise RuntimeError(
-            f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first."
-        )
+        raise RuntimeError(f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first.")
 
     # When parsing model information from HuggingFace API,
     # the file size was not found and needs to be obtained from the response header.

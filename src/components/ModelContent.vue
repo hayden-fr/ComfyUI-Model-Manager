@@ -62,7 +62,7 @@ import TabList from 'primevue/tablist'
 import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
-import { BaseModel } from 'types/typings'
+import { BaseModel, WithResolved } from 'types/typings'
 import { toRaw, watch } from 'vue'
 
 interface Props {
@@ -73,7 +73,7 @@ const props = defineProps<Props>()
 const editable = defineModel<boolean>('editable')
 
 const emits = defineEmits<{
-  submit: [formData: BaseModel]
+  submit: [formData: WithResolved<BaseModel>]
   reset: []
 }>()
 

@@ -249,18 +249,44 @@ from PIL import Image
 from io import BytesIO
 
 
-def save_model_preview_image(model_path: str, image_url: str):
-    try:
-        image_response = requests.get(image_url)
-        image_response.raise_for_status()
+def remove_model_preview_image(model_path: str):
+    basename = os.path.splitext(model_path)[0]
+    preview_path = f"{basename}.webp"
+    if os.path.exists(preview_path):
+        os.remove(preview_path)
 
-        basename = os.path.splitext(model_path)[0]
-        preview_path = f"{basename}.webp"
-        image = Image.open(BytesIO(image_response.content))
+
+def save_model_preview_image(model_path: str, image_file_or_url: Any):
+    basename = os.path.splitext(model_path)[0]
+    preview_path = f"{basename}.webp"
+
+    # Download image file if it is url
+    if type(image_file_or_url) is str:
+        image_url = image_file_or_url
+
+        try:
+            image_response = requests.get(image_url)
+            image_response.raise_for_status()
+
+            image = Image.open(BytesIO(image_response.content))
+            image.save(preview_path, "WEBP")
+
+        except Exception as e:
+            print_error(f"Failed to download image: {e}")
+
+    else:
+        # Assert image as file
+        image_file = image_file_or_url
+
+        if not isinstance(image_file, web.FileField):
+            raise RuntimeError("Invalid image file")
+
+        content_type: str = image_file.content_type
+        if not content_type.startswith("image/"):
+            raise RuntimeError(f"FileTypeError: expected image, got {content_type}")
+
+        image = Image.open(image_file.file)
         image.save(preview_path, "WEBP")
-
-    except Exception as e:
-        print_error(f"Failed to download image: {e}")
 
 
 def get_model_all_descriptions(model_path: str):
