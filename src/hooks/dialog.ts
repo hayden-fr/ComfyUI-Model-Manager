@@ -49,7 +49,12 @@ export const useDialog = defineStore('dialog', () => {
     }
   }
 
-  const close = (dialog: { key: string }) => {
+  const close = (dialog?: { key: string }) => {
+    if (!dialog) {
+      stack.value.pop()
+      return
+    }
+
     const item = stack.value.find((item) => item.key === dialog.key)
     if (item?.keepAlive) {
       item.visible = false
