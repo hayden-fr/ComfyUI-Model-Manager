@@ -95,7 +95,7 @@ const createDownTask = async (data: VersionModel) => {
     body: JSON.stringify(data),
   })
     .then(() => {
-      dialog.close({ key: 'model-manager-create-task' })
+      dialog.close()
     })
     .catch((e) => {
       toast.add({
