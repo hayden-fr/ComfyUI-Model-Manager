@@ -130,7 +130,13 @@
   <slot v-else name="desktop">
     <slot name="container">
       <slot name="desktop:container">
-        <Menu ref="menu" :model="items" :popup="true" :base-z-index="1000">
+        <Menu
+          ref="menu"
+          :model="items"
+          :popup="true"
+          :base-z-index="1000"
+          :pt:root:style="{ maxHeight: '300px', overflowX: 'hidden' }"
+        >
           <template #item="{ item }">
             <slot name="item" :item="item">
               <slot name="desktop:container:item" :item="item">
