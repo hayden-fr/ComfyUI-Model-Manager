@@ -1,6 +1,7 @@
 <template>
   <div
-    class="group/card relative w-full cursor-pointer select-none preview-aspect"
+    class="group/card relative cursor-pointer select-none"
+    :style="{ width: `${cardSize.width}px`, height: `${cardSize.height}px` }"
     @click.stop="openDetailDialog"
   >
     <div class="h-full overflow-hidden rounded-lg">
@@ -71,6 +72,7 @@
 
 <script setup lang="ts">
 import DialogModelDetail from 'components/DialogModelDetail.vue'
+import { useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useDialog } from 'hooks/dialog'
 import { useModelNodeAction } from 'hooks/model'
@@ -84,6 +86,8 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
+const { cardSize } = useConfig()
 
 const dialog = useDialog()
 

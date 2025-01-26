@@ -21,9 +21,19 @@ export const useConfig = defineStore('config', (store) => {
     window.removeEventListener('resize', checkDeviceType)
   })
 
+  const cardSize = ref({
+    width:
+      app.ui?.settings.getSettingValue<number>('ModelManager.UI.CardWidth') ??
+      240,
+    height:
+      app.ui?.settings.getSettingValue<number>('ModelManager.UI.CardHeight') ??
+      310,
+  })
+
   const config = {
     isMobile,
     gutter: 16,
+    cardSize,
     cardWidth: 240,
     aspect: 7 / 9,
   }
@@ -97,6 +107,39 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       name: 'Civitai API Key',
       type: 'text',
       defaultValue: undefined,
+    })
+
+    // UI settings
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.UI.CardWidth',
+      category: [t('modelManager'), t('setting.ui'), 'CardWidth'],
+      name: t('setting.cardWidth'),
+      type: 'slider',
+      defaultValue: 240,
+      attrs: {
+        min: 80,
+        max: 320,
+        step: 10,
+      },
+      onChange(value) {
+        store.config.cardSize.value.width = value
+      },
+    })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.UI.CardHeight',
+      category: [t('modelManager'), t('setting.ui'), 'CardHeight'],
+      name: t('setting.cardHeight'),
+      type: 'slider',
+      defaultValue: 310,
+      attrs: {
+        min: 80,
+        max: 320,
+        step: 10,
+      },
+      onChange(value) {
+        store.config.cardSize.value.height = value
+      },
     })
 
     // Scan information

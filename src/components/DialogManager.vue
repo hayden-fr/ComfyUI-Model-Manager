@@ -79,7 +79,7 @@ import { genModelKey } from 'utils/model'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { isMobile, cardWidth, gutter, aspect } = useConfig()
+const { isMobile, gutter, cardSize } = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
@@ -133,18 +133,17 @@ watch([searchContent, currentType], () => {
 })
 
 const itemSize = computed(() => {
-  let itemWidth = cardWidth
+  let itemWidth = cardSize.value.height
   let itemGutter = gutter
   if (isMobile.value) {
     const baseSize = 16
     itemWidth = window.innerWidth - baseSize * 2 * 2
     itemGutter = baseSize * 2
   }
-  return itemWidth / aspect + itemGutter
+  return itemWidth + itemGutter
 })
 
 const colSpan = ref(1)
-const colSpanWidth = ref(cardWidth)
 
 const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
@@ -189,15 +188,15 @@ const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
 const contentContainer = Symbol('content')
 const { $lg: $content_lg } = useContainerQueries(contentContainer)
 
-const contentStyle = {
-  gridTemplateColumns: `repeat(auto-fit, ${cardWidth}px)`,
+const contentStyle = computed(() => ({
+  gridTemplateColumns: `repeat(auto-fit, ${cardSize.value.width}px)`,
   gap: `${gutter}px`,
   paddingLeft: `1rem`,
   paddingRight: `1rem`,
-}
-const toolbarStyle = {
+}))
+const toolbarStyle = computed(() => ({
   flexDirection: 'row',
-}
+}))
 
 const onContainerResize = defineResizeCallback((entries) => {
   const entry = entries[0]
@@ -205,8 +204,8 @@ const onContainerResize = defineResizeCallback((entries) => {
     colSpan.value = 1
   } else {
     const containerWidth = entry.contentRect.width
+    const cardWidth = cardSize.value.width
     colSpan.value = Math.floor((containerWidth - gutter) / (cardWidth + gutter))
-    colSpanWidth.value = colSpan.value * (cardWidth + gutter) - gutter
   }
 })
 </script>
