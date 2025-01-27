@@ -2,6 +2,7 @@
   <div
     class="group/card relative cursor-pointer select-none"
     :style="{ width: `${cardSize.width}px`, height: `${cardSize.height}px` }"
+    v-tooltip.top="{ value: model.basename, disabled: showModelName }"
     @click.stop="openDetailDialog"
   >
     <div class="h-full overflow-hidden rounded-lg">
@@ -19,7 +20,7 @@
 
     <div class="pointer-events-none absolute left-0 top-0 h-full w-full p-4">
       <div class="relative h-full w-full text-white">
-        <div class="absolute bottom-0 left-0">
+        <div v-show="showModelName" class="absolute bottom-0 left-0">
           <div class="drop-shadow-[0px_2px_2px_rgba(0,0,0,0.75)]">
             <div
               :class="[
@@ -34,13 +35,19 @@
 
         <div class="absolute left-0 top-0 w-full">
           <div class="flex flex-row items-start justify-between">
-            <div class="flex items-center rounded-full bg-black/30 px-3 py-2">
+            <div
+              v-show="showModelType"
+              class="flex items-center rounded-full bg-black/30 px-3 py-2"
+            >
               <div :class="['font-bold', $lg('text-xs')]">
                 {{ model.type }}
               </div>
             </div>
 
-            <div class="opacity-0 duration-300 group-hover/card:opacity-100">
+            <div
+              v-show="showToolButton"
+              class="opacity-0 duration-300 group-hover/card:opacity-100"
+            >
               <div class="flex flex-col gap-4 *:pointer-events-auto">
                 <Button
                   icon="pi pi-plus"
@@ -108,6 +115,18 @@ const preview = computed(() =>
     ? props.model.preview[0]
     : props.model.preview,
 )
+
+const showToolButton = computed(() => {
+  return cardSize.value.height > 200 && cardSize.value.width > 200
+})
+
+const showModelName = computed(() => {
+  return cardSize.value.height > 110 && cardSize.value.width > 200
+})
+
+const showModelType = computed(() => {
+  return cardSize.value.width > 120
+})
 
 const { addModelNode, dragToAddModelNode, copyModelNode, loadPreviewWorkflow } =
   useModelNodeAction(props.model)
