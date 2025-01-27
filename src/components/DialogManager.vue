@@ -1,7 +1,7 @@
 <template>
   <div
+    ref="container"
     class="flex h-full flex-col gap-4 overflow-hidden"
-    v-resize="onContainerResize"
     v-container="contentContainer"
   >
     <div
@@ -71,7 +71,7 @@ import ResponseSelect from 'components/ResponseSelect.vue'
 import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
-import { defineResizeCallback } from 'hooks/resize'
+import { useContainerResize } from 'hooks/resize'
 import { chunk } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
@@ -79,10 +79,14 @@ import { genModelKey } from 'utils/model'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+const container = ref<HTMLElement | null>(null)
+
 const { isMobile, gutter, cardSize } = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
+
+const { width } = useContainerResize(container)
 
 const responseScroll = ref()
 
@@ -133,17 +137,24 @@ watch([searchContent, currentType], () => {
 })
 
 const itemSize = computed(() => {
-  let itemWidth = cardSize.value.height
+  let itemHeight = cardSize.value.height
   let itemGutter = gutter
   if (isMobile.value) {
     const baseSize = 16
-    itemWidth = window.innerWidth - baseSize * 2 * 2
+    itemHeight = window.innerWidth - baseSize * 2 * 2
     itemGutter = baseSize * 2
   }
-  return itemWidth + itemGutter
+  return itemHeight + itemGutter
 })
 
-const colSpan = ref(1)
+const cols = computed(() => {
+  if (isMobile.value) {
+    return 1
+  }
+  const containerWidth = width.value
+  const itemWidth = cardSize.value.width
+  return Math.floor((containerWidth - gutter) / (itemWidth + gutter))
+})
 
 const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
@@ -179,7 +190,7 @@ const list = computed(() => {
 
   const sortedList = filterList.sort(sortStrategy)
 
-  return chunk(sortedList, colSpan.value)
+  return chunk(sortedList, cols.value)
 })
 
 const toolbarContainer = Symbol('toolbar')
@@ -197,15 +208,4 @@ const contentStyle = computed(() => ({
 const toolbarStyle = computed(() => ({
   flexDirection: 'row',
 }))
-
-const onContainerResize = defineResizeCallback((entries) => {
-  const entry = entries[0]
-  if (isMobile.value) {
-    colSpan.value = 1
-  } else {
-    const containerWidth = entry.contentRect.width
-    const cardWidth = cardSize.value.width
-    colSpan.value = Math.floor((containerWidth - gutter) / (cardWidth + gutter))
-  }
-})
 </script>
