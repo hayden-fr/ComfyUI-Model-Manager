@@ -403,3 +403,89 @@ async def download_model_file(
     else:
         task_status.status = "pause"
         await utils.send_json("update_download_task", task_status.to_dict())
+
+
+from . import services
+
+
+from aiohttp import web
+
+
+class ModelDownload:
+    def add_routes(self, routes):
+
+        @routes.get("/model-manager/download/task")
+        async def scan_download_tasks(request):
+            """
+            Read download task list.
+            """
+            try:
+                result = await services.scan_model_download_task_list()
+                return web.json_response({"success": True, "data": result})
+            except Exception as e:
+                error_msg = f"Read download task list failed: {e}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
+        @routes.put("/model-manager/download/{task_id}")
+        async def resume_download_task(request):
+            """
+            Toggle download task status.
+            """
+            try:
+                task_id = request.match_info.get("task_id", None)
+                if task_id is None:
+                    raise web.HTTPBadRequest(reason="Invalid task id")
+                json_data = await request.json()
+                status = json_data.get("status", None)
+                if status == "pause":
+                    await services.pause_model_download_task(task_id)
+                elif status == "resume":
+                    await services.resume_model_download_task(task_id, request)
+                else:
+                    raise web.HTTPBadRequest(reason="Invalid status")
+
+                return web.json_response({"success": True})
+            except Exception as e:
+                error_msg = f"Resume download task failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
+        @routes.delete("/model-manager/download/{task_id}")
+        async def delete_model_download_task(request):
+            """
+            Delete download task.
+            """
+            task_id = request.match_info.get("task_id", None)
+            try:
+                await services.delete_model_download_task(task_id)
+                return web.json_response({"success": True})
+            except Exception as e:
+                error_msg = f"Delete download task failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
+        @routes.post("/model-manager/model")
+        async def create_model(request):
+            """
+            Create a new model.
+
+            request body: x-www-form-urlencoded
+            - type: model type.
+            - pathIndex: index of the model folders.
+            - fullname: filename that relative to the model folder.
+            - previewFile: preview file.
+            - description: description.
+            - downloadPlatform: download platform.
+            - downloadUrl: download url.
+            - hash: a JSON string containing the hash value of the downloaded model.
+            """
+            task_data = await request.post()
+            task_data = dict(task_data)
+            try:
+                task_id = await services.create_model_download_task(task_data, request)
+                return web.json_response({"success": True, "data": {"taskId": task_id}})
+            except Exception as e:
+                error_msg = f"Create model download task failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
