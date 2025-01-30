@@ -7,6 +7,7 @@ import logging
 import requests
 import traceback
 import configparser
+import functools
 
 import comfy.utils
 import folder_paths
@@ -20,6 +21,10 @@ def print_info(msg, *args, **kwargs):
     logging.info(f"[{config.extension_tag}] {msg}", *args, **kwargs)
 
 
+def print_warning(msg, *args, **kwargs):
+    logging.warning(f"[{config.extension_tag}][WARNING] {msg}", *args, **kwargs)
+
+
 def print_error(msg, *args, **kwargs):
     logging.error(f"[{config.extension_tag}] {msg}", *args, **kwargs)
     logging.debug(traceback.format_exc())
@@ -27,6 +32,18 @@ def print_error(msg, *args, **kwargs):
 
 def print_debug(msg, *args, **kwargs):
     logging.debug(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+
+
+def deprecated(reason: str):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            print_warning(f"{func.__name__} is deprecated: {reason}")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def _matches(predicate: dict):

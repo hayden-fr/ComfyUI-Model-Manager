@@ -89,8 +89,8 @@ async def delete_model_download_task(request):
         return web.json_response({"success": False, "error": error_msg})
 
 
-# @deprecated
 @routes.get("/model-manager/base-folders")
+@utils.deprecated(reason="Use `/model-manager/models` instead.")
 async def get_model_paths(request):
     """
     Returns the base folders for models.
