@@ -133,7 +133,11 @@ def download_web_distribution(version: str):
         print_error(f"An unexpected error occurred: {e}")
 
 
-def resolve_model_base_paths():
+def resolve_model_base_paths() -> dict[str, list[str]]:
+    """
+    Resolve model base paths.
+    eg. { "checkpoints": ["path/to/checkpoints"] }
+    """
     folders = list(folder_paths.folder_names_and_paths.keys())
     model_base_paths = {}
     folder_black_list = ["configs", "custom_nodes"]

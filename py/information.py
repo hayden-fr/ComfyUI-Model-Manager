@@ -27,9 +27,7 @@ class ModelSearcher(ABC):
 
 class UnknownWebsiteSearcher(ModelSearcher):
     def search_by_url(self, url: str):
-        raise RuntimeError(
-            f"Unknown Website, please input a URL from huggingface.co or civitai.com."
-        )
+        raise RuntimeError(f"Unknown Website, please input a URL from huggingface.co or civitai.com.")
 
     def search_by_hash(self, hash: str):
         raise RuntimeError(f"Unknown Website, unable to search with hash value.")
@@ -87,29 +85,15 @@ class CivitaiModelSearcher(ModelSearcher):
                 description_parts.append("")
                 description_parts.append(f"# Trigger Words")
                 description_parts.append("")
-                description_parts.append(
-                    ", ".join(version.get("trainedWords", ["No trigger words"]))
-                )
+                description_parts.append(", ".join(version.get("trainedWords", ["No trigger words"])))
                 description_parts.append("")
                 description_parts.append(f"# About this version")
                 description_parts.append("")
-                description_parts.append(
-                    markdownify.markdownify(
-                        version.get(
-                            "description", "<p>No description about this version</p>"
-                        )
-                    ).strip()
-                )
+                description_parts.append(markdownify.markdownify(version.get("description", "<p>No description about this version</p>")).strip())
                 description_parts.append("")
                 description_parts.append(f"# {res_data.get('name')}")
                 description_parts.append("")
-                description_parts.append(
-                    markdownify.markdownify(
-                        res_data.get(
-                            "description", "<p>No description about this model</p>"
-                        )
-                    ).strip()
-                )
+                description_parts.append(markdownify.markdownify(res_data.get("description", "<p>No description about this model</p>")).strip())
                 description_parts.append("")
 
                 model = {
@@ -136,18 +120,14 @@ class CivitaiModelSearcher(ModelSearcher):
         if not hash:
             raise RuntimeError(f"Hash value is empty.")
 
-        response = requests.get(
-            f"https://civitai.com/api/v1/model-versions/by-hash/{hash}"
-        )
+        response = requests.get(f"https://civitai.com/api/v1/model-versions/by-hash/{hash}")
         response.raise_for_status()
         version: dict = response.json()
 
         model_id = version.get("modelId")
         version_id = version.get("id")
 
-        model_page = (
-            f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
-        )
+        model_page = f"https://civitai.com/models/{model_id}?modelVersionId={version_id}"
 
         models = self.search_by_url(model_page)
 
@@ -186,9 +166,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
         response.raise_for_status()
         res_data: dict = response.json()
 
-        sibling_files: list[str] = [
-            x.get("rfilename") for x in res_data.get("siblings", [])
-        ]
+        sibling_files: list[str] = [x.get("rfilename") for x in res_data.get("siblings", [])]
 
         model_files = utils.filter_with(
             utils.filter_with(sibling_files, self._match_model_files()),
@@ -199,10 +177,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
             utils.filter_with(sibling_files, self._match_image_files()),
             self._match_tree_files(rest_pathname),
         )
-        image_files = [
-            f"https://huggingface.co/{model_id}/resolve/main/{filename}"
-            for filename in image_files
-        ]
+        image_files = [f"https://huggingface.co/{model_id}/resolve/main/{filename}" for filename in image_files]
 
         models: list[dict] = []
 
@@ -315,3 +290,148 @@ def get_model_searcher_by_url(url: str) -> ModelSearcher:
     elif host_name == "huggingface.co":
         return HuggingfaceModelSearcher()
     return UnknownWebsiteSearcher()
+
+
+import folder_paths
+
+
+from . import config
+
+
+from aiohttp import web
+
+
+class Information:
+    def add_routes(self, routes):
+
+        @routes.get("/model-manager/model-info")
+        async def fetch_model_info(request):
+            """
+            Fetch model information from network with model page.
+            """
+            try:
+                model_page = request.query.get("model-page", None)
+                result = self.fetch_model_info(model_page)
+                return web.json_response({"success": True, "data": result})
+            except Exception as e:
+                error_msg = f"Fetch model info failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
+        @routes.post("/model-manager/model-info/scan")
+        async def download_model_info(request):
+            """
+            Create a task to download model information.
+            """
+            post = await utils.get_request_body(request)
+            try:
+                scan_mode = post.get("scanMode", "diff")
+                await self.download_model_info(scan_mode, request)
+                return web.json_response({"success": True})
+            except Exception as e:
+                error_msg = f"Download model info failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
+        @routes.get("/model-manager/preview/{type}/{index}/{filename:.*}")
+        async def read_model_preview(request):
+            """
+            Get the file stream of the specified image.
+            If the file does not exist, no-preview.png is returned.
+
+            :param type: The type of the model. eg.checkpoints, loras, vae, etc.
+            :param index: The index of the model folders.
+            :param filename: The filename of the image.
+            """
+            model_type = request.match_info.get("type", None)
+            index = int(request.match_info.get("index", None))
+            filename = request.match_info.get("filename", None)
+
+            extension_uri = config.extension_uri
+
+            try:
+                folders = folder_paths.get_folder_paths(model_type)
+                base_path = folders[index]
+                abs_path = utils.join_path(base_path, filename)
+            except:
+                abs_path = extension_uri
+
+            if not os.path.isfile(abs_path):
+                abs_path = utils.join_path(extension_uri, "assets", "no-preview.png")
+            return web.FileResponse(abs_path)
+
+        @routes.get("/model-manager/preview/download/{filename}")
+        async def read_download_preview(request):
+            filename = request.match_info.get("filename", None)
+            extension_uri = config.extension_uri
+
+            download_path = utils.get_download_path()
+            preview_path = utils.join_path(download_path, filename)
+
+            if not os.path.isfile(preview_path):
+                preview_path = utils.join_path(extension_uri, "assets", "no-preview.png")
+
+            return web.FileResponse(preview_path)
+
+    def fetch_model_info(self, model_page: str):
+        if not model_page:
+            return []
+
+        model_searcher = get_model_searcher_by_url(model_page)
+        result = model_searcher.search_by_url(model_page)
+        return result
+
+    async def download_model_info(self, scan_mode: str, request):
+        utils.print_info(f"Download model info for {scan_mode}")
+        model_base_paths = utils.resolve_model_base_paths()
+        for model_type in model_base_paths:
+
+            folders, extensions = folder_paths.folder_names_and_paths[model_type]
+            for path_index, base_path in enumerate(folders):
+                files = utils.recursive_search_files(base_path, request)
+
+                models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
+
+                for fullname in models:
+                    fullname = utils.normalize_path(fullname)
+                    basename = os.path.splitext(fullname)[0]
+
+                    abs_model_path = utils.join_path(base_path, fullname)
+
+                    image_name = utils.get_model_preview_name(abs_model_path)
+                    abs_image_path = utils.join_path(base_path, image_name)
+
+                    has_preview = os.path.isfile(abs_image_path)
+
+                    description_name = utils.get_model_description_name(abs_model_path)
+                    abs_description_path = utils.join_path(base_path, description_name) if description_name else None
+                    has_description = os.path.isfile(abs_description_path) if abs_description_path else False
+
+                    try:
+
+                        utils.print_info(f"Checking model {abs_model_path}")
+                        utils.print_debug(f"Scan mode: {scan_mode}")
+                        utils.print_debug(f"Has preview: {has_preview}")
+                        utils.print_debug(f"Has description: {has_description}")
+
+                        if scan_mode != "full" and (has_preview and has_description):
+                            continue
+
+                        utils.print_debug(f"Calculate sha256 for {abs_model_path}")
+                        hash_value = utils.calculate_sha256(abs_model_path)
+                        utils.print_info(f"Searching model info by hash {hash_value}")
+                        model_info = CivitaiModelSearcher().search_by_hash(hash_value)
+
+                        preview_url_list = model_info.get("preview", [])
+                        preview_image_url = preview_url_list[0] if preview_url_list else None
+                        if preview_image_url:
+                            utils.print_debug(f"Save preview image to {abs_image_path}")
+                            utils.save_model_preview_image(abs_model_path, preview_image_url)
+
+                        description = model_info.get("description", None)
+                        if description:
+                            utils.save_model_description(abs_model_path, description)
+                    except Exception as e:
+                        utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
+
+        utils.print_debug("Completed scan model information.")
