@@ -4,7 +4,7 @@ import folder_paths
 
 from . import utils
 from . import download
-from . import searcher
+from . import information
 
 
 def scan_models(folder: str, request):
@@ -132,7 +132,7 @@ def fetch_model_info(model_page: str):
     if not model_page:
         return []
 
-    model_searcher = searcher.get_model_searcher_by_url(model_page)
+    model_searcher = information.get_model_searcher_by_url(model_page)
     result = model_searcher.search_by_url(model_page)
     return result
 
@@ -176,7 +176,7 @@ async def download_model_info(scan_mode: str, request):
                     utils.print_debug(f"Calculate sha256 for {abs_model_path}")
                     hash_value = utils.calculate_sha256(abs_model_path)
                     utils.print_info(f"Searching model info by hash {hash_value}")
-                    model_info = searcher.CivitaiModelSearcher().search_by_hash(hash_value)
+                    model_info = information.CivitaiModelSearcher().search_by_hash(hash_value)
 
                     preview_url_list = model_info.get("preview", [])
                     preview_image_url = preview_url_list[0] if preview_url_list else None
