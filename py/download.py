@@ -405,9 +405,6 @@ async def download_model_file(
         await utils.send_json("update_download_task", task_status.to_dict())
 
 
-from . import services
-
-
 from aiohttp import web
 
 
@@ -420,7 +417,7 @@ class ModelDownload:
             Read download task list.
             """
             try:
-                result = await services.scan_model_download_task_list()
+                result = await scan_model_download_task_list()
                 return web.json_response({"success": True, "data": result})
             except Exception as e:
                 error_msg = f"Read download task list failed: {e}"
@@ -439,9 +436,9 @@ class ModelDownload:
                 json_data = await request.json()
                 status = json_data.get("status", None)
                 if status == "pause":
-                    await services.pause_model_download_task(task_id)
+                    await pause_model_download_task(task_id)
                 elif status == "resume":
-                    await services.resume_model_download_task(task_id, request)
+                    await download_model(task_id, request)
                 else:
                     raise web.HTTPBadRequest(reason="Invalid status")
 
@@ -458,7 +455,7 @@ class ModelDownload:
             """
             task_id = request.match_info.get("task_id", None)
             try:
-                await services.delete_model_download_task(task_id)
+                await delete_model_download_task(task_id)
                 return web.json_response({"success": True})
             except Exception as e:
                 error_msg = f"Delete download task failed: {str(e)}"
@@ -483,7 +480,7 @@ class ModelDownload:
             task_data = await request.post()
             task_data = dict(task_data)
             try:
-                task_id = await services.create_model_download_task(task_data, request)
+                task_id = await create_model_download_task(task_data, request)
                 return web.json_response({"success": True, "data": {"taskId": task_id}})
             except Exception as e:
                 error_msg = f"Create model download task failed: {str(e)}"
