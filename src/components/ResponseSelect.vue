@@ -27,12 +27,7 @@
   </slot>
 
   <div v-else class="relative flex-1 overflow-hidden">
-    <div
-      ref="scrollArea"
-      class="h-full w-full overflow-auto scrollbar-none"
-      v-resize="checkScrollPosition"
-      @scroll="checkScrollPosition"
-    >
+    <div ref="scrollArea" class="h-full w-full overflow-auto scrollbar-none">
       <div ref="contentArea" class="table max-w-full">
         <div
           v-show="showControlButton && scrollPosition !== 'left'"
@@ -157,11 +152,13 @@
 
 <script setup lang="ts">
 import { useConfig } from 'hooks/config'
+import { useContainerResize } from 'hooks/resize'
+import { useContainerScroll } from 'hooks/scroll'
 import Button, { ButtonProps } from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Menu from 'primevue/menu'
 import { SelectOptions } from 'types/typings'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const current = defineModel()
 
@@ -202,7 +199,7 @@ const toggle = (event: MouseEvent) => {
 }
 
 // Select Button Type
-const scrollArea = ref()
+const scrollArea = ref<HTMLElement | null>(null)
 const contentArea = ref()
 
 type ScrollPosition = 'left' | 'right'
@@ -242,4 +239,16 @@ const checkScrollPosition = () => {
   scrollPosition.value = position
   showControlButton.value = contentWidth > containerWidth
 }
+
+const { width, height } = useContainerResize(scrollArea)
+
+watch([width, height], () => {
+  checkScrollPosition()
+})
+
+useContainerScroll(scrollArea, {
+  onScroll: () => {
+    checkScrollPosition()
+  },
+})
 </script>
