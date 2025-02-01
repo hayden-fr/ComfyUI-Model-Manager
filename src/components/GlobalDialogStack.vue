@@ -11,7 +11,8 @@
     :max-width="item.maxWidth"
     :min-height="item.minHeight"
     :max-height="item.maxHeight"
-    :z-index="baseZIndex + index + 1"
+    :auto-z-index="false"
+    :pt:mask:style="{ zIndex: baseZIndex + index + 1 }"
     :pt:root:onMousedown="() => rise(item)"
     @hide="() => close(item)"
   >
@@ -43,7 +44,7 @@ import ResponseDialog from 'components/ResponseDialog.vue'
 import { useDialog } from 'hooks/dialog'
 import Button from 'primevue/button'
 import { usePrimeVue } from 'primevue/config'
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 
 const { stack, rise, close } = useDialog()
 
@@ -51,5 +52,11 @@ const { config } = usePrimeVue()
 
 const baseZIndex = computed(() => {
   return config.zIndex?.modal ?? 1100
+})
+
+onMounted(() => {
+  for (const key in config.zIndex) {
+    config.zIndex[key] = baseZIndex.value
+  }
 })
 </script>
