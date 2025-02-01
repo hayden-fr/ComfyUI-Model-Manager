@@ -1,14 +1,13 @@
 <template>
   <div
+    ref="contentContainer"
     class="flex h-full flex-col gap-4 overflow-hidden"
-    v-resize="onContainerResize"
-    v-container="contentContainer"
   >
     <div
       class="grid grid-cols-1 justify-center gap-4 px-8"
       :style="$content_lg(contentStyle)"
     >
-      <div class="col-span-full" v-container="toolbarContainer">
+      <div ref="toolbarContainer" class="col-span-full">
         <div class="flex flex-col gap-4" :style="$toolbar_2xl(toolbarStyle)">
           <ResponseInput
             v-model="searchContent"
@@ -71,7 +70,7 @@ import ResponseSelect from 'components/ResponseSelect.vue'
 import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
-import { defineResizeCallback } from 'hooks/resize'
+import { useContainerResize } from 'hooks/resize'
 import { chunk } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
@@ -83,6 +82,12 @@ const { isMobile, cardWidth, gutter, aspect } = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
+
+const toolbarContainer = ref<HTMLElement | null>(null)
+const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
+
+const contentContainer = ref<HTMLElement | null>(null)
+const { $lg: $content_lg } = useContainerQueries(contentContainer)
 
 const responseScroll = ref()
 
@@ -143,8 +148,16 @@ const itemSize = computed(() => {
   return itemWidth / aspect + itemGutter
 })
 
-const colSpan = ref(1)
-const colSpanWidth = ref(cardWidth)
+const { width } = useContainerResize(contentContainer)
+
+const cols = computed(() => {
+  if (isMobile.value) {
+    return 1
+  }
+
+  const containerWidth = width.value
+  return Math.floor((containerWidth - gutter) / (cardWidth + gutter))
+})
 
 const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
@@ -180,33 +193,17 @@ const list = computed(() => {
 
   const sortedList = filterList.sort(sortStrategy)
 
-  return chunk(sortedList, colSpan.value)
+  return chunk(sortedList, cols.value)
 })
 
-const toolbarContainer = Symbol('toolbar')
-const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
-
-const contentContainer = Symbol('content')
-const { $lg: $content_lg } = useContainerQueries(contentContainer)
-
-const contentStyle = {
+const contentStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fit, ${cardWidth}px)`,
   gap: `${gutter}px`,
   paddingLeft: `1rem`,
   paddingRight: `1rem`,
-}
-const toolbarStyle = {
-  flexDirection: 'row',
-}
+}))
 
-const onContainerResize = defineResizeCallback((entries) => {
-  const entry = entries[0]
-  if (isMobile.value) {
-    colSpan.value = 1
-  } else {
-    const containerWidth = entry.contentRect.width
-    colSpan.value = Math.floor((containerWidth - gutter) / (cardWidth + gutter))
-    colSpanWidth.value = colSpan.value * (cardWidth + gutter) - gutter
-  }
-})
+const toolbarStyle = computed(() => ({
+  flexDirection: 'row',
+}))
 </script>

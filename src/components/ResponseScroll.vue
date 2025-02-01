@@ -5,8 +5,6 @@
       data-scroll-viewport
       class="h-full w-full overflow-auto scrollbar-none"
       :style="{ contain: items ? 'strict' : undefined }"
-      @scroll="onContentScroll"
-      v-resize="onContainerResize"
     >
       <div data-scroll-content class="relative min-w-full">
         <slot name="default">
@@ -60,7 +58,8 @@
 </template>
 
 <script setup lang="ts" generic="T">
-import { defineResizeCallback } from 'hooks/resize'
+import { useContainerResize } from 'hooks/resize'
+import { useContainerScroll } from 'hooks/scroll'
 import { clamp, throttle } from 'lodash'
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 
@@ -74,7 +73,6 @@ interface ScrollAreaProps {
 const props = withDefaults(defineProps<ScrollAreaProps>(), {
   scrollbar: true,
 })
-const emit = defineEmits(['scroll', 'resize'])
 
 type ScrollbarDirection = 'horizontal' | 'vertical'
 
@@ -207,37 +205,40 @@ const calculateScrollThumbSize = () => {
   })
 }
 
-const onContainerResize = defineResizeCallback((entries) => {
-  emit('resize', entries)
+const viewport = ref<HTMLElement | null>(null)
+
+const { width, height } = useContainerResize(viewport)
+
+watch([width, height], () => {
   if (isDragging.value) return
 
   calculateScrollThumbSize()
 })
 
-const onContentScroll = throttle((event: Event) => {
-  emit('scroll', event)
-  if (isDragging.value) return
+useContainerScroll(viewport, {
+  onScroll: (event) => {
+    if (isDragging.value) return
 
-  const container = event.target as HTMLDivElement
-  const content = getContainerContent()
+    const container = event.target as HTMLDivElement
+    const content = getContainerContent()
 
-  const resolveOffset = (item: Scrollbar, attr: ScrollbarAttribute) => {
-    const containerSize = container[attr.clientSize]
-    const contentSize = content[attr.clientSize]
-    const scrollOffset = container[attr.scrollOffset]
+    const resolveOffset = (item: Scrollbar, attr: ScrollbarAttribute) => {
+      const containerSize = container[attr.clientSize]
+      const contentSize = content[attr.clientSize]
+      const scrollOffset = container[attr.scrollOffset]
 
-    item.offset =
-      (scrollOffset / (contentSize - containerSize)) *
-      (containerSize - item.size)
-  }
+      item.offset =
+        (scrollOffset / (contentSize - containerSize)) *
+        (containerSize - item.size)
+    }
 
-  resolveOffset(scrollbars.value.horizontal, scrollbarAttrs.horizontal)
-  resolveOffset(scrollbars.value.vertical, scrollbarAttrs.vertical)
+    resolveOffset(scrollbars.value.horizontal, scrollbarAttrs.horizontal)
+    resolveOffset(scrollbars.value.vertical, scrollbarAttrs.vertical)
 
-  calculateLoadItems()
+    calculateLoadItems()
+  },
 })
 
-const viewport = ref<HTMLElement>()
 const draggingDirection = ref<ScrollbarDirection>()
 const prevDraggingEvent = ref<MouseEvent>()
 

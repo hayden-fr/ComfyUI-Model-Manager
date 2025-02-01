@@ -1,7 +1,5 @@
 import { definePreset } from '@primevue/themes'
 import Aura from '@primevue/themes/aura'
-import { containerDirective } from 'hooks/container'
-import { resizeDirective } from 'hooks/resize'
 import PrimeVue from 'primevue/config'
 import ConfirmationService from 'primevue/confirmationservice'
 import ToastService from 'primevue/toastservice'
@@ -21,8 +19,6 @@ const ComfyUIPreset = definePreset(Aura, {
 function createVueApp(rootContainer: string | HTMLElement) {
   const app = createApp(App)
   app.directive('tooltip', Tooltip)
-  app.directive('resize', resizeDirective)
-  app.directive('container', containerDirective)
   app
     .use(PrimeVue, {
       theme: {
