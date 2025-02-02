@@ -31,20 +31,14 @@
       </div>
     </div>
 
-    <ResponseScroll
-      ref="responseScroll"
-      :items="list"
-      :itemSize="itemSize"
-      :row-key="(item) => item.map(genModelKey).join(',')"
-      class="h-full flex-1"
-    >
+    <ResponseScroll :items="list" :itemSize="itemSize" class="h-full flex-1">
       <template #item="{ item }">
         <div
           class="grid grid-cols-1 justify-center gap-8 px-8"
           :style="contentStyle"
         >
           <ModelCard
-            v-for="model in item"
+            v-for="model in item.row"
             :key="genModelKey(model)"
             :model="model"
           ></ModelCard>
@@ -75,7 +69,7 @@ import { chunk } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
 import { genModelKey } from 'utils/model'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { isMobile, cardWidth, gutter, aspect } = useConfig()
@@ -88,8 +82,6 @@ const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
 
 const contentContainer = ref<HTMLElement | null>(null)
 const { $lg: $content_lg } = useContainerQueries(contentContainer)
-
-const responseScroll = ref()
 
 const searchContent = ref<string>()
 
@@ -132,10 +124,6 @@ const sortOrderOptions = ref(
     }
   }),
 )
-
-watch([searchContent, currentType], () => {
-  responseScroll.value.init()
-})
 
 const itemSize = computed(() => {
   let itemWidth = cardWidth
@@ -193,7 +181,9 @@ const list = computed(() => {
 
   const sortedList = filterList.sort(sortStrategy)
 
-  return chunk(sortedList, cols.value)
+  return chunk(sortedList, cols.value).map((row) => {
+    return { key: row.map(genModelKey).join(','), row }
+  })
 })
 
 const contentStyle = computed(() => ({

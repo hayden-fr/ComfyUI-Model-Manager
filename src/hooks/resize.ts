@@ -1,13 +1,6 @@
 import { throttle } from 'lodash'
 import { type Ref, onUnmounted, ref, toRef, watch } from 'vue'
 
-export const defineResizeCallback = (
-  callback: ResizeObserverCallback,
-  wait?: number,
-) => {
-  return throttle(callback, wait ?? 100)
-}
-
 export const useContainerResize = (
   el: HTMLElement | null | Ref<HTMLElement | null>,
 ) => {
@@ -20,11 +13,11 @@ export const useContainerResize = (
     toRef(el),
     (el) => {
       if (el) {
-        const onResize = defineResizeCallback((entries) => {
+        const onResize = throttle((entries: ResizeObserverEntry[]) => {
           const entry = entries[0]
           width.value = entry.contentRect.width
           height.value = entry.contentRect.height
-        })
+        }, 64)
 
         observer.value = new ResizeObserver(onResize)
         observer.value.observe(el)
