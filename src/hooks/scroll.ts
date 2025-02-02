@@ -22,29 +22,29 @@ export const useContainerScroll = (
       scrollLeft.value = container.value.scrollLeft
       scrollTop.value = container.value.scrollTop
     }
-  }, options?.throttle || 100)
+  }, options?.throttle ?? 64)
 
   watch(
     container,
     (el) => {
       if (el) {
-        el.addEventListener('scroll', onScroll)
+        el.addEventListener('scroll', onScroll, { passive: true })
       }
     },
     { immediate: true },
   )
 
   const x = computed({
-    get: () => scrollLeft,
+    get: () => scrollLeft.value,
     set: (val) => {
-      container.value?.scrollTo({ left: val.value })
+      container.value?.scrollTo({ left: val })
     },
   })
 
   const y = computed({
-    get: () => scrollTop,
+    get: () => scrollTop.value,
     set: (val) => {
-      container.value?.scrollTo({ top: val.value })
+      container.value?.scrollTo({ top: val })
     },
   })
 
