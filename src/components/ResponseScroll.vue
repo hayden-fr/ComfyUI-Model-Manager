@@ -23,19 +23,25 @@
       </div>
     </div>
 
-    <div class="absolute right-0 top-0 h-full w-2">
+    <div ref="scroll" class="absolute right-0 top-0 h-full w-2">
       <div
+        ref="thumb"
         :class="[
           'absolute w-full cursor-pointer rounded-full bg-gray-500',
           'opacity-0 transition-opacity duration-300 group-hover/scroll:opacity-30',
         ]"
-        :style="{ height: `${thumbSize}px`, top: `${thumbOffset}px` }"
+        :style="{
+          height: `${thumbSize}px`,
+          top: `${thumbOffset}px`,
+          opacity: isDragging ? '0.3' : undefined,
+        }"
       ></div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts" generic="T">
+import { useDraggable } from '@vueuse/core'
 import { useContainerResize } from 'hooks/resize'
 import { useContainerScroll } from 'hooks/scroll'
 import { clamp } from 'lodash'
@@ -103,10 +109,34 @@ const thumbSize = computed(() => {
   return Math.max(thumbHeight, 16)
 })
 
-const thumbOffset = computed(() => {
-  return (
-    (scrollY.value / (contentHeight.value - viewportHeight.value)) *
-    (viewportHeight.value - thumbSize.value)
-  )
+const thumbOffset = computed({
+  get: () => {
+    return (
+      (scrollY.value / (contentHeight.value - viewportHeight.value)) *
+      (viewportHeight.value - thumbSize.value)
+    )
+  },
+  set: (offset) => {
+    scrollY.value =
+      (offset / (viewportHeight.value - thumbSize.value)) *
+      (contentHeight.value - viewportHeight.value)
+  },
+})
+
+const scroll = ref<HTMLElement | null>(null)
+const thumb = ref<HTMLElement | null>(null)
+
+const { isDragging } = useDraggable(thumb, {
+  axis: 'y',
+  containerElement: scroll,
+  onStart: () => {
+    document.body.style.userSelect = 'none'
+  },
+  onMove: (position) => {
+    thumbOffset.value = position.y
+  },
+  onEnd: () => {
+    document.body.style.userSelect = ''
+  },
 })
 </script>
