@@ -41,8 +41,7 @@
 </template>
 
 <script setup lang="ts" generic="T">
-import { useDraggable, useElementSize } from '@vueuse/core'
-import { useContainerScroll } from 'hooks/scroll'
+import { useDraggable, useElementSize, useScroll } from '@vueuse/core'
 import { clamp } from 'lodash'
 import { computed, ref } from 'vue'
 
@@ -58,7 +57,7 @@ const content = ref<HTMLElement | null>(null)
 
 const { height: viewportHeight } = useElementSize(viewport)
 const { height: contentHeight } = useElementSize(content)
-const { y: scrollY } = useContainerScroll(viewport)
+const { y: scrollY } = useScroll(viewport)
 
 const itemSize = computed(() => props.itemSize || 0)
 
