@@ -1,4 +1,4 @@
-import { useContainerResize } from 'hooks/resize'
+import { useElementSize } from '@vueuse/core'
 import { type InjectionKey, type Ref, inject, provide, toRef } from 'vue'
 
 const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
@@ -14,7 +14,7 @@ export const useContainerQueries = (
 
   provide(containerKey, container)
 
-  const { width } = useContainerResize(container)
+  const { width } = useElementSize(container)
 
   /**
    * @param size unit rem
