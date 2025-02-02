@@ -57,6 +57,7 @@
 </template>
 
 <script setup lang="ts" name="manager-dialog">
+import { useElementSize } from '@vueuse/core'
 import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
@@ -64,7 +65,6 @@ import ResponseSelect from 'components/ResponseSelect.vue'
 import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
-import { useContainerResize } from 'hooks/resize'
 import { chunk } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
@@ -136,7 +136,7 @@ const itemSize = computed(() => {
   return itemWidth / aspect + itemGutter
 })
 
-const { width } = useContainerResize(contentContainer)
+const { width } = useElementSize(contentContainer)
 
 const cols = computed(() => {
   if (isMobile.value) {

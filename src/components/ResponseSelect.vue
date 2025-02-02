@@ -151,9 +151,8 @@
 </template>
 
 <script setup lang="ts">
+import { useElementSize, useScroll } from '@vueuse/core'
 import { useConfig } from 'hooks/config'
-import { useContainerResize } from 'hooks/resize'
-import { useContainerScroll } from 'hooks/scroll'
 import Button, { ButtonProps } from 'primevue/button'
 import Drawer from 'primevue/drawer'
 import Menu from 'primevue/menu'
@@ -240,13 +239,13 @@ const checkScrollPosition = () => {
   showControlButton.value = contentWidth > containerWidth
 }
 
-const { width, height } = useContainerResize(scrollArea)
+const { width, height } = useElementSize(scrollArea)
 
 watch([width, height], () => {
   checkScrollPosition()
 })
 
-useContainerScroll(scrollArea, {
+useScroll(scrollArea, {
   onScroll: () => {
     checkScrollPosition()
   },
