@@ -9,18 +9,19 @@
     >
       <div ref="toolbarContainer" class="col-span-full">
         <div :class="['flex gap-4', $toolbar_2xl('flex-row', 'flex-col')]">
-          <ResponseInput
-            v-model="searchContent"
-            :placeholder="$t('searchModels')"
-            :allow-clear="true"
-            suffix-icon="pi pi-search"
-          ></ResponseInput>
+          <div class="flex-1">
+            <ResponseInput
+              v-model="searchContent"
+              :placeholder="$t('searchModels')"
+              :allow-clear="true"
+              suffix-icon="pi pi-search"
+            ></ResponseInput>
+          </div>
 
           <div class="flex items-center justify-between gap-4 overflow-hidden">
             <ResponseSelect
               v-model="currentType"
               :items="typeOptions"
-              :type="isMobile ? 'drop' : 'button'"
             ></ResponseSelect>
             <ResponseSelect
               v-model="sortOrder"
