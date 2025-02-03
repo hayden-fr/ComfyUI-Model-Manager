@@ -8,7 +8,7 @@
       :style="$content_lg(contentStyle)"
     >
       <div ref="toolbarContainer" class="col-span-full">
-        <div class="flex flex-col gap-4" :style="$toolbar_2xl(toolbarStyle)">
+        <div :class="['flex gap-4', $toolbar_2xl('flex-row', 'flex-col')]">
           <ResponseInput
             v-model="searchContent"
             :placeholder="$t('searchModels')"
@@ -191,8 +191,5 @@ const contentStyle = computed(() => ({
   gap: `${gutter}px`,
   paddingLeft: `1rem`,
   paddingRight: `1rem`,
-}))
-const toolbarStyle = computed(() => ({
-  flexDirection: 'row',
 }))
 </script>
