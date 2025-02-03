@@ -225,7 +225,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
                 "pathIndex": 0,
                 "description": "\n".join(description_parts),
                 "metadata": {},
-                "downloadPlatform": "",
+                "downloadPlatform": "huggingface",
                 "downloadUrl": f"https://huggingface.co/{model_id}/resolve/main/{filename}?download=true",
             }
             models.append(model)

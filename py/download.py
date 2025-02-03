@@ -103,6 +103,8 @@ def get_task_content(task_id: str):
     if not os.path.isfile(task_file):
         raise RuntimeError(f"Task {task_id} not found")
     task_content = utils.load_dict_pickle_file(task_file)
+    if isinstance(task_content, TaskContent):
+        return task_content
     return TaskContent(**task_content)
 
 
@@ -178,17 +180,18 @@ async def create_model_download_task(task_data: dict, request):
     task_path = utils.join_path(download_path, f"{task_id}.task")
     if os.path.exists(task_path):
         raise RuntimeError(f"Task {task_id} already exists")
+    download_platform = task_data.get("downloadPlatform", None)
 
     try:
-        previewFile = task_data.pop("previewFile", None)
-        utils.save_model_preview_image(task_path, previewFile)
+        preview_file = task_data.pop("previewFile", None)
+        utils.save_model_preview_image(task_path, preview_file, download_platform)
         set_task_content(task_id, task_data)
         task_status = TaskStatus(
             taskId=task_id,
             type=model_type,
             fullname=fullname,
             preview=utils.get_model_preview_name(task_path),
-            platform=task_data.get("downloadPlatform", None),
+            platform=download_platform,
             totalSize=float(task_data.get("sizeBytes", 0)),
         )
         download_model_task_status[task_id] = task_status

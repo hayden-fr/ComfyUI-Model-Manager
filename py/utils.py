@@ -277,10 +277,9 @@ def remove_model_preview_image(model_path: str):
         os.remove(preview_path)
 
 
-def save_model_preview_image(model_path: str, image_file_or_url: Any):
+def save_model_preview_image(model_path: str, image_file_or_url: Any, platform: str | None = None):
     basename = os.path.splitext(model_path)[0]
     preview_path = f"{basename}.webp"
-
     # Download image file if it is url
     if type(image_file_or_url) is str:
         image_url = image_file_or_url
@@ -304,8 +303,11 @@ def save_model_preview_image(model_path: str, image_file_or_url: Any):
 
         content_type: str = image_file.content_type
         if not content_type.startswith("image/"):
-            raise RuntimeError(f"FileTypeError: expected image, got {content_type}")
-
+            if platform == "huggingface":
+                # huggingface previewFile content_type='text/plain',  not startswith("image/")
+                return
+            else:
+                raise RuntimeError(f"FileTypeError: expected image, got {content_type}")
         image = Image.open(image_file.file)
         image.save(preview_path, "WEBP")
 
