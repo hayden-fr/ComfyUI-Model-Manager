@@ -63,7 +63,11 @@ export const useDialog = defineStore('dialog', () => {
     }
   }
 
-  return { stack, open, close, rise }
+  const closeAll = () => {
+    stack.value = []
+  }
+
+  return { stack, open, close, closeAll, rise }
 })
 
 declare module 'hooks/store' {
