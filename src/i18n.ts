@@ -31,6 +31,13 @@ const messages = {
       created: 'Latest created',
       modified: 'Latest modified',
     },
+    size: {
+      extraLarge: 'Extra Large Icons',
+      large: 'Large Icons',
+      medium: 'Medium Icons',
+      small: 'Small Icons',
+      custom: 'Custom Size',
+    },
     info: {
       type: 'Model Type',
       pathIndex: 'Directory',
@@ -79,6 +86,13 @@ const messages = {
       size: '最大',
       created: '最新创建',
       modified: '最新修改',
+    },
+    size: {
+      extraLarge: '超大图标',
+      large: '大图标',
+      medium: '中等图标',
+      small: '小图标',
+      custom: '自定义尺寸',
     },
     info: {
       type: '类型',

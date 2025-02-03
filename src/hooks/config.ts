@@ -131,7 +131,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       category: [t('modelManager'), t('setting.ui'), 'CardHeight'],
       name: t('setting.cardHeight'),
       type: 'slider',
-      defaultValue: 310,
+      defaultValue: 320,
       attrs: {
         min: 80,
         max: 320,
