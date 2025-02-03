@@ -208,6 +208,7 @@ const currentCardSize = computed({
   },
   set: (val) => {
     if (val === 'custom') {
+      app.ui?.settings.show(t('size.customTip'))
       return
     }
 

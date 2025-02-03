@@ -37,6 +37,7 @@ const messages = {
       medium: 'Medium Icons',
       small: 'Small Icons',
       custom: 'Custom Size',
+      customTip: 'Set in `Settings > Model Manager > UI`',
     },
     info: {
       type: 'Model Type',
@@ -93,6 +94,7 @@ const messages = {
       medium: '中等图标',
       small: '小图标',
       custom: '自定义尺寸',
+      customTip: '在 `设置 > 模型管理器 > 外观` 中设置',
     },
     info: {
       type: '类型',

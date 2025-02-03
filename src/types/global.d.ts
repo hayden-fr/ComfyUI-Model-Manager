@@ -155,7 +155,7 @@ declare namespace ComfyAPI {
       deprecated?: boolean
     }
 
-    class ComfySettingsDialog {
+    class ComfySettingsDialog extends dialog.ComfyDialog {
       addSetting: (params: SettingParams) => { value: any }
       getSettingValue: <T>(id: string, defaultValue?: T) => T
       setSettingValue: <T>(id: string, value: T) => void
