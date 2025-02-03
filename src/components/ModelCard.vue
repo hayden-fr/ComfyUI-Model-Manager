@@ -117,15 +117,15 @@ const preview = computed(() =>
 )
 
 const showToolButton = computed(() => {
-  return cardSize.value.height > 200 && cardSize.value.width > 200
+  return cardSize.value.width >= 180 && cardSize.value.height >= 240
 })
 
 const showModelName = computed(() => {
-  return cardSize.value.height > 110 && cardSize.value.width > 200
+  return cardSize.value.width >= 160 && cardSize.value.height >= 120
 })
 
 const showModelType = computed(() => {
-  return cardSize.value.width > 120
+  return cardSize.value.width >= 120
 })
 
 const { addModelNode, dragToAddModelNode, copyModelNode, loadPreviewWorkflow } =
