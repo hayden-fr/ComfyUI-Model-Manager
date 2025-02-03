@@ -1,8 +1,8 @@
 <template>
   <form
+    ref="container"
     @submit.prevent="handleSubmit"
     @reset.prevent="handleReset"
-    v-container="container"
   >
     <div class="mx-auto w-full max-w-[50rem]">
       <div
@@ -63,7 +63,7 @@ import TabPanel from 'primevue/tabpanel'
 import TabPanels from 'primevue/tabpanels'
 import Tabs from 'primevue/tabs'
 import { BaseModel, WithResolved } from 'types/typings'
-import { toRaw, watch } from 'vue'
+import { ref, toRaw, watch } from 'vue'
 
 interface Props {
   model: BaseModel
@@ -101,6 +101,6 @@ watch(
   },
 )
 
-const container = Symbol('container')
+const container = ref<HTMLElement | null>(null)
 const { $xl } = useContainerQueries(container)
 </script>

@@ -7,6 +7,7 @@ import logging
 import requests
 import traceback
 import configparser
+import functools
 
 import comfy.utils
 import folder_paths
@@ -20,6 +21,10 @@ def print_info(msg, *args, **kwargs):
     logging.info(f"[{config.extension_tag}] {msg}", *args, **kwargs)
 
 
+def print_warning(msg, *args, **kwargs):
+    logging.warning(f"[{config.extension_tag}][WARNING] {msg}", *args, **kwargs)
+
+
 def print_error(msg, *args, **kwargs):
     logging.error(f"[{config.extension_tag}] {msg}", *args, **kwargs)
     logging.debug(traceback.format_exc())
@@ -27,6 +32,18 @@ def print_error(msg, *args, **kwargs):
 
 def print_debug(msg, *args, **kwargs):
     logging.debug(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+
+
+def deprecated(reason: str):
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            print_warning(f"{func.__name__} is deprecated: {reason}")
+            return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def _matches(predicate: dict):
@@ -116,7 +133,11 @@ def download_web_distribution(version: str):
         print_error(f"An unexpected error occurred: {e}")
 
 
-def resolve_model_base_paths():
+def resolve_model_base_paths() -> dict[str, list[str]]:
+    """
+    Resolve model base paths.
+    eg. { "checkpoints": ["path/to/checkpoints"] }
+    """
     folders = list(folder_paths.folder_names_and_paths.keys())
     model_base_paths = {}
     folder_black_list = ["configs", "custom_nodes"]

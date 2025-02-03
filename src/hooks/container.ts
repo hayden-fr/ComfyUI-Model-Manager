@@ -1,46 +1,27 @@
-import { defineResizeCallback } from 'hooks/resize'
-import { computed, Directive, inject, InjectionKey, provide, ref } from 'vue'
-
-const globalContainerSize = ref<Record<symbol, number>>({})
-
-const containerNameKey = Symbol('containerName') as InjectionKey<symbol>
-
-export const containerDirective: Directive<HTMLElement, symbol> = {
-  mounted: (el, binding) => {
-    const containerName = binding.value || Symbol('container')
-    const resizeCallback = defineResizeCallback((entries) => {
-      const entry = entries[0]
-      globalContainerSize.value[containerName] = entry.contentRect.width
-    })
-    const observer = new ResizeObserver(resizeCallback)
-    observer.observe(el)
-    el['_containerObserver'] = observer
-  },
-  unmounted: (el) => {
-    const observer = el['_containerObserver']
-    observer.disconnect()
-  },
-}
+import { useElementSize } from '@vueuse/core'
+import { type InjectionKey, type Ref, inject, provide, toRef } from 'vue'
 
 const rem = parseFloat(getComputedStyle(document.documentElement).fontSize)
 
-export const useContainerQueries = (containerName?: symbol) => {
-  const parentContainer = inject(containerNameKey, Symbol('unknown'))
+const containerKey = Symbol('container') as InjectionKey<
+  Ref<HTMLElement | null>
+>
 
-  const name = containerName ?? parentContainer
+export const useContainerQueries = (
+  el?: HTMLElement | null | Ref<HTMLElement | null>,
+) => {
+  const container = inject(containerKey, el ? toRef(el) : toRef(document.body))
 
-  provide(containerNameKey, name)
+  provide(containerKey, container)
 
-  const currentContainerSize = computed(() => {
-    return globalContainerSize.value[name] ?? 0
-  })
+  const { width } = useElementSize(container)
 
   /**
    * @param size unit rem
    */
   const generator = (size: number) => {
     return (content: any, defaultContent: any = undefined) => {
-      return currentContainerSize.value > size * rem ? content : defaultContent
+      return width.value > size * rem ? content : defaultContent
     }
   }
 

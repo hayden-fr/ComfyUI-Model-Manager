@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-full flex-col gap-4">
-    <div class="whitespace-nowrap px-4" v-container="container">
+    <div ref="container" class="whitespace-nowrap px-4">
       <div :class="['flex gap-4', $sm('justify-end')]">
         <Button
           :class="[$sm('w-auto', 'w-full')]"
@@ -77,6 +77,7 @@ import { useContainerQueries } from 'hooks/container'
 import { useDialog } from 'hooks/dialog'
 import { useDownload } from 'hooks/download'
 import Button from 'primevue/button'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const { data } = useDownload()
@@ -92,6 +93,6 @@ const openCreateTask = () => {
   })
 }
 
-const container = Symbol('container')
+const container = ref<HTMLElement | null>(null)
 const { $sm } = useContainerQueries(container)
 </script>

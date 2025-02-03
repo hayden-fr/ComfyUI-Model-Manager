@@ -1,14 +1,13 @@
 <template>
   <div
-    ref="container"
+    ref="contentContainer"
     class="flex h-full flex-col gap-4 overflow-hidden"
-    v-container="contentContainer"
   >
     <div
       class="grid grid-cols-1 justify-center gap-4 px-8"
       :style="$content_lg(contentStyle)"
     >
-      <div class="col-span-full" v-container="toolbarContainer">
+      <div ref="toolbarContainer" class="col-span-full">
         <div class="flex flex-col gap-4" :style="$toolbar_2xl(toolbarStyle)">
           <ResponseInput
             v-model="searchContent"
@@ -32,20 +31,14 @@
       </div>
     </div>
 
-    <ResponseScroll
-      ref="responseScroll"
-      :items="list"
-      :itemSize="itemSize"
-      :row-key="(item) => item.map(genModelKey).join(',')"
-      class="h-full flex-1"
-    >
+    <ResponseScroll :items="list" :itemSize="itemSize" class="h-full flex-1">
       <template #item="{ item }">
         <div
           class="grid grid-cols-1 justify-center gap-8 px-8"
           :style="contentStyle"
         >
           <ModelCard
-            v-for="model in item"
+            v-for="model in item.row"
             :key="genModelKey(model)"
             :model="model"
           ></ModelCard>
@@ -64,6 +57,7 @@
 </template>
 
 <script setup lang="ts" name="manager-dialog">
+import { useElementSize } from '@vueuse/core'
 import ModelCard from 'components/ModelCard.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
@@ -71,24 +65,23 @@ import ResponseSelect from 'components/ResponseSelect.vue'
 import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
 import { useModels } from 'hooks/model'
-import { useContainerResize } from 'hooks/resize'
 import { chunk } from 'lodash'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
 import { genModelKey } from 'utils/model'
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-
-const container = ref<HTMLElement | null>(null)
 
 const { isMobile, gutter, cardSize } = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
 
-const { width } = useContainerResize(container)
+const toolbarContainer = ref<HTMLElement | null>(null)
+const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
 
-const responseScroll = ref()
+const contentContainer = ref<HTMLElement | null>(null)
+const { $lg: $content_lg } = useContainerQueries(contentContainer)
 
 const searchContent = ref<string>()
 
@@ -132,10 +125,6 @@ const sortOrderOptions = ref(
   }),
 )
 
-watch([searchContent, currentType], () => {
-  responseScroll.value.init()
-})
-
 const itemSize = computed(() => {
   let itemHeight = cardSize.value.height
   let itemGutter = gutter
@@ -146,6 +135,8 @@ const itemSize = computed(() => {
   }
   return itemHeight + itemGutter
 })
+
+const { width } = useElementSize(contentContainer)
 
 const cols = computed(() => {
   if (isMobile.value) {
@@ -190,14 +181,10 @@ const list = computed(() => {
 
   const sortedList = filterList.sort(sortStrategy)
 
-  return chunk(sortedList, cols.value)
+  return chunk(sortedList, cols.value).map((row) => {
+    return { key: row.map(genModelKey).join(','), row }
+  })
 })
-
-const toolbarContainer = Symbol('toolbar')
-const { $2xl: $toolbar_2xl } = useContainerQueries(toolbarContainer)
-
-const contentContainer = Symbol('content')
-const { $lg: $content_lg } = useContainerQueries(contentContainer)
 
 const contentStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fit, ${cardSize.value.width}px)`,
