@@ -64,6 +64,7 @@ export const useConfig = defineStore('config', (store) => {
         })
       },
     },
+    flat: ref(app.ui?.settings.getSettingValue('ModelManager.UI.Flat')),
   }
 
   watch(cardSizeFlag, (val) => {
@@ -169,6 +170,18 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       type: 'hidden',
       onChange(value) {
         store.config.cardSizeMap.value = JSON.parse(value)
+      },
+    })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.UI.Flat',
+      category: [t('modelManager'), t('setting.ui'), 'Flat'],
+      name: t('setting.useFlatUI'),
+      type: 'boolean',
+      defaultValue: false,
+      onChange(value) {
+        store.dialog.closeAll()
+        store.config.flat.value = value
       },
     })
 
