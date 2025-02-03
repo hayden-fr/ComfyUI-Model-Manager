@@ -31,6 +31,14 @@ const messages = {
       created: 'Latest created',
       modified: 'Latest modified',
     },
+    size: {
+      extraLarge: 'Extra Large Icons',
+      large: 'Large Icons',
+      medium: 'Medium Icons',
+      small: 'Small Icons',
+      custom: 'Custom Size',
+      customTip: 'Set in `Settings > Model Manager > UI`',
+    },
     info: {
       type: 'Model Type',
       pathIndex: 'Directory',
@@ -41,11 +49,14 @@ const messages = {
     },
     setting: {
       apiKey: 'API Key',
+      cardHeight: 'Card Height',
+      cardWidth: 'Card Width',
       scan: 'Scan',
       scanMissing: 'Download missing information or preview',
       scanAll: "Override all models' information and preview",
       includeHiddenFiles: 'Include hidden files(start with .)',
       excludeScanTypes: 'Exclude scan types (separate with commas)',
+      ui: 'UI',
     },
   },
   zh: {
@@ -77,6 +88,14 @@ const messages = {
       created: '最新创建',
       modified: '最新修改',
     },
+    size: {
+      extraLarge: '超大图标',
+      large: '大图标',
+      medium: '中等图标',
+      small: '小图标',
+      custom: '自定义尺寸',
+      customTip: '在 `设置 > 模型管理器 > 外观` 中设置',
+    },
     info: {
       type: '类型',
       pathIndex: '目录',
@@ -87,11 +106,14 @@ const messages = {
     },
     setting: {
       apiKey: '密钥',
+      cardHeight: '卡片高度',
+      cardWidth: '卡片宽度',
       scan: '扫描',
       scanMissing: '下载缺失的信息或预览图片',
       scanAll: '覆盖所有模型信息和预览图片',
       includeHiddenFiles: '包含隐藏文件(以 . 开头的文件或文件夹)',
       excludeScanTypes: '排除扫描类型(使用英文逗号隔开)',
+      ui: '外观',
     },
   },
 }

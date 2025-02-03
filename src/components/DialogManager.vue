@@ -8,7 +8,7 @@
       :style="$content_lg(contentStyle)"
     >
       <div ref="toolbarContainer" class="col-span-full">
-        <div class="flex flex-col gap-4" :style="$toolbar_2xl(toolbarStyle)">
+        <div :class="['flex gap-4', $toolbar_2xl('flex-row', 'flex-col')]">
           <ResponseInput
             v-model="searchContent"
             :placeholder="$t('searchModels')"
@@ -25,6 +25,10 @@
             <ResponseSelect
               v-model="sortOrder"
               :items="sortOrderOptions"
+            ></ResponseSelect>
+            <ResponseSelect
+              v-model="currentCardSize"
+              :items="cardSizeOptions"
             ></ResponseSelect>
           </div>
         </div>
@@ -72,7 +76,7 @@ import { genModelKey } from 'utils/model'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { isMobile, cardWidth, gutter, aspect } = useConfig()
+const { isMobile, gutter, cardSize } = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
@@ -126,14 +130,14 @@ const sortOrderOptions = ref(
 )
 
 const itemSize = computed(() => {
-  let itemWidth = cardWidth
+  let itemHeight = cardSize.value.height
   let itemGutter = gutter
   if (isMobile.value) {
     const baseSize = 16
-    itemWidth = window.innerWidth - baseSize * 2 * 2
+    itemHeight = window.innerWidth - baseSize * 2 * 2
     itemGutter = baseSize * 2
   }
-  return itemWidth / aspect + itemGutter
+  return itemHeight + itemGutter
 })
 
 const { width } = useElementSize(contentContainer)
@@ -142,9 +146,9 @@ const cols = computed(() => {
   if (isMobile.value) {
     return 1
   }
-
   const containerWidth = width.value
-  return Math.floor((containerWidth - gutter) / (cardWidth + gutter))
+  const itemWidth = cardSize.value.width
+  return Math.floor((containerWidth - gutter) / (itemWidth + gutter))
 })
 
 const list = computed(() => {
@@ -187,13 +191,56 @@ const list = computed(() => {
 })
 
 const contentStyle = computed(() => ({
-  gridTemplateColumns: `repeat(auto-fit, ${cardWidth}px)`,
+  gridTemplateColumns: `repeat(auto-fit, ${cardSize.value.width}px)`,
   gap: `${gutter}px`,
   paddingLeft: `1rem`,
   paddingRight: `1rem`,
 }))
 
-const toolbarStyle = computed(() => ({
-  flexDirection: 'row',
-}))
+const currentCardSize = computed({
+  get: () => {
+    const options = cardSizeOptions.value.map((item) => item.value)
+    const current = [cardSize.value.width, cardSize.value.height].join('x')
+    if (options.includes(current)) {
+      return current
+    }
+    return 'custom'
+  },
+  set: (val) => {
+    if (val === 'custom') {
+      app.ui?.settings.show(t('size.customTip'))
+      return
+    }
+
+    const [width, height] = val.split('x')
+    app.ui?.settings.setSettingValue(
+      'ModelManager.UI.CardWidth',
+      parseInt(width),
+    )
+    app.ui?.settings.setSettingValue(
+      'ModelManager.UI.CardHeight',
+      parseInt(height),
+    )
+  },
+})
+
+const cardSizeOptions = computed(() => {
+  const defineOptions = {
+    extraLarge: '240x320',
+    large: '180x240',
+    medium: '120x160',
+    small: '80x120',
+    custom: 'custom',
+  }
+
+  return Object.entries(defineOptions).map(([key, value]) => {
+    return {
+      label: t(`size.${key}`),
+      value,
+      command() {
+        currentCardSize.value = value
+      },
+    }
+  })
+})
 </script>
