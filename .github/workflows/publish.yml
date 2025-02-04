@@ -60,7 +60,7 @@ jobs:
         run: |
           pnpm install
           pnpm run build
-          tar -czf dist.tar.gz py/ web/ __init__.py LICENSE pyproject.toml
+          tar -czf dist.tar.gz py/ web/ __init__.py LICENSE pyproject.toml requirements.txt
 
       - name: Create release draft
         uses: softprops/action-gh-release@v2
