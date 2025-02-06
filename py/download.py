@@ -61,7 +61,7 @@ class TaskContent:
     description: str
     downloadPlatform: str
     downloadUrl: str
-    sizeBytes: int
+    sizeBytes: float
     hashes: Optional[dict[str, str]] = None
 
     def __init__(self, **kwargs):
@@ -71,7 +71,7 @@ class TaskContent:
         self.description = kwargs.get("description", None)
         self.downloadPlatform = kwargs.get("downloadPlatform", None)
         self.downloadUrl = kwargs.get("downloadUrl", None)
-        self.sizeBytes = int(kwargs.get("sizeBytes", 0))
+        self.sizeBytes = float(kwargs.get("sizeBytes", 0))
         self.hashes = kwargs.get("hashes", None)
 
     def to_dict(self):
@@ -382,7 +382,7 @@ async def download_model_file(
     # When parsing model information from HuggingFace API,
     # the file size was not found and needs to be obtained from the response header.
     if total_size == 0:
-        total_size = int(response.headers.get("content-length", 0))
+        total_size = float(response.headers.get("content-length", 0))
         task_content.sizeBytes = total_size
         task_status.totalSize = total_size
         set_task_content(task_id, task_content)
