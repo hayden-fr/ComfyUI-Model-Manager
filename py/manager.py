@@ -117,7 +117,7 @@ class ModelManager:
         result = []
 
         include_hidden_files = utils.get_setting_value(request, "scan.include_hidden_files", False)
-        folders, extensions = folder_paths.folder_names_and_paths[folder]
+        folders, *others = folder_paths.folder_names_and_paths[folder]
 
         def get_file_info(entry: os.DirEntry[str], base_path: str, path_index: int):
             fullname = utils.normalize_path(entry.path).replace(f"{base_path}/", "")
