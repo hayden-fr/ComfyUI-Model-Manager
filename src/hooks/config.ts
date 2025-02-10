@@ -2,7 +2,7 @@ import SettingCardSize from 'components/SettingCardSize.vue'
 import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
-import { computed, onMounted, onUnmounted, readonly, ref } from 'vue'
+import { computed, onMounted, onUnmounted, readonly, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from './toast'
 
@@ -65,6 +65,17 @@ export const useConfig = defineStore('config', (store) => {
       },
     },
   }
+
+  watch(cardSizeFlag, (val) => {
+    app.ui?.settings.setSettingValue('ModelManager.UI.CardSize', val)
+  })
+
+  watch(cardSizeMap, (val) => {
+    app.ui?.settings.setSettingValue(
+      'ModelManager.UI.CardSizeMap',
+      JSON.stringify(val),
+    )
+  })
 
   useAddConfigSettings(store)
 
