@@ -386,7 +386,7 @@ class Information:
         model_base_paths = utils.resolve_model_base_paths()
         for model_type in model_base_paths:
 
-            folders, extensions = folder_paths.folder_names_and_paths[model_type]
+            folders, *others = folder_paths.folder_names_and_paths[model_type]
             for path_index, base_path in enumerate(folders):
                 files = utils.recursive_search_files(base_path, request)
 
