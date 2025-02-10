@@ -120,7 +120,11 @@ class ModelManager:
         folders, *others = folder_paths.folder_names_and_paths[folder]
 
         def get_file_info(entry: os.DirEntry[str], base_path: str, path_index: int):
-            fullname = utils.normalize_path(entry.path).replace(f"{base_path}/", "")
+            prefix_path = utils.normalize_path(base_path)
+            if not prefix_path.endswith("/"):
+                prefix_path = f"{prefix_path}/"
+
+            fullname = utils.normalize_path(entry.path).replace(prefix_path, "")
             basename = os.path.splitext(fullname)[0]
             extension = os.path.splitext(fullname)[1]
 
