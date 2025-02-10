@@ -20,14 +20,17 @@
 
           <div class="flex items-center justify-between gap-4 overflow-hidden">
             <ResponseSelect
+              class="flex-1"
               v-model="currentType"
               :items="typeOptions"
             ></ResponseSelect>
             <ResponseSelect
+              class="flex-1"
               v-model="sortOrder"
               :items="sortOrderOptions"
             ></ResponseSelect>
             <ResponseSelect
+              class="flex-1"
               v-model="cardSizeFlag"
               :items="cardSizeOptions"
             ></ResponseSelect>
@@ -97,7 +100,8 @@ const { $lg: $content_lg } = useContainerQueries(contentContainer)
 
 const searchContent = ref<string>()
 
-const currentType = ref('all')
+const allType = 'All'
+const currentType = ref(allType)
 const typeOptions = computed(() => {
   const excludeScanTypes = app.ui?.settings.getSettingValue<string>(
     configSetting.excludeScanTypes,
@@ -108,7 +112,7 @@ const typeOptions = computed(() => {
       .map((type) => type.trim())
       .filter(Boolean) ?? []
   return [
-    'all',
+    allType,
     ...Object.keys(folders.value).filter(
       (folder) => !customBlackList.includes(folder),
     ),
@@ -163,7 +167,7 @@ const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
 
   const filterList = mergedList.filter((model) => {
-    const showAllModel = currentType.value === 'all'
+    const showAllModel = currentType.value === allType
 
     const matchType = showAllModel || model.type === currentType.value
     const matchName = model.fullname
