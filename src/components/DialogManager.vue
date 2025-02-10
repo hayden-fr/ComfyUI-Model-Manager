@@ -28,7 +28,7 @@
               :items="sortOrderOptions"
             ></ResponseSelect>
             <ResponseSelect
-              v-model="currentCardSize"
+              v-model="cardSizeFlag"
               :items="cardSizeOptions"
             ></ResponseSelect>
           </div>
@@ -77,7 +77,14 @@ import { genModelKey } from 'utils/model'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-const { isMobile, gutter, cardSize } = useConfig()
+const {
+  isMobile,
+  gutter,
+  cardSize,
+  cardSizeMap,
+  cardSizeFlag,
+  dialog: settings,
+} = useConfig()
 
 const { data, folders } = useModels()
 const { t } = useI18n()
@@ -198,48 +205,24 @@ const contentStyle = computed(() => ({
   paddingRight: `1rem`,
 }))
 
-const currentCardSize = computed({
-  get: () => {
-    const options = cardSizeOptions.value.map((item) => item.value)
-    const current = [cardSize.value.width, cardSize.value.height].join('x')
-    if (options.includes(current)) {
-      return current
-    }
-    return 'custom'
-  },
-  set: (val) => {
-    if (val === 'custom') {
-      app.ui?.settings.show(t('size.customTip'))
-      return
-    }
-
-    const [width, height] = val.split('x')
-    app.ui?.settings.setSettingValue(
-      'ModelManager.UI.CardWidth',
-      parseInt(width),
-    )
-    app.ui?.settings.setSettingValue(
-      'ModelManager.UI.CardHeight',
-      parseInt(height),
-    )
-  },
-})
-
 const cardSizeOptions = computed(() => {
-  const defineOptions = {
-    extraLarge: '240x320',
-    large: '180x240',
-    medium: '120x160',
-    small: '80x120',
-    custom: 'custom',
+  const customSize = 'size.custom'
+
+  const customOptionMap = {
+    ...cardSizeMap.value,
+    [customSize]: 'custom',
   }
 
-  return Object.entries(defineOptions).map(([key, value]) => {
+  return Object.keys(customOptionMap).map((key) => {
     return {
-      label: t(`size.${key}`),
-      value,
-      command() {
-        currentCardSize.value = value
+      label: t(key),
+      value: key,
+      command: () => {
+        if (key === customSize) {
+          settings.showCardSizeSetting()
+        } else {
+          cardSizeFlag.value = key
+        }
       },
     }
   })

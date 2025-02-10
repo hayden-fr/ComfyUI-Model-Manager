@@ -1,11 +1,14 @@
+import SettingCardSize from 'components/SettingCardSize.vue'
 import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, readonly, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useToast } from './toast'
 
 export const useConfig = defineStore('config', (store) => {
+  const { t } = useI18n()
+
   const mobileDeviceBreakPoint = 759
   const isMobile = ref(window.innerWidth < mobileDeviceBreakPoint)
 
@@ -21,21 +24,46 @@ export const useConfig = defineStore('config', (store) => {
     window.removeEventListener('resize', checkDeviceType)
   })
 
-  const cardSize = ref({
-    width:
-      app.ui?.settings.getSettingValue<number>('ModelManager.UI.CardWidth') ??
-      240,
-    height:
-      app.ui?.settings.getSettingValue<number>('ModelManager.UI.CardHeight') ??
-      310,
+  const defaultCardSizeMap = readonly({
+    'size.extraLarge': '240x320',
+    'size.large': '180x240',
+    'size.medium': '120x160',
+    'size.small': '80x120',
+  })
+
+  const cardSizeMap = ref<Record<string, string>>({ ...defaultCardSizeMap })
+  const cardSizeFlag = ref('size.extraLarge')
+  const cardSize = computed(() => {
+    const size = cardSizeMap.value[cardSizeFlag.value]
+    const [width = '120', height = '240'] = size.split('x')
+    return {
+      width: parseInt(width),
+      height: parseInt(height),
+    }
   })
 
   const config = {
     isMobile,
     gutter: 16,
-    cardSize,
+    defaultCardSizeMap: defaultCardSizeMap,
+    cardSizeMap: cardSizeMap,
+    cardSizeFlag: cardSizeFlag,
+    cardSize: cardSize,
     cardWidth: 240,
     aspect: 7 / 9,
+    dialog: {
+      showCardSizeSetting: () => {
+        store.dialog.open({
+          key: 'setting.cardSize',
+          title: t('setting.cardSize'),
+          content: SettingCardSize,
+          defaultSize: {
+            width: 500,
+            height: 390,
+          },
+        })
+      },
+    },
   }
 
   useAddConfigSettings(store)
@@ -109,36 +137,27 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       defaultValue: undefined,
     })
 
-    // UI settings
+    const defaultCardSize = store.config.defaultCardSizeMap
+
     app.ui?.settings.addSetting({
-      id: 'ModelManager.UI.CardWidth',
-      category: [t('modelManager'), t('setting.ui'), 'CardWidth'],
-      name: t('setting.cardWidth'),
-      type: 'slider',
-      defaultValue: 240,
-      attrs: {
-        min: 80,
-        max: 320,
-        step: 10,
-      },
-      onChange(value) {
-        store.config.cardSize.value.width = value
+      id: 'ModelManager.UI.CardSize',
+      category: [t('modelManager'), t('setting.ui'), 'CardSize'],
+      name: t('setting.cardSize'),
+      defaultValue: 'size.extraLarge',
+      type: 'hidden',
+      onChange: (val) => {
+        store.config.cardSizeFlag.value = val
       },
     })
 
     app.ui?.settings.addSetting({
-      id: 'ModelManager.UI.CardHeight',
-      category: [t('modelManager'), t('setting.ui'), 'CardHeight'],
-      name: t('setting.cardHeight'),
-      type: 'slider',
-      defaultValue: 320,
-      attrs: {
-        min: 80,
-        max: 320,
-        step: 10,
-      },
+      id: 'ModelManager.UI.CardSizeMap',
+      category: [t('modelManager'), t('setting.ui'), 'CardSizeMap'],
+      name: t('setting.cardSize'),
+      defaultValue: JSON.stringify(defaultCardSize),
+      type: 'hidden',
       onChange(value) {
-        store.config.cardSize.value.height = value
+        store.config.cardSizeMap.value = JSON.parse(value)
       },
     })
 

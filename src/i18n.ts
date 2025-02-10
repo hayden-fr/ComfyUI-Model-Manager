@@ -25,6 +25,10 @@ const messages = {
     none: 'None',
     uploadFile: 'Upload File',
     tapToChange: 'Tap description to change content',
+    name: 'Name',
+    width: 'Width',
+    height: 'Height',
+    reset: 'Reset',
     sort: {
       name: 'Name',
       size: 'Largest',
@@ -57,6 +61,7 @@ const messages = {
       includeHiddenFiles: 'Include hidden files(start with .)',
       excludeScanTypes: 'Exclude scan types (separate with commas)',
       ui: 'UI',
+      cardSize: 'Card Size',
     },
   },
   zh: {
@@ -82,6 +87,10 @@ const messages = {
     none: '无',
     uploadFile: '上传文件',
     tapToChange: '点击描述可更改内容',
+    name: '名称',
+    width: '宽度',
+    height: '高度',
+    reset: '重置',
     sort: {
       name: '名称',
       size: '最大',
@@ -114,6 +123,7 @@ const messages = {
       includeHiddenFiles: '包含隐藏文件(以 . 开头的文件或文件夹)',
       excludeScanTypes: '排除扫描类型(使用英文逗号隔开)',
       ui: '外观',
+      cardSize: '卡片尺寸',
     },
   },
 }
