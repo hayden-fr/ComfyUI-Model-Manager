@@ -9,7 +9,7 @@
     minimizeIcon="pi pi-arrow-down-left-and-arrow-up-right-to-center"
     :pt:mask:class="['group', { open: visible }]"
     :pt:root:class="['max-h-full group-[:not(.open)]:!hidden', $style.dialog]"
-    pt:content:class="px-0 flex-1"
+    pt:content:class="p-0 flex-1"
     :base-z-index="1000"
     :auto-z-index="isNil(zIndex)"
     :pt:mask:style="isNil(zIndex) ? {} : { zIndex: 1000 + zIndex }"

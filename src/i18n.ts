@@ -62,6 +62,7 @@ const messages = {
       excludeScanTypes: 'Exclude scan types (separate with commas)',
       ui: 'UI',
       cardSize: 'Card Size',
+      useFlatUI: 'Flat Layout',
     },
   },
   zh: {
@@ -124,6 +125,7 @@ const messages = {
       excludeScanTypes: '排除扫描类型(使用英文逗号隔开)',
       ui: '外观',
       cardSize: '卡片尺寸',
+      useFlatUI: '展平布局',
     },
   },
 }

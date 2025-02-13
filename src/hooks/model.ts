@@ -1,3 +1,4 @@
+import DialogModelDetail from 'components/DialogModelDetail.vue'
 import { useLoading } from 'hooks/loading'
 import { useMarkdown } from 'hooks/markdown'
 import { request } from 'hooks/request'
@@ -65,7 +66,7 @@ export const useModels = defineStore('models', (store) => {
         ?.split(',')
         .map((type) => type.trim())
         .filter(Boolean) ?? []
-    return forceRefresh.then(() =>
+    await forceRefresh.then(() =>
       Promise.allSettled(
         Object.keys(folders.value)
           .filter((folder) => !customBlackList.includes(folder))
@@ -195,12 +196,25 @@ export const useModels = defineStore('models', (store) => {
     })
   }
 
+  function openModelDetail(model: BaseModel) {
+    const basename = model.fullname.split('/').pop()!
+    const filename = basename.replace(model.extension, '')
+
+    store.dialog.open({
+      key: genModelKey(model),
+      title: filename,
+      content: DialogModelDetail,
+      contentProps: { model: model },
+    })
+  }
+
   return {
     folders: folders,
     data: models,
     refresh: refreshAllModels,
     remove: deleteModel,
     update: updateModel,
+    openModelDetail: openModelDetail,
   }
 })
 
@@ -552,11 +566,11 @@ export const useModelMetadata = () => {
   return inject(metadataKey)!
 }
 
-export const useModelNodeAction = (model: BaseModel) => {
+export const useModelNodeAction = () => {
   const { t } = useI18n()
   const { toast, wrapperToastError } = useToast()
 
-  const createNode = (options: Record<string, any> = {}) => {
+  const createNode = (model: BaseModel, options: Record<string, any> = {}) => {
     const nodeType = resolveModelTypeLoader(model.type)
     if (!nodeType) {
       throw new Error(t('unSupportedModelType', [model.type]))
@@ -570,45 +584,47 @@ export const useModelNodeAction = (model: BaseModel) => {
     return node
   }
 
-  const dragToAddModelNode = wrapperToastError((event: DragEvent) => {
-    // const target = document.elementFromPoint(event.clientX, event.clientY)
-    // if (
-    //   target?.tagName.toLocaleLowerCase() === 'canvas' &&
-    //   target.id === 'graph-canvas'
-    // ) {
-    //   const pos = app.clientPosToCanvasPos([event.clientX - 20, event.clientY])
-    //   const node = createNode({ pos })
-    //   app.graph.add(node)
-    //   app.canvas.selectNode(node)
-    // }
-    //
-    // Use the legacy method instead
-    const removeEmbeddingExtension = true
-    const strictDragToAdd = false
+  const dragToAddModelNode = wrapperToastError(
+    (model: BaseModel, event: DragEvent) => {
+      // const target = document.elementFromPoint(event.clientX, event.clientY)
+      // if (
+      //   target?.tagName.toLocaleLowerCase() === 'canvas' &&
+      //   target.id === 'graph-canvas'
+      // ) {
+      //   const pos = app.clientPosToCanvasPos([event.clientX - 20, event.clientY])
+      //   const node = createNode({ pos })
+      //   app.graph.add(node)
+      //   app.canvas.selectNode(node)
+      // }
+      //
+      // Use the legacy method instead
+      const removeEmbeddingExtension = true
+      const strictDragToAdd = false
 
-    ModelGrid.dragAddModel(
-      event,
-      model.type,
-      model.fullname,
-      removeEmbeddingExtension,
-      strictDragToAdd,
-    )
-  })
+      ModelGrid.dragAddModel(
+        event,
+        model.type,
+        model.fullname,
+        removeEmbeddingExtension,
+        strictDragToAdd,
+      )
+    },
+  )
 
-  const addModelNode = wrapperToastError(() => {
+  const addModelNode = wrapperToastError((model: BaseModel) => {
     const selectedNodes = app.canvas.selected_nodes
     const firstSelectedNode = Object.values(selectedNodes)[0]
     const offset = 25
     const pos = firstSelectedNode
       ? [firstSelectedNode.pos[0] + offset, firstSelectedNode.pos[1] + offset]
       : app.canvas.canvas_mouse
-    const node = createNode({ pos })
+    const node = createNode(model, { pos })
     app.graph.add(node)
     app.canvas.selectNode(node)
   })
 
-  const copyModelNode = wrapperToastError(() => {
-    const node = createNode()
+  const copyModelNode = wrapperToastError((model: BaseModel) => {
+    const node = createNode(model)
     app.canvas.copyToClipboard([node])
     toast.add({
       severity: 'success',
@@ -618,7 +634,7 @@ export const useModelNodeAction = (model: BaseModel) => {
     })
   })
 
-  const loadPreviewWorkflow = wrapperToastError(async () => {
+  const loadPreviewWorkflow = wrapperToastError(async (model: BaseModel) => {
     const previewUrl = model.preview as string
     const response = await fetch(previewUrl)
     const data = await response.blob()

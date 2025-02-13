@@ -7,6 +7,7 @@
 
 <script setup lang="ts">
 import DialogDownload from 'components/DialogDownload.vue'
+import DialogExplorer from 'components/DialogExplorer.vue'
 import DialogManager from 'components/DialogManager.vue'
 import GlobalDialogStack from 'components/GlobalDialogStack.vue'
 import GlobalLoading from 'components/GlobalLoading.vue'
@@ -50,7 +51,7 @@ onMounted(() => {
   }
 
   const openManagerDialog = () => {
-    const { cardWidth, gutter, aspect } = config
+    const { cardWidth, gutter, aspect, flat } = config
 
     if (firstOpenManager.value) {
       models.refresh(true)
@@ -60,7 +61,7 @@ onMounted(() => {
     dialog.open({
       key: 'model-manager',
       title: t('modelManager'),
-      content: DialogManager,
+      content: flat.value ? DialogManager : DialogExplorer,
       keepAlive: true,
       headerButtons: [
         {

@@ -1,114 +1,80 @@
 <template>
   <div
-    class="group/card relative cursor-pointer select-none"
-    :style="{ width: `${cardSize.width}px`, height: `${cardSize.height}px` }"
-    v-tooltip.top="{ value: model.basename, disabled: showModelName }"
-    @click.stop="openDetailDialog"
+    ref="container"
+    class="relative h-full select-none rounded-lg hover:bg-gray-500/40"
   >
-    <div class="h-full overflow-hidden rounded-lg">
-      <div class="h-full bg-gray-500 duration-300 group-hover/card:scale-110">
-        <img class="h-full w-full object-cover" :src="preview" />
+    <div data-card-main class="flex h-full w-full flex-col">
+      <div data-card-preview class="flex-1 overflow-hidden">
+        <div v-if="model.type === 'folder'" class="h-full w-full">
+          <svg
+            class="icon"
+            viewBox="0 0 1024 1024"
+            version="1.1"
+            xmlns="http://www.w3.org/2000/svg"
+            width="100%"
+            height="100%"
+          >
+            <path
+              d="M853.333333 256H469.333333l-85.333333-85.333333H170.666667c-46.933333 0-85.333333 38.4-85.333334 85.333333v170.666667h853.333334v-85.333334c0-46.933333-38.4-85.333333-85.333334-85.333333z"
+              fill="#FFA000"
+            ></path>
+            <path
+              d="M853.333333 256H170.666667c-46.933333 0-85.333333 38.4-85.333334 85.333333v426.666667c0 46.933333 38.4 85.333333 85.333334 85.333333h682.666666c46.933333 0 85.333333-38.4 85.333334-85.333333V341.333333c0-46.933333-38.4-85.333333-85.333334-85.333333z"
+              fill="#FFCA28"
+            ></path>
+          </svg>
+        </div>
+        <div v-else class="h-full w-full p-1 hover:p-0">
+          <img class="h-full w-full rounded-lg object-cover" :src="preview" />
+        </div>
       </div>
+
+      <slot name="name">
+        <div class="flex justify-center overflow-hidden px-1">
+          <span class="overflow-hidden text-ellipsis whitespace-nowrap">
+            {{ model.basename }}
+          </span>
+        </div>
+      </slot>
     </div>
 
     <div
+      v-if="model.type !== 'folder'"
       data-draggable-overlay
       class="absolute left-0 top-0 h-full w-full"
       draggable="true"
-      @dragend.stop="dragToAddModelNode"
+      @dragend.stop="dragToAddModelNode(model, $event)"
     ></div>
 
-    <div class="pointer-events-none absolute left-0 top-0 h-full w-full p-4">
-      <div class="relative h-full w-full text-white">
-        <div v-show="showModelName" class="absolute bottom-0 left-0">
-          <div class="drop-shadow-[0px_2px_2px_rgba(0,0,0,0.75)]">
-            <div
-              :class="[
-                'line-clamp-3 break-all font-bold',
-                $lg('text-lg', 'text-2xl'),
-              ]"
-            >
-              {{ model.basename }}
-            </div>
-          </div>
-        </div>
-
-        <div class="absolute left-0 top-0 w-full">
-          <div class="flex flex-row items-start justify-between">
-            <div
-              v-show="showModelType"
-              class="flex items-center rounded-full bg-black/30 px-3 py-2"
-            >
-              <div :class="['font-bold', $lg('text-xs')]">
-                {{ model.type }}
-              </div>
-            </div>
-
-            <div
-              v-show="showToolButton"
-              class="opacity-0 duration-300 group-hover/card:opacity-100"
-            >
-              <div class="flex flex-col gap-4 *:pointer-events-auto">
-                <Button
-                  icon="pi pi-plus"
-                  severity="secondary"
-                  rounded
-                  @click.stop="addModelNode"
-                ></Button>
-                <Button
-                  icon="pi pi-copy"
-                  severity="secondary"
-                  rounded
-                  @click.stop="copyModelNode"
-                ></Button>
-                <Button
-                  v-show="model.preview"
-                  icon="pi pi-file-import"
-                  severity="secondary"
-                  rounded
-                  @click.stop="loadPreviewWorkflow"
-                ></Button>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div
+      v-if="model.type !== 'folder'"
+      data-mode-type
+      class="pointer-events-none absolute left-2 top-2"
+      :style="{
+        transform: `scale(${typeLabelScale})`,
+        transformOrigin: 'left top',
+      }"
+    >
+      <div class="rounded-full bg-black/50 px-3 py-1">
+        <span>{{ model.type }}</span>
       </div>
     </div>
+
+    <slot name="extra"></slot>
   </div>
 </template>
 
 <script setup lang="ts">
-import DialogModelDetail from 'components/DialogModelDetail.vue'
-import { useConfig } from 'hooks/config'
-import { useContainerQueries } from 'hooks/container'
-import { useDialog } from 'hooks/dialog'
+import { useElementSize } from '@vueuse/core'
 import { useModelNodeAction } from 'hooks/model'
-import Button from 'primevue/button'
-import { Model } from 'types/typings'
-import { genModelKey } from 'utils/model'
-import { computed } from 'vue'
+import { BaseModel } from 'types/typings'
+import { computed, ref } from 'vue'
 
 interface Props {
-  model: Model
+  model: BaseModel
 }
 
 const props = defineProps<Props>()
-
-const { cardSize } = useConfig()
-
-const dialog = useDialog()
-
-const openDetailDialog = () => {
-  const basename = props.model.fullname.split('/').pop()!
-  const filename = basename.replace(props.model.extension, '')
-
-  dialog.open({
-    key: genModelKey(props.model),
-    title: filename,
-    content: DialogModelDetail,
-    contentProps: { model: props.model },
-  })
-}
 
 const preview = computed(() =>
   Array.isArray(props.model.preview)
@@ -116,20 +82,13 @@ const preview = computed(() =>
     : props.model.preview,
 )
 
-const showToolButton = computed(() => {
-  return cardSize.value.width >= 180 && cardSize.value.height >= 240
+const container = ref<HTMLElement | null>(null)
+
+const { width } = useElementSize(container)
+
+const typeLabelScale = computed(() => {
+  return width.value / 200
 })
 
-const showModelName = computed(() => {
-  return cardSize.value.width >= 160 && cardSize.value.height >= 120
-})
-
-const showModelType = computed(() => {
-  return cardSize.value.width >= 120
-})
-
-const { addModelNode, dragToAddModelNode, copyModelNode, loadPreviewWorkflow } =
-  useModelNodeAction(props.model)
-
-const { $lg } = useContainerQueries()
+const { dragToAddModelNode } = useModelNodeAction()
 </script>

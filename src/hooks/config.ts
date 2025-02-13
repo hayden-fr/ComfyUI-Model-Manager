@@ -24,6 +24,8 @@ export const useConfig = defineStore('config', (store) => {
     window.removeEventListener('resize', checkDeviceType)
   })
 
+  const flatLayout = ref(false)
+
   const defaultCardSizeMap = readonly({
     'size.extraLarge': '240x320',
     'size.large': '180x240',
@@ -64,7 +66,7 @@ export const useConfig = defineStore('config', (store) => {
         })
       },
     },
-    flat: ref(app.ui?.settings.getSettingValue('ModelManager.UI.Flat')),
+    flat: flatLayout,
   }
 
   watch(cardSizeFlag, (val) => {
