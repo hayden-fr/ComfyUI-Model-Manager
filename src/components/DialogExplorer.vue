@@ -9,14 +9,7 @@
             rounded
             severity="secondary"
             :disabled="folderPaths.length < 2"
-            @click.stop=""
-          ></Button>
-          <Button
-            icon="pi pi-refresh"
-            text
-            rounded
-            severity="secondary"
-            @click.stop=""
+            @click="handleGoBackParentFolder"
           ></Button>
         </div>
 
@@ -29,9 +22,19 @@
       </div>
 
       <div :class="['flex gap-4', showToolbar && 'flex-1']">
-        <ResponseInput :placeholder="$t('searchModels')"></ResponseInput>
+        <ResponseInput
+          v-model="searchContent"
+          :placeholder="$t('searchModels')"
+        ></ResponseInput>
 
-        <div v-show="showToolbar" class="flex flex-1 justify-end gap-2">
+        <div
+          v-show="showToolbar"
+          class="flex flex-1 items-center justify-end gap-2"
+        >
+          <ResponseSelect
+            v-model="sortOrder"
+            :items="sortOrderOptions"
+          ></ResponseSelect>
           <ResponseSelect
             v-model="cardSizeFlag"
             :items="cardSizeOptions"
@@ -84,18 +87,18 @@
 
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core'
-import Button from 'primevue/button'
-import ResponseSelect from 'components/ResponseSelect.vue'
 import ModelCard from 'components/ModelCard.vue'
+import ResponseBreadcrumb from 'components/ResponseBreadcrumb.vue'
 import ResponseInput from 'components/ResponseInput.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import ResponseBreadcrumb from 'components/ResponseBreadcrumb.vue'
+import ResponseSelect from 'components/ResponseSelect.vue'
 import { useConfig } from 'hooks/config'
 import { type ModelTreeNode, useModelExplorer } from 'hooks/explorer'
 import { chunk } from 'lodash'
+import Button from 'primevue/button'
+import { genModelKey } from 'utils/model'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { genModelKey } from 'utils/model'
 
 const { t } = useI18n()
 
@@ -127,11 +130,49 @@ const cols = computed(() => {
   return Math.floor(containerWidth / itemWidth)
 })
 
+const searchContent = ref<string>()
+
+const sortOrder = ref('name')
+const sortOrderOptions = ref(
+  ['name', 'size', 'created', 'modified'].map((key) => {
+    return {
+      label: t(`sort.${key}`),
+      value: key,
+      icon: key === 'name' ? 'pi pi-sort-alpha-down' : 'pi pi-sort-amount-down',
+      command: () => {
+        sortOrder.value = key
+      },
+    }
+  }),
+)
+
 const currentDataList = computed(() => {
   let renderedList = dataTreeList.value
   for (const folderItem of folderPaths.value) {
     const found = findFolder(renderedList, folderItem.name)
     renderedList = found?.children || []
+  }
+
+  if (searchContent.value) {
+    const filterItems: ModelTreeNode[] = []
+
+    const searchList = [...renderedList]
+
+    while (searchList.length) {
+      const item = searchList.pop()!
+      const children = (item as any).children ?? []
+      searchList.push(...children)
+
+      if (
+        item.basename
+          .toLocaleLowerCase()
+          .includes(searchContent.value.toLocaleLowerCase())
+      ) {
+        filterItems.push(item)
+      }
+    }
+
+    renderedList = filterItems
   }
 
   if (folderPaths.value.length > 1) {
@@ -150,7 +191,23 @@ const currentDataList = computed(() => {
       return a.basename.localeCompare(b.basename)
     })
     modelItems.sort((a, b) => {
-      return a.basename.localeCompare(b.basename)
+      const sortFieldMap = {
+        name: 'basename',
+        size: 'sizeBytes',
+        created: 'createdAt',
+        modified: 'updatedAt',
+      }
+      const sortField = sortFieldMap[sortOrder.value]
+
+      const aValue = a[sortField]
+      const bValue = b[sortField]
+
+      const result =
+        typeof aValue === 'string'
+          ? aValue.localeCompare(bValue)
+          : aValue - bValue
+
+      return result
     })
     renderedList = [...folderItems, ...modelItems]
   }
@@ -193,5 +250,9 @@ const openItem = (item: ModelTreeNode) => {
   } else {
     openModelDetail(item)
   }
+}
+
+const handleGoBackParentFolder = () => {
+  folderPaths.value.pop()
 }
 </script>
