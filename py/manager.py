@@ -124,21 +124,23 @@ class ModelManager:
             if not prefix_path.endswith("/"):
                 prefix_path = f"{prefix_path}/"
 
-            fullname = utils.normalize_path(entry.path).replace(prefix_path, "")
-            basename = os.path.splitext(fullname)[0]
-            extension = os.path.splitext(fullname)[1]
+            relative_path = utils.normalize_path(entry.path).replace(prefix_path, "")
+            sub_folder = os.path.dirname(relative_path)
+            filename = os.path.basename(relative_path)
+            basename = os.path.splitext(filename)[0]
+            extension = os.path.splitext(filename)[1]
 
             if extension not in folder_paths.supported_pt_extensions:
                 return None
 
-            model_preview = f"/model-manager/preview/{folder}/{path_index}/{basename}.webp"
+            model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, '.webp')}"
 
             stat = entry.stat()
             return {
-                "fullname": fullname,
+                "type": folder,
+                "subFolder": sub_folder,
                 "basename": basename,
                 "extension": extension,
-                "type": folder,
                 "pathIndex": path_index,
                 "sizeBytes": stat.st_size,
                 "preview": model_preview,

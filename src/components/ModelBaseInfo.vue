@@ -85,7 +85,7 @@ const pathOptions = computed(() => {
 const information = computed(() => {
   return Object.values(baseInfo.value).filter((row) => {
     if (editable.value) {
-      const hiddenKeys = ['fullname', 'pathIndex']
+      const hiddenKeys = ['basename', 'pathIndex']
       return !hiddenKeys.includes(row.key)
     }
     return true

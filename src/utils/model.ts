@@ -25,5 +25,5 @@ export const resolveModelTypeLoader = (type: string) => {
 }
 
 export const genModelKey = (model: BaseModel) => {
-  return `${model.type}:${model.pathIndex}:${model.fullname}`
+  return `${model.type}:${model.pathIndex}:${model.subFolder}:${model.basename}${model.extension}`
 }

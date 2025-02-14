@@ -46,7 +46,7 @@ const messages = {
     info: {
       type: 'Model Type',
       pathIndex: 'Directory',
-      fullname: 'File Name',
+      basename: 'File Name',
       sizeBytes: 'File Size',
       createdAt: 'Created At',
       updatedAt: 'Updated At',
@@ -109,7 +109,7 @@ const messages = {
     info: {
       type: '类型',
       pathIndex: '目录',
-      fullname: '文件名',
+      basename: '文件名',
       sizeBytes: '文件大小',
       createdAt: '创建时间',
       updatedAt: '更新时间',

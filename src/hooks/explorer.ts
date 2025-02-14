@@ -1,4 +1,4 @@
-import { useModels } from 'hooks/model'
+import { genModelFullName, useModels } from 'hooks/model'
 import { filter, find } from 'lodash'
 import { BaseModel, Model, SelectOptions } from 'types/typings'
 import { computed, ref, watchEffect } from 'vue'
@@ -30,11 +30,11 @@ export const useModelExplorer = () => {
 
   const folderPaths = ref<FolderPathItem[]>([])
 
-  const genFolderItem = (basename: string, fullname: string): ModelFolder => {
+  const genFolderItem = (basename: string, subFolder: string): ModelFolder => {
     return {
       id: basename,
       basename: basename,
-      fullname: fullname,
+      subFolder: subFolder,
       pathIndex: 0,
       sizeBytes: 0,
       extension: '',
@@ -51,7 +51,7 @@ export const useModelExplorer = () => {
 
     for (const folder in folders.value) {
       if (Object.prototype.hasOwnProperty.call(folders.value, folder)) {
-        const folderItem = genFolderItem(folder, folder)
+        const folderItem = genFolderItem(folder, '')
 
         const modelFolders = folders.value[folder]
 
@@ -59,7 +59,7 @@ export const useModelExplorer = () => {
         const folderRoot: ModelTreeNode[] = []
 
         for (const item of folderModels) {
-          const fullPath = item.fullname
+          const fullPath = genModelFullName(item)
           const prefixPath = modelFolders[item.pathIndex]
 
           if (!prefixPath) {
@@ -80,7 +80,8 @@ export const useModelExplorer = () => {
             ) as ModelFolder | undefined
 
             if (!found) {
-              found = genFolderItem(part, parts.join('/'))
+              const [, ...restPart] = parts
+              found = genFolderItem(part, restPart.join('/'))
               currentLevel.push(found)
             }
             currentLevel = found.children
@@ -93,7 +94,7 @@ export const useModelExplorer = () => {
       }
     }
 
-    const root: ModelTreeNode = genFolderItem('root', 'root')
+    const root: ModelTreeNode = genFolderItem('root', '')
     root.children = rootChildren
     return [root]
   })

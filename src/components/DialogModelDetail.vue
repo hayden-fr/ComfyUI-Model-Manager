@@ -18,12 +18,18 @@
               icon="pi pi-eye"
               @click="openModelPage(metadata.modelPage)"
             ></Button>
-            <Button icon="pi pi-plus" @click.stop="addModelNode"></Button>
-            <Button icon="pi pi-copy" @click.stop="copyModelNode"></Button>
+            <Button
+              icon="pi pi-plus"
+              @click.stop="addModelNode(model)"
+            ></Button>
+            <Button
+              icon="pi pi-copy"
+              @click.stop="copyModelNode(model)"
+            ></Button>
             <Button
               v-show="model.preview"
               icon="pi pi-file-import"
-              @click.stop="loadPreviewWorkflow"
+              @click.stop="loadPreviewWorkflow(model)"
             ></Button>
             <Button
               icon="pi pi-pen-to-square"
@@ -44,7 +50,7 @@
 <script setup lang="ts">
 import ModelContent from 'components/ModelContent.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
-import { useModelNodeAction, useModels } from 'hooks/model'
+import { genModelUrl, useModelNodeAction, useModels } from 'hooks/model'
 import { useRequest } from 'hooks/request'
 import Button from 'primevue/button'
 import { BaseModel, Model, WithResolved } from 'types/typings'
@@ -59,7 +65,7 @@ const { remove, update } = useModels()
 
 const editable = ref(false)
 
-const modelDetailUrl = `/model/${props.model.type}/${props.model.pathIndex}/${props.model.fullname}`
+const modelDetailUrl = genModelUrl(props.model)
 const { data: extraInfo } = useRequest(modelDetailUrl, {
   method: 'GET',
 })
@@ -85,7 +91,6 @@ const openModelPage = (url: string) => {
   window.open(url, '_blank')
 }
 
-const { addModelNode, copyModelNode, loadPreviewWorkflow } = useModelNodeAction(
-  props.model,
-)
+const { addModelNode, copyModelNode, loadPreviewWorkflow } =
+  useModelNodeAction()
 </script>

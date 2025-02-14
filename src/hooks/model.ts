@@ -13,9 +13,10 @@ import { genModelKey, resolveModelTypeLoader } from 'utils/model'
 import {
   computed,
   inject,
-  InjectionKey,
+  type InjectionKey,
   onMounted,
   provide,
+  type Ref,
   ref,
   toRaw,
   unref,
@@ -25,7 +26,20 @@ import { configSetting } from './config'
 
 type ModelFolder = Record<string, string[]>
 
-const modelFolderProvideKey = Symbol('modelFolder')
+const modelFolderProvideKey = Symbol('modelFolder') as InjectionKey<
+  Ref<ModelFolder, ModelFolder>
+>
+
+export const genModelFullName = (model: BaseModel) => {
+  return [model.subFolder, `${model.basename}${model.extension}`]
+    .filter(Boolean)
+    .join('/')
+}
+
+export const genModelUrl = (model: BaseModel) => {
+  const fullname = genModelFullName(model)
+  return `/model/${model.type}/${model.pathIndex}/${fullname}`
+}
 
 export const useModels = defineStore('models', (store) => {
   const { toast, confirm } = useToast()
@@ -33,6 +47,7 @@ export const useModels = defineStore('models', (store) => {
   const loading = useLoading()
 
   const folders = ref<ModelFolder>({})
+
   const refreshFolders = async () => {
     return request('/models').then((resData) => {
       folders.value = resData
@@ -103,13 +118,13 @@ export const useModels = defineStore('models', (store) => {
 
     // Check current name and pathIndex
     if (
-      model.fullname !== data.fullname ||
+      model.subFolder !== data.subFolder ||
       model.pathIndex !== data.pathIndex
     ) {
       oldKey = genModelKey(model)
       updateData.set('type', data.type)
       updateData.set('pathIndex', data.pathIndex.toString())
-      updateData.set('fullname', data.fullname)
+      updateData.set('subFolder', data.subFolder)
       needUpdate = true
     }
 
@@ -118,7 +133,8 @@ export const useModels = defineStore('models', (store) => {
     }
 
     loading.show()
-    await request(`/model/${model.type}/${model.pathIndex}/${model.fullname}`, {
+
+    await request(genModelUrl(model), {
       method: 'PUT',
       body: updateData,
     })
@@ -161,14 +177,14 @@ export const useModels = defineStore('models', (store) => {
         accept: () => {
           const dialogKey = genModelKey(model)
           loading.show()
-          request(`/model/${model.type}/${model.pathIndex}/${model.fullname}`, {
+          request(genModelUrl(model), {
             method: 'DELETE',
           })
             .then(() => {
               toast.add({
                 severity: 'success',
                 summary: 'Success',
-                detail: `${model.fullname} Deleted`,
+                detail: `${model.basename} Deleted`,
                 life: 2000,
               })
               store.dialog.close({ key: dialogKey })
@@ -197,8 +213,7 @@ export const useModels = defineStore('models', (store) => {
   }
 
   function openModelDetail(model: BaseModel) {
-    const basename = model.fullname.split('/').pop()!
-    const filename = basename.replace(model.extension, '')
+    const filename = model.basename.replace(model.extension, '')
 
     store.dialog.open({
       key: genModelKey(model),
@@ -312,10 +327,10 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
 
   const basename = computed({
     get: () => {
-      return model.value.fullname.replace(model.value.extension, '')
+      return model.value.basename
     },
     set: (val) => {
-      model.value.fullname = `${val ?? ''}${model.value.extension}`
+      model.value.basename = val
     },
   })
 
@@ -345,12 +360,14 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
           const modelType = modelData.value.type
           const pathIndex = modelData.value.pathIndex
           const folders = modelFolders.value[modelType] ?? []
-          return `${folders[pathIndex]}`
+          return [`${folders[pathIndex]}`, modelData.value.subFolder]
+            .filter(Boolean)
+            .join('/')
         },
       },
       {
-        key: 'fullname',
-        formatter: (val) => val,
+        key: 'basename',
+        formatter: (val) => `${val}${model.value.extension}`,
       },
       {
         key: 'sizeBytes',
@@ -397,6 +414,8 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
 export const useModelBaseInfo = () => {
   return inject(baseInfoKey)!
 }
+
+export const useModelFolder = () => {}
 
 /**
  * Editable preview image.
@@ -579,7 +598,7 @@ export const useModelNodeAction = () => {
     const node = window.LiteGraph.createNode(nodeType, null, options)
     const widgetIndex = node.widgets.findIndex((w) => w.type === 'combo')
     if (widgetIndex > -1) {
-      node.widgets[widgetIndex].value = model.fullname
+      node.widgets[widgetIndex].value = genModelFullName(model)
     }
     return node
   }
@@ -604,7 +623,7 @@ export const useModelNodeAction = () => {
       ModelGrid.dragAddModel(
         event,
         model.type,
-        model.fullname,
+        genModelFullName(model),
         removeEmbeddingExtension,
         strictDragToAdd,
       )
@@ -640,7 +659,7 @@ export const useModelNodeAction = () => {
     const data = await response.blob()
     const type = data.type
     const extension = type.split('/').pop()
-    const file = new File([data], `${model.fullname}.${extension}`, { type })
+    const file = new File([data], `${model.basename}.${extension}`, { type })
     app.handleFile(file)
   })
 

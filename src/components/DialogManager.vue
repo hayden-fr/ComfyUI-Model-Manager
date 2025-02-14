@@ -220,7 +220,7 @@ const list = computed(() => {
     const showAllModel = currentType.value === allType
 
     const matchType = showAllModel || model.type === currentType.value
-    const matchName = model.fullname
+    const matchName = model.basename
       .toLowerCase()
       .includes(searchContent.value?.toLowerCase() || '')
 
@@ -230,7 +230,7 @@ const list = computed(() => {
   let sortStrategy: (a: Model, b: Model) => number = () => 0
   switch (sortOrder.value) {
     case 'name':
-      sortStrategy = (a, b) => a.fullname.localeCompare(b.fullname)
+      sortStrategy = (a, b) => a.basename.localeCompare(b.basename)
       break
     case 'size':
       sortStrategy = (a, b) => b.sizeBytes - a.sizeBytes
