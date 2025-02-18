@@ -66,15 +66,14 @@ const inputValue = computed({
 })
 const trigger = computed(() => props.updateTrigger ?? 'change')
 const updateContent = () => {
-  let value = innerValue.value
+  let value = inputValue.value
 
   if (modifiers.trim) {
-    value = innerValue.value?.trim()
+    value = value?.trim()
   }
 
   if (modifiers.valid) {
     const isValid = props.validate?.(value) ?? true
-    console.log({ isValid, value })
     if (!isValid) {
       innerValue.value = content.value
       return
