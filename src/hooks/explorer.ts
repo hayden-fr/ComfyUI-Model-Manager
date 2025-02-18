@@ -1,5 +1,5 @@
 import { genModelFullName, useModels } from 'hooks/model'
-import { filter, find } from 'lodash'
+import { cloneDeep, filter, find } from 'lodash'
 import { BaseModel, Model, SelectOptions } from 'types/typings'
 import { computed, ref, watchEffect } from 'vue'
 
@@ -13,12 +13,13 @@ export interface FolderPathItem {
 export type ModelFolder = BaseModel & {
   type: 'folder'
   children: ModelTreeNode[]
-  [x: string]: any
 }
 
 export type ModelItem = Model
 
-export type ModelTreeNode = ModelFolder | ModelItem
+export type ModelTreeNode = BaseModel & {
+  children?: ModelTreeNode[]
+}
 
 export type TreeItemNode = ModelTreeNode & {
   onDbClick: () => void
@@ -53,43 +54,30 @@ export const useModelExplorer = () => {
       if (Object.prototype.hasOwnProperty.call(folders.value, folder)) {
         const folderItem = genFolderItem(folder, '')
 
-        const modelFolders = folders.value[folder]
+        const folderModels = cloneDeep(data.value[folder]) ?? []
 
-        const folderModels = data.value[folder] ?? []
-        const folderRoot: ModelTreeNode[] = []
+        const pathMap: Record<string, ModelTreeNode> = Object.fromEntries(
+          folderModels.map((item) => [
+            `${item.pathIndex}-${genModelFullName(item)}`,
+            item,
+          ]),
+        )
 
         for (const item of folderModels) {
-          const fullPath = genModelFullName(item)
-          const prefixPath = modelFolders[item.pathIndex]
+          const key = genModelFullName(item)
+          const parentKey = key.split('/').slice(0, -1).join('/')
 
-          if (!prefixPath) {
+          if (parentKey === '') {
+            folderItem.children.push(item)
             continue
           }
 
-          const relativePath = fullPath.replace(`${prefixPath}/`, '')
-
-          const pathParts = relativePath.split('/')
-          pathParts.pop()
-          let currentLevel = folderRoot
-          const parts: string[] = []
-          for (const part of pathParts) {
-            parts.push(part)
-
-            let found = currentLevel.find(
-              (item) => item.type === 'folder' && item.basename === part,
-            ) as ModelFolder | undefined
-
-            if (!found) {
-              const [, ...restPart] = parts
-              found = genFolderItem(part, restPart.join('/'))
-              currentLevel.push(found)
-            }
-            currentLevel = found.children
+          const parentItem = pathMap[`${item.pathIndex}-${parentKey}`]
+          if (parentItem) {
+            parentItem.children ??= []
+            parentItem.children.push(item)
           }
-          currentLevel.push(item)
         }
-
-        folderItem.children = folderRoot
         rootChildren.push(folderItem)
       }
     }

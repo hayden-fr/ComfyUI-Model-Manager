@@ -7,13 +7,56 @@
         </template>
       </ResponseSelect>
 
-      <ResponseSelect class="w-full" v-model="pathIndex" :items="pathOptions">
-      </ResponseSelect>
+      <div class="flex gap-2 overflow-hidden">
+        <div class="flex-1 overflow-hidden rounded bg-gray-500/30">
+          <div class="flex h-full items-center justify-end">
+            <span class="overflow-hidden text-ellipsis whitespace-nowrap px-2">
+              {{ renderedModelFolder }}
+            </span>
+          </div>
+        </div>
+        <Button icon="pi pi-folder" @click="handleSelectFolder"></Button>
+
+        <Dialog
+          v-model:visible="folderSelectVisible"
+          :header="$t('folder')"
+          :auto-z-index="false"
+          :pt:mask:style="{ zIndex }"
+          :pt:root:style="{ height: '50vh', maxWidth: '50vw' }"
+          pt:content:class="flex-1"
+        >
+          <div class="flex h-full flex-col overflow-hidden">
+            <div class="flex-1 overflow-hidden">
+              <ResponseScroll>
+                <Tree
+                  class="h-full"
+                  v-model:selection-keys="modelFolder"
+                  :value="pathOptions"
+                  selectionMode="single"
+                  :pt:nodeLabel:class="'text-ellipsis overflow-hidden'"
+                ></Tree>
+              </ResponseScroll>
+            </div>
+            <div class="flex justify-end gap-2">
+              <Button
+                :label="$t('cancel')"
+                severity="secondary"
+                @click="handleCancelSelectFolder"
+              ></Button>
+              <Button
+                :label="$t('select')"
+                @click="handleConfirmSelectFolder"
+              ></Button>
+            </div>
+          </div>
+        </Dialog>
+      </div>
 
       <ResponseInput
-        v-model.trim="basename"
+        v-model.trim.valid="basename"
         class="-mr-2 text-right"
         update-trigger="blur"
+        :validate="validateBasename"
       >
         <template #suffix>
           <span class="text-base opacity-60">
@@ -48,14 +91,30 @@
 
 <script setup lang="ts">
 import ResponseInput from 'components/ResponseInput.vue'
+import ResponseScroll from 'components/ResponseScroll.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
-import { useModelBaseInfo } from 'hooks/model'
-import { computed } from 'vue'
+import { useDialog } from 'hooks/dialog'
+import { useModelBaseInfo, useModelFolder } from 'hooks/model'
+import { useToast } from 'hooks/toast'
+import Button from 'primevue/button'
+import { usePrimeVue } from 'primevue/config'
+import Dialog from 'primevue/dialog'
+import Tree from 'primevue/tree'
+import { computed, ref } from 'vue'
 
 const editable = defineModel<boolean>('editable')
 
-const { baseInfo, pathIndex, basename, extension, type, modelFolders } =
-  useModelBaseInfo()
+const { toast } = useToast()
+
+const {
+  baseInfo,
+  pathIndex,
+  subFolder,
+  basename,
+  extension,
+  type,
+  modelFolders,
+} = useModelBaseInfo()
 
 const typeOptions = computed(() => {
   return Object.keys(modelFolders.value).map((curr) => {
@@ -70,18 +129,6 @@ const typeOptions = computed(() => {
   })
 })
 
-const pathOptions = computed(() => {
-  return (modelFolders.value[type.value] ?? []).map((folder, index) => {
-    return {
-      value: index,
-      label: folder,
-      command: () => {
-        pathIndex.value = index
-      },
-    }
-  })
-})
-
 const information = computed(() => {
   return Object.values(baseInfo.value).filter((row) => {
     if (editable.value) {
@@ -91,4 +138,95 @@ const information = computed(() => {
     return true
   })
 })
+
+const validateBasename = (val: string | undefined) => {
+  if (!val) {
+    toast.add({
+      severity: 'error',
+      detail: 'basename is required',
+      life: 3000,
+    })
+    return false
+  }
+  const invalidChart = /[\\/:*?"<>|]/
+  if (invalidChart.test(val)) {
+    toast.add({
+      severity: 'error',
+      detail: 'basename is invalid, \\/:*?"<>|',
+      life: 3000,
+    })
+    return false
+  }
+  return true
+}
+
+const folderSelectVisible = ref(false)
+
+const { stack } = useDialog()
+const { config } = usePrimeVue()
+const zIndex = computed(() => {
+  const baseZIndex = config.zIndex?.modal ?? 1100
+  return baseZIndex + stack.value.length + 1
+})
+
+const handleSelectFolder = () => {
+  if (!type.value) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: 'Please select model type first',
+      life: 5000,
+    })
+    return
+  }
+  folderSelectVisible.value = true
+}
+
+const { pathOptions } = useModelFolder({ type })
+
+const selectedModelFolder = ref<string>()
+
+const modelFolder = computed({
+  get: () => {
+    const folderPath = baseInfo.value.pathIndex.display
+    const selectedKey = selectedModelFolder.value ?? folderPath
+    return { [selectedKey]: true }
+  },
+  set: (val) => {
+    const folderPath = Object.keys(val)[0]
+    selectedModelFolder.value = folderPath
+  },
+})
+
+const renderedModelFolder = computed(() => {
+  return baseInfo.value.pathIndex.display
+})
+
+const handleCancelSelectFolder = () => {
+  selectedModelFolder.value = undefined
+  folderSelectVisible.value = false
+}
+
+const handleConfirmSelectFolder = () => {
+  const folderPath = Object.keys(modelFolder.value)[0]
+
+  const folders = modelFolders.value[type.value]
+  pathIndex.value = folders.findIndex((item) => folderPath.includes(item))
+  if (pathIndex.value < 0) {
+    toast.add({
+      severity: 'error',
+      detail: 'Folder not found',
+      life: 3000,
+    })
+    return
+  }
+  const prefixPath = folders[pathIndex.value]
+  subFolder.value = folderPath.replace(prefixPath, '')
+  if (subFolder.value.startsWith('/')) {
+    subFolder.value = subFolder.value.replace('/', '')
+  }
+
+  selectedModelFolder.value = undefined
+  folderSelectVisible.value = false
+}
 </script>

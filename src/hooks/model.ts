@@ -5,6 +5,7 @@ import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import { castArray, cloneDeep } from 'lodash'
+import { TreeNode } from 'primevue/treenode'
 import { app } from 'scripts/comfyAPI'
 import { BaseModel, Model, SelectEvent, WithResolved } from 'types/typings'
 import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
@@ -14,11 +15,13 @@ import {
   computed,
   inject,
   type InjectionKey,
+  MaybeRefOrGetter,
   onMounted,
   provide,
   type Ref,
   ref,
   toRaw,
+  toValue,
   unref,
 } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -27,7 +30,7 @@ import { configSetting } from './config'
 type ModelFolder = Record<string, string[]>
 
 const modelFolderProvideKey = Symbol('modelFolder') as InjectionKey<
-  Ref<ModelFolder, ModelFolder>
+  Ref<ModelFolder>
 >
 
 export const genModelFullName = (model: BaseModel) => {
@@ -124,7 +127,7 @@ export const useModels = defineStore('models', (store) => {
       oldKey = genModelKey(model)
       updateData.set('type', data.type)
       updateData.set('pathIndex', data.pathIndex.toString())
-      updateData.set('subFolder', data.subFolder)
+      updateData.set('fullname', genModelFullName(data as BaseModel))
       needUpdate = true
     }
 
@@ -296,9 +299,9 @@ const baseInfoKey = Symbol('baseInfo') as InjectionKey<
 >
 
 export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
-  const { formData: model, modelData } = formInstance
+  const { formData: model } = formInstance
 
-  const provideModelFolders = inject<any>(modelFolderProvideKey)
+  const provideModelFolders = inject(modelFolderProvideKey)
   const modelFolders = computed<ModelFolder>(() => {
     return provideModelFolders?.value ?? {}
   })
@@ -318,6 +321,15 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
     },
     set: (val) => {
       model.value.pathIndex = val
+    },
+  })
+
+  const subFolder = computed({
+    get: () => {
+      return model.value.subFolder
+    },
+    set: (val) => {
+      model.value.subFolder = val
     },
   })
 
@@ -350,17 +362,18 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
       {
         key: 'type',
         formatter: () =>
-          modelData.value.type in modelFolders.value
-            ? modelData.value.type
-            : undefined,
+          model.value.type in modelFolders.value ? model.value.type : undefined,
       },
       {
         key: 'pathIndex',
         formatter: () => {
-          const modelType = modelData.value.type
-          const pathIndex = modelData.value.pathIndex
+          const modelType = model.value.type
+          const pathIndex = model.value.pathIndex
+          if (!modelType) {
+            return undefined
+          }
           const folders = modelFolders.value[modelType] ?? []
-          return [`${folders[pathIndex]}`, modelData.value.subFolder]
+          return [`${folders[pathIndex]}`, model.value.subFolder]
             .filter(Boolean)
             .join('/')
         },
@@ -402,6 +415,7 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
     baseInfo,
     basename,
     extension,
+    subFolder,
     pathIndex,
     modelFolders,
   }
@@ -415,7 +429,73 @@ export const useModelBaseInfo = () => {
   return inject(baseInfoKey)!
 }
 
-export const useModelFolder = () => {}
+export const useModelFolder = (
+  option: {
+    type?: MaybeRefOrGetter<string>
+  } = {},
+) => {
+  const { data: models, folders: modelFolders } = useModels()
+
+  const pathOptions = computed(() => {
+    const type = toValue(option.type)
+
+    if (!type) {
+      return []
+    }
+
+    const folderItems = cloneDeep(models.value[type]) ?? []
+    const pureFolders = folderItems.filter((item) => item.type === 'folder')
+    pureFolders.sort((a, b) => a.basename.localeCompare(b.basename))
+
+    const folders = modelFolders.value[type] ?? []
+
+    const root: TreeNode[] = []
+
+    for (const [index, folder] of folders.entries()) {
+      const pathIndexItem: TreeNode = {
+        key: folder,
+        label: folder,
+        children: [],
+      }
+
+      const items = pureFolders
+        .filter((item) => item.pathIndex === index)
+        .map((item) => {
+          const node: TreeNode = {
+            key: `${folder}/${genModelFullName(item)}`,
+            label: item.basename,
+            data: item,
+          }
+          return node
+        })
+      const itemMap = Object.fromEntries(items.map((item) => [item.key, item]))
+
+      for (const item of items) {
+        const key = item.key
+        const parentKey = key.split('/').slice(0, -1).join('/')
+
+        if (parentKey === folder) {
+          pathIndexItem.children!.push(item)
+          continue
+        }
+
+        const parentItem = itemMap[parentKey]
+        if (parentItem) {
+          parentItem.children ??= []
+          parentItem.children.push(item)
+        }
+      }
+
+      root.push(pathIndexItem)
+    }
+
+    return root
+  })
+
+  return {
+    pathOptions,
+  }
+}
 
 /**
  * Editable preview image.

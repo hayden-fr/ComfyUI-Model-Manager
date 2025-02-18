@@ -17,6 +17,7 @@ export interface BaseModel {
 export interface Model extends BaseModel {
   createdAt: number
   updatedAt: number
+  children?: Model[]
 }
 
 export interface VersionModel extends BaseModel {
