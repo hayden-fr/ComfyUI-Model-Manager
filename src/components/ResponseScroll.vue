@@ -1,5 +1,5 @@
 <template>
-  <div class="group/scroll relative overflow-hidden">
+  <div class="group/scroll relative h-full overflow-hidden">
     <div ref="viewport" class="h-full w-full overflow-auto scrollbar-none">
       <div ref="content">
         <slot name="default">
@@ -40,13 +40,13 @@
   </div>
 </template>
 
-<script setup lang="ts" generic="T">
+<script setup lang="ts" generic="T extends { key: string }">
 import { useDraggable, useElementSize, useScroll } from '@vueuse/core'
 import { clamp } from 'lodash'
 import { computed, ref } from 'vue'
 
 interface ScrollAreaProps {
-  items?: (T & { key: string })[]
+  items?: T[]
   itemSize?: number
 }
 

@@ -9,6 +9,9 @@ export default {
   plugins: [
     plugin(({ addUtilities }) => {
       addUtilities({
+        '.text-shadow': {
+          'text-shadow': '2px 2px 4px rgba(0, 0, 0, 0.5)',
+        },
         '.scrollbar-none': {
           'scrollbar-width': 'none',
         },

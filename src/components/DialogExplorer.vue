@@ -1,0 +1,258 @@
+<template>
+  <div class="flex h-full w-full select-none flex-col overflow-hidden">
+    <div class="flex w-full gap-4 overflow-hidden px-4 pb-4">
+      <div :class="['flex gap-4 overflow-hidden', showToolbar || 'flex-1']">
+        <div class="flex overflow-hidden">
+          <Button
+            icon="pi pi-arrow-up"
+            text
+            rounded
+            severity="secondary"
+            :disabled="folderPaths.length < 2"
+            @click="handleGoBackParentFolder"
+          ></Button>
+        </div>
+
+        <ResponseBreadcrumb
+          v-show="!showToolbar"
+          class="h-10 flex-1"
+          :items="folderPaths"
+          @item-click="(item, index) => openFolder(index, item.name, item.icon)"
+        ></ResponseBreadcrumb>
+      </div>
+
+      <div :class="['flex gap-4', showToolbar && 'flex-1']">
+        <ResponseInput
+          v-model="searchContent"
+          :placeholder="$t('searchModels')"
+        ></ResponseInput>
+
+        <div
+          v-show="showToolbar"
+          class="flex flex-1 items-center justify-end gap-2"
+        >
+          <ResponseSelect
+            v-model="sortOrder"
+            :items="sortOrderOptions"
+          ></ResponseSelect>
+          <ResponseSelect
+            v-model="cardSizeFlag"
+            :items="cardSizeOptions"
+          ></ResponseSelect>
+        </div>
+
+        <Button
+          :icon="`mdi mdi-menu-${showToolbar ? 'close' : 'open'}`"
+          text
+          severity="secondary"
+          @click="toggleToolbar"
+        ></Button>
+      </div>
+    </div>
+
+    <div ref="contentContainer" class="relative flex-1 overflow-hidden px-2">
+      <ResponseScroll :items="renderedList" :item-size="itemSize">
+        <template #item="{ item }">
+          <div
+            class="grid h-full justify-center"
+            :style="{
+              gridTemplateColumns: `repeat(auto-fit, ${cardSize.width}px)`,
+              columnGap: `${gutter.x}px`,
+              rowGap: `${gutter.y}px`,
+            }"
+          >
+            <ModelCard
+              :model="rowItem"
+              v-for="rowItem in item.row"
+              :key="genModelKey(rowItem)"
+              :style="{
+                width: `${cardSize.width}px`,
+                height: `${cardSize.height}px`,
+              }"
+              @dblclick="openItem(rowItem)"
+            ></ModelCard>
+            <div class="col-span-full"></div>
+          </div>
+        </template>
+      </ResponseScroll>
+    </div>
+
+    <!-- bottom status bar -->
+    <div class="flex justify-between px-4 py-2 text-sm">
+      <div></div>
+      <div></div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { useElementSize } from '@vueuse/core'
+import ModelCard from 'components/ModelCard.vue'
+import ResponseBreadcrumb from 'components/ResponseBreadcrumb.vue'
+import ResponseInput from 'components/ResponseInput.vue'
+import ResponseScroll from 'components/ResponseScroll.vue'
+import ResponseSelect from 'components/ResponseSelect.vue'
+import { useConfig } from 'hooks/config'
+import { type ModelTreeNode, useModelExplorer } from 'hooks/explorer'
+import { chunk } from 'lodash'
+import Button from 'primevue/button'
+import { genModelKey } from 'utils/model'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
+const gutter = {
+  x: 4,
+  y: 32,
+}
+
+const { dataTreeList, folderPaths, findFolder, openFolder, openModelDetail } =
+  useModelExplorer()
+const { cardSize, cardSizeMap, cardSizeFlag, dialog: settings } = useConfig()
+
+const showToolbar = ref(false)
+const toggleToolbar = () => {
+  showToolbar.value = !showToolbar.value
+}
+
+const contentContainer = ref<HTMLElement | null>(null)
+const contentSize = useElementSize(contentContainer)
+
+const itemSize = computed(() => {
+  return cardSize.value.height + gutter.y
+})
+
+const cols = computed(() => {
+  const containerWidth = contentSize.width.value + gutter.x
+  const itemWidth = cardSize.value.width + gutter.x
+
+  return Math.floor(containerWidth / itemWidth)
+})
+
+const searchContent = ref<string>()
+
+const sortOrder = ref('name')
+const sortOrderOptions = ref(
+  ['name', 'size', 'created', 'modified'].map((key) => {
+    return {
+      label: t(`sort.${key}`),
+      value: key,
+      icon: key === 'name' ? 'pi pi-sort-alpha-down' : 'pi pi-sort-amount-down',
+      command: () => {
+        sortOrder.value = key
+      },
+    }
+  }),
+)
+
+const currentDataList = computed(() => {
+  let renderedList = dataTreeList.value
+  for (const folderItem of folderPaths.value) {
+    const found = findFolder(renderedList, folderItem.name)
+    renderedList = found?.children || []
+  }
+
+  if (searchContent.value) {
+    const filterItems: ModelTreeNode[] = []
+
+    const searchList = [...renderedList]
+
+    while (searchList.length) {
+      const item = searchList.pop()!
+      const children = (item as any).children ?? []
+      searchList.push(...children)
+
+      if (
+        item.basename
+          .toLocaleLowerCase()
+          .includes(searchContent.value.toLocaleLowerCase())
+      ) {
+        filterItems.push(item)
+      }
+    }
+
+    renderedList = filterItems
+  }
+
+  if (folderPaths.value.length > 1) {
+    const folderItems: ModelTreeNode[] = []
+    const modelItems: ModelTreeNode[] = []
+
+    for (const item of renderedList) {
+      if (item.type === 'folder') {
+        folderItems.push(item)
+      } else {
+        modelItems.push(item)
+      }
+    }
+
+    folderItems.sort((a, b) => {
+      return a.basename.localeCompare(b.basename)
+    })
+    modelItems.sort((a, b) => {
+      const sortFieldMap = {
+        name: 'basename',
+        size: 'sizeBytes',
+        created: 'createdAt',
+        modified: 'updatedAt',
+      }
+      const sortField = sortFieldMap[sortOrder.value]
+
+      const aValue = a[sortField]
+      const bValue = b[sortField]
+
+      const result =
+        typeof aValue === 'string'
+          ? aValue.localeCompare(bValue)
+          : aValue - bValue
+
+      return result
+    })
+    renderedList = [...folderItems, ...modelItems]
+  }
+
+  return renderedList
+})
+
+const renderedList = computed(() => {
+  return chunk(currentDataList.value, cols.value).map((row) => {
+    return { key: row.map((o) => o.basename).join('#'), row }
+  })
+})
+
+const cardSizeOptions = computed(() => {
+  const customSize = 'size.custom'
+
+  const customOptionMap = {
+    ...cardSizeMap.value,
+    [customSize]: 'custom',
+  }
+
+  return Object.keys(customOptionMap).map((key) => {
+    return {
+      label: t(key),
+      value: key,
+      command: () => {
+        if (key === customSize) {
+          settings.showCardSizeSetting()
+        } else {
+          cardSizeFlag.value = key
+        }
+      },
+    }
+  })
+})
+
+const openItem = (item: ModelTreeNode) => {
+  if (item.type === 'folder') {
+    openFolder(folderPaths.value.length, item.basename)
+  } else {
+    openModelDetail(item)
+  }
+}
+
+const handleGoBackParentFolder = () => {
+  folderPaths.value.pop()
+}
+</script>

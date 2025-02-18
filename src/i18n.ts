@@ -46,7 +46,7 @@ const messages = {
     info: {
       type: 'Model Type',
       pathIndex: 'Directory',
-      fullname: 'File Name',
+      basename: 'File Name',
       sizeBytes: 'File Size',
       createdAt: 'Created At',
       updatedAt: 'Updated At',
@@ -62,6 +62,7 @@ const messages = {
       excludeScanTypes: 'Exclude scan types (separate with commas)',
       ui: 'UI',
       cardSize: 'Card Size',
+      useFlatUI: 'Flat Layout',
     },
   },
   zh: {
@@ -108,7 +109,7 @@ const messages = {
     info: {
       type: '类型',
       pathIndex: '目录',
-      fullname: '文件名',
+      basename: '文件名',
       sizeBytes: '文件大小',
       createdAt: '创建时间',
       updatedAt: '更新时间',
@@ -124,6 +125,7 @@ const messages = {
       excludeScanTypes: '排除扫描类型(使用英文逗号隔开)',
       ui: '外观',
       cardSize: '卡片尺寸',
+      useFlatUI: '展平布局',
     },
   },
 }

@@ -49,7 +49,56 @@
             v-for="model in item.row"
             :key="genModelKey(model)"
             :model="model"
-          ></ModelCard>
+            :style="{
+              width: `${cardSize.width}px`,
+              height: `${cardSize.height}px`,
+            }"
+            class="group/card cursor-pointer !p-0"
+            @click="openModelDetail(model)"
+            v-tooltip.top="{ value: model.basename, disabled: showModelName }"
+          >
+            <template #name>
+              <div
+                v-show="showModelName"
+                class="absolute top-0 h-full w-full p-2"
+              >
+                <div class="flex h-full flex-col justify-end text-lg">
+                  <div class="line-clamp-3 break-all font-bold text-shadow">
+                    {{ model.basename }}
+                  </div>
+                </div>
+              </div>
+            </template>
+
+            <template #extra>
+              <div
+                v-show="showModeAction"
+                class="pointer-events-none absolute right-2 top-2 opacity-0 duration-300 group-hover/card:opacity-100"
+              >
+                <div class="flex flex-col gap-2">
+                  <Button
+                    icon="pi pi-plus"
+                    severity="secondary"
+                    rounded
+                    @click.stop="addModelNode(model)"
+                  ></Button>
+                  <Button
+                    icon="pi pi-copy"
+                    severity="secondary"
+                    rounded
+                    @click.stop="copyModelNode(model)"
+                  ></Button>
+                  <Button
+                    v-show="model.preview"
+                    icon="pi pi-file-import"
+                    severity="secondary"
+                    rounded
+                    @click.stop="loadPreviewWorkflow(model)"
+                  ></Button>
+                </div>
+              </div>
+            </template>
+          </ModelCard>
           <div class="col-span-full"></div>
         </div>
       </template>
@@ -72,8 +121,9 @@ import ResponseScroll from 'components/ResponseScroll.vue'
 import ResponseSelect from 'components/ResponseSelect.vue'
 import { configSetting, useConfig } from 'hooks/config'
 import { useContainerQueries } from 'hooks/container'
-import { useModels } from 'hooks/model'
+import { useModelNodeAction, useModels } from 'hooks/model'
 import { chunk } from 'lodash'
+import Button from 'primevue/button'
 import { app } from 'scripts/comfyAPI'
 import { Model } from 'types/typings'
 import { genModelKey } from 'utils/model'
@@ -89,7 +139,7 @@ const {
   dialog: settings,
 } = useConfig()
 
-const { data, folders } = useModels()
+const { data, folders, openModelDetail } = useModels()
 const { t } = useI18n()
 
 const toolbarContainer = ref<HTMLElement | null>(null)
@@ -165,12 +215,15 @@ const cols = computed(() => {
 
 const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
+  const pureModels = mergedList.filter((item) => {
+    return item.type !== 'folder'
+  })
 
-  const filterList = mergedList.filter((model) => {
+  const filterList = pureModels.filter((model) => {
     const showAllModel = currentType.value === allType
 
     const matchType = showAllModel || model.type === currentType.value
-    const matchName = model.fullname
+    const matchName = model.basename
       .toLowerCase()
       .includes(searchContent.value?.toLowerCase() || '')
 
@@ -180,7 +233,7 @@ const list = computed(() => {
   let sortStrategy: (a: Model, b: Model) => number = () => 0
   switch (sortOrder.value) {
     case 'name':
-      sortStrategy = (a, b) => a.fullname.localeCompare(b.fullname)
+      sortStrategy = (a, b) => a.basename.localeCompare(b.basename)
       break
     case 'size':
       sortStrategy = (a, b) => b.sizeBytes - a.sizeBytes
@@ -231,4 +284,15 @@ const cardSizeOptions = computed(() => {
     }
   })
 })
+
+const showModelName = computed(() => {
+  return cardSize.value.width > 120 && cardSize.value.height > 160
+})
+
+const showModeAction = computed(() => {
+  return cardSize.value.width > 120 && cardSize.value.height > 160
+})
+
+const { addModelNode, copyModelNode, loadPreviewWorkflow } =
+  useModelNodeAction()
 </script>

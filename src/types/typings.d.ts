@@ -3,11 +3,11 @@ export type ContainerPosition = { left: number; top: number }
 
 export interface BaseModel {
   id: number | string
-  fullname: string
   basename: string
   extension: string
   sizeBytes: number
   type: string
+  subFolder: string
   pathIndex: number
   preview: string | string[]
   description: string
@@ -17,6 +17,7 @@ export interface BaseModel {
 export interface Model extends BaseModel {
   createdAt: number
   updatedAt: number
+  children?: Model[]
 }
 
 export interface VersionModel extends BaseModel {

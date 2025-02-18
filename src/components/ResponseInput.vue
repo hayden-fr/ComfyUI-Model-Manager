@@ -14,7 +14,7 @@
 
     <input
       ref="inputRef"
-      v-model="innerValue"
+      v-model="inputValue"
       class="flex-1 border-none bg-transparent text-base outline-none"
       type="text"
       :placeholder="placeholder"
@@ -47,14 +47,23 @@ interface Props {
   placeholder?: string
   allowClear?: boolean
   updateTrigger?: string
+  validate?: (value: string | undefined) => boolean
 }
 
 const props = defineProps<Props>()
-const [content, modifiers] = defineModel<string, 'trim'>()
+const [content, modifiers] = defineModel<string, 'trim' | 'valid'>()
 
 const inputRef = ref()
 
-const innerValue = ref(content)
+const innerValue = ref<string>()
+const inputValue = computed({
+  get: () => {
+    return innerValue.value ?? content.value
+  },
+  set: (val) => {
+    innerValue.value = val
+  },
+})
 const trigger = computed(() => props.updateTrigger ?? 'change')
 const updateContent = () => {
   let value = innerValue.value
@@ -63,6 +72,16 @@ const updateContent = () => {
     value = innerValue.value?.trim()
   }
 
+  if (modifiers.valid) {
+    const isValid = props.validate?.(value) ?? true
+    console.log({ isValid, value })
+    if (!isValid) {
+      innerValue.value = content.value
+      return
+    }
+  }
+
+  innerValue.value = undefined
   content.value = value
   inputRef.value.value = value
 }

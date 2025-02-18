@@ -2,7 +2,14 @@
   <slot
     v-if="type === 'drop'"
     name="target"
-    v-bind="{ toggle, prefixIcon, suffixIcon, currentLabel, current }"
+    v-bind="{
+      toggle,
+      prefixIcon,
+      suffixIcon,
+      currentLabel,
+      current,
+      overlayVisible,
+    }"
   >
     <div :class="['-my-1 py-1', $attrs.class]" @click="toggle">
       <Button
@@ -196,6 +203,10 @@ const toggle = (event: MouseEvent) => {
     menu.value.toggle(event)
   }
 }
+
+const overlayVisible = computed(() => {
+  return isMobile.value ? visible.value : (menu.value?.overlayVisible ?? false)
+})
 
 // Select Button Type
 const scrollArea = ref<HTMLElement | null>(null)
