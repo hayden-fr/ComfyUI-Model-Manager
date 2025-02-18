@@ -15,7 +15,7 @@ import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 export const useDownload = defineStore('download', (store) => {
-  const { toast, confirm } = useToast()
+  const { toast, confirm, wrapperToastError } = useToast()
   const { t } = useI18n()
 
   const taskList = ref<DownloadTask[]>([])
@@ -29,20 +29,24 @@ export const useDownload = defineStore('download', (store) => {
       downloadProgress: `${bytesToSize(downloadedSize)} / ${bytesToSize(totalSize)}`,
       downloadSpeed: `${bytesToSize(bps)}/s`,
       pauseTask() {
-        request(`/download/${item.taskId}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            status: 'pause',
+        wrapperToastError(async () =>
+          request(`/download/${item.taskId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              status: 'pause',
+            }),
           }),
-        })
+        )()
       },
       resumeTask: () => {
-        request(`/download/${item.taskId}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-            status: 'resume',
+        wrapperToastError(async () =>
+          request(`/download/${item.taskId}`, {
+            method: 'PUT',
+            body: JSON.stringify({
+              status: 'resume',
+            }),
           }),
-        })
+        )()
       },
       deleteTask: () => {
         confirm.require({
@@ -59,9 +63,11 @@ export const useDownload = defineStore('download', (store) => {
             severity: 'danger',
           },
           accept: () => {
-            request(`/download/${item.taskId}`, {
-              method: 'DELETE',
-            })
+            wrapperToastError(async () =>
+              request(`/download/${item.taskId}`, {
+                method: 'DELETE',
+              }),
+            )()
           },
           reject: () => {},
         })
@@ -71,21 +77,12 @@ export const useDownload = defineStore('download', (store) => {
     return task
   }
 
-  const refresh = async () => {
-    return request('/download/task')
-      .then((resData: DownloadTaskOptions[]) => {
-        taskList.value = resData.map((item) => createTaskItem(item))
-        return taskList.value
-      })
-      .catch((err) => {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: err.message ?? 'Failed to refresh download task list',
-          life: 15000,
-        })
-      })
-  }
+  const refresh = wrapperToastError(async () => {
+    return request('/download/task').then((resData: DownloadTaskOptions[]) => {
+      taskList.value = resData.map((item) => createTaskItem(item))
+      return taskList.value
+    })
+  })
 
   onBeforeMount(() => {
     api.addEventListener('reconnected', () => {
