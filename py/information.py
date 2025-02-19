@@ -64,9 +64,9 @@ class CivitaiModelSearcher(ModelSearcher):
             shortname = version.get("name", None) if len(model_files) > 0 else None
 
             for file in model_files:
-                fullname = file.get("name", None)
-                extension = os.path.splitext(fullname)[1]
-                basename = os.path.splitext(fullname)[0]
+                name = file.get("name", None)
+                extension = os.path.splitext(name)[1]
+                basename = os.path.splitext(name)[0]
 
                 metadata_info = {
                     "website": "Civitai",
@@ -99,13 +99,13 @@ class CivitaiModelSearcher(ModelSearcher):
                 model = {
                     "id": file.get("id"),
                     "shortname": shortname or basename,
-                    "fullname": fullname,
                     "basename": basename,
                     "extension": extension,
                     "preview": metadata_info.get("preview"),
                     "sizeBytes": file.get("sizeKB", 0) * 1024,
-                    "type": self._resolve_model_type(res_data.get("type", "unknown")),
+                    "type": self._resolve_model_type(res_data.get("type", "")),
                     "pathIndex": 0,
+                    "subFolder": "",
                     "description": "\n".join(description_parts),
                     "metadata": file.get("metadata"),
                     "downloadPlatform": "civitai",
@@ -146,7 +146,7 @@ class CivitaiModelSearcher(ModelSearcher):
             "Controlnet": "controlnet",
             "Upscaler": "upscale_models",
             "VAE": "vae",
-            "unknown": "unknown",
+            "unknown": "",
         }
         return map_legacy.get(model_type, f"{model_type.lower()}s")
 
@@ -216,13 +216,13 @@ class HuggingfaceModelSearcher(ModelSearcher):
             model = {
                 "id": filename,
                 "shortname": filename,
-                "fullname": fullname,
                 "basename": basename,
                 "extension": extension,
                 "preview": image_files,
                 "sizeBytes": 0,
-                "type": "unknown",
+                "type": "",
                 "pathIndex": 0,
+                "subFolder": "",
                 "description": "\n".join(description_parts),
                 "metadata": {},
                 "downloadPlatform": "huggingface",
