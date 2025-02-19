@@ -1,5 +1,8 @@
 <template>
-  <div class="flex h-full w-full select-none flex-col overflow-hidden">
+  <div
+    class="flex h-full w-full select-none flex-col overflow-hidden"
+    @contextmenu.prevent="nonContextMenu"
+  >
     <div class="flex w-full gap-4 overflow-hidden px-4 pb-4">
       <div :class="['flex gap-4 overflow-hidden', showToolbar || 'flex-1']">
         <div class="flex overflow-hidden">
@@ -50,7 +53,11 @@
       </div>
     </div>
 
-    <div ref="contentContainer" class="relative flex-1 overflow-hidden px-2">
+    <div
+      ref="contentContainer"
+      class="relative flex-1 overflow-hidden px-2"
+      @contextmenu.stop.prevent=""
+    >
       <ResponseScroll :items="renderedList" :item-size="itemSize">
         <template #item="{ item }">
           <div
@@ -69,7 +76,8 @@
                 width: `${cardSize.width}px`,
                 height: `${cardSize.height}px`,
               }"
-              @dblclick="openItem(rowItem)"
+              @dblclick="openItem(rowItem, $event)"
+              @contextmenu.stop.prevent="openItemContext(rowItem, $event)"
             ></ModelCard>
             <div class="col-span-full"></div>
           </div>
@@ -77,11 +85,30 @@
       </ResponseScroll>
     </div>
 
-    <!-- bottom status bar -->
     <div class="flex justify-between px-4 py-2 text-sm">
       <div></div>
       <div></div>
     </div>
+
+    <ContextMenu ref="menu" :model="contextItems"></ContextMenu>
+
+    <ConfirmDialog group="confirm-name">
+      <template #container="{ acceptCallback: accept, rejectCallback: reject }">
+        <div class="flex w-90 flex-col items-end rounded px-4 pb-4 pt-8">
+          <InputText
+            class="w-full"
+            type="text"
+            v-model="confirmName"
+            v-focus
+            @keyup.enter="accept"
+          ></InputText>
+          <div class="mt-6 flex items-center gap-2">
+            <Button :label="$t('cancel')" @click="reject" outlined></Button>
+            <Button :label="$t('confirm')" @click="accept"></Button>
+          </div>
+        </div>
+      </template>
+    </ConfirmDialog>
   </div>
 </template>
 
@@ -96,6 +123,10 @@ import { useConfig } from 'hooks/config'
 import { type ModelTreeNode, useModelExplorer } from 'hooks/explorer'
 import { chunk } from 'lodash'
 import Button from 'primevue/button'
+import ConfirmDialog from 'primevue/confirmdialog'
+import ContextMenu from 'primevue/contextmenu'
+import InputText from 'primevue/inputtext'
+import { MenuItem } from 'primevue/menuitem'
 import { genModelKey } from 'utils/model'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -244,12 +275,43 @@ const cardSizeOptions = computed(() => {
   })
 })
 
-const openItem = (item: ModelTreeNode) => {
+const menu = ref()
+const contextItems = ref<MenuItem[]>([])
+const confirmName = ref('')
+
+const openItem = (item: ModelTreeNode, e: Event) => {
+  menu.value.hide(e)
   if (item.type === 'folder') {
     openFolder(folderPaths.value.length, item.basename)
   } else {
     openModelDetail(item)
   }
+}
+
+const openItemContext = (item: ModelTreeNode, e: Event) => {
+  if (folderPaths.value.length < 2) {
+    return
+  }
+
+  contextItems.value = [
+    {
+      label: t('open'),
+      icon: 'pi pi-folder-open',
+      command: () => {
+        openItem(item, e)
+      },
+    },
+  ]
+
+  menu.value?.show(e)
+}
+
+const nonContextMenu = (e: Event) => {
+  menu.value.hide(e)
+}
+
+const vFocus = {
+  mounted: (el: HTMLInputElement) => el.focus(),
 }
 
 const handleGoBackParentFolder = () => {
