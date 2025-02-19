@@ -66,6 +66,7 @@ import { useConfig } from 'hooks/config'
 import { useDialog } from 'hooks/dialog'
 import { useModelSearch } from 'hooks/download'
 import { useLoading } from 'hooks/loading'
+import { genModelFullName } from 'hooks/model'
 import { request } from 'hooks/request'
 import { useToast } from 'hooks/toast'
 import Button from 'primevue/button'
@@ -127,6 +128,9 @@ const createDownTask = async (data: WithResolved<VersionModel>) => {
       formData.append(key, value)
     }
   }
+
+  const fullname = genModelFullName(data as VersionModel)
+  formData.append('fullname', fullname)
 
   await request('/model', {
     method: 'POST',
