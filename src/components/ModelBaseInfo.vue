@@ -15,7 +15,11 @@
             </span>
           </div>
         </div>
-        <Button icon="pi pi-folder" @click="handleSelectFolder"></Button>
+        <Button
+          icon="pi pi-folder"
+          :disabled="!type"
+          @click="handleSelectFolder"
+        ></Button>
 
         <Dialog
           v-model:visible="folderSelectVisible"
@@ -100,7 +104,7 @@ import Button from 'primevue/button'
 import { usePrimeVue } from 'primevue/config'
 import Dialog from 'primevue/dialog'
 import Tree from 'primevue/tree'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const editable = defineModel<boolean>('editable')
 
@@ -115,6 +119,10 @@ const {
   type,
   modelFolders,
 } = useModelBaseInfo()
+
+watch(type, () => {
+  subFolder.value = ''
+})
 
 const typeOptions = computed(() => {
   return Object.keys(modelFolders.value).map((curr) => {
@@ -199,7 +207,7 @@ const modelFolder = computed({
 })
 
 const renderedModelFolder = computed(() => {
-  return baseInfo.value.pathIndex.display
+  return baseInfo.value.pathIndex?.display
 })
 
 const handleCancelSelectFolder = () => {

@@ -299,7 +299,7 @@ const baseInfoKey = Symbol('baseInfo') as InjectionKey<
 >
 
 export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
-  const { formData: model } = formInstance
+  const { formData: model, modelData } = formInstance
 
   const provideModelFolders = inject(modelFolderProvideKey)
   const modelFolders = computed<ModelFolder>(() => {
@@ -362,7 +362,9 @@ export const useModelBaseInfoEditor = (formInstance: ModelFormInstance) => {
       {
         key: 'type',
         formatter: () =>
-          model.value.type in modelFolders.value ? model.value.type : undefined,
+          modelData.value.type in modelFolders.value
+            ? modelData.value.type
+            : undefined,
       },
       {
         key: 'pathIndex',
@@ -542,7 +544,8 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
    * No preview
    */
   const noPreviewContent = computed(() => {
-    return `/model-manager/preview/${model.value.type}/0/no-preview.png`
+    const folder = model.value.type || 'unknown'
+    return `/model-manager/preview/${folder}/0/no-preview.png`
   })
 
   const preview = computed(() => {
