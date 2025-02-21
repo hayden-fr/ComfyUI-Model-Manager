@@ -184,7 +184,8 @@ const currentDataList = computed(() => {
     renderedList = found?.children || []
   }
 
-  if (searchContent.value) {
+  const filter = searchContent.value?.toLowerCase().trim() ?? ''
+  if (filter) {
     const filterItems: ModelTreeNode[] = []
 
     const searchList = [...renderedList]
@@ -194,11 +195,10 @@ const currentDataList = computed(() => {
       const children = (item as any).children ?? []
       searchList.push(...children)
 
-      if (
-        item.basename
-          .toLocaleLowerCase()
-          .includes(searchContent.value.toLocaleLowerCase())
-      ) {
+      const matchSubFolder = `${item.subFolder}/`.toLowerCase().includes(filter)
+      const matchName = item.basename.toLowerCase().includes(filter)
+
+      if (matchSubFolder || matchName) {
         filterItems.push(item)
       }
     }

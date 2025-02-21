@@ -223,11 +223,12 @@ const list = computed(() => {
     const showAllModel = currentType.value === allType
 
     const matchType = showAllModel || model.type === currentType.value
-    const matchName = model.basename
-      .toLowerCase()
-      .includes(searchContent.value?.toLowerCase() || '')
 
-    return matchType && matchName
+    const filter = searchContent.value?.toLowerCase() ?? ''
+    const matchSubFolder = model.subFolder.toLowerCase().includes(filter)
+    const matchName = model.basename.toLowerCase().includes(filter)
+
+    return matchType && (matchSubFolder || matchName)
   })
 
   let sortStrategy: (a: Model, b: Model) => number = () => 0
