@@ -68,12 +68,20 @@
             }"
           >
             <ModelCard
-              :model="rowItem"
               v-for="rowItem in item.row"
+              :model="rowItem"
               :key="genModelKey(rowItem)"
               :style="{
                 width: `${cardSize.width}px`,
                 height: `${cardSize.height}px`,
+              }"
+              v-tooltip.top="{
+                value: getFullPath(rowItem),
+                disabled: folderPaths.length < 2,
+                autoHide: false,
+                showDelay: 800,
+                hideDelay: 300,
+                pt: { root: { style: { zIndex: 2100, maxWidth: '32rem' } } },
               }"
               @dblclick="openItem(rowItem, $event)"
               @contextmenu.stop.prevent="openItemContext(rowItem, $event)"
@@ -137,8 +145,14 @@ const gutter = {
   y: 32,
 }
 
-const { dataTreeList, folderPaths, findFolder, openFolder, openModelDetail } =
-  useModelExplorer()
+const {
+  dataTreeList,
+  folderPaths,
+  findFolder,
+  openFolder,
+  openModelDetail,
+  getFullPath,
+} = useModelExplorer()
 const { cardSize, cardSizeMap, cardSizeFlag, dialog: settings } = useConfig()
 
 const showToolbar = ref(false)

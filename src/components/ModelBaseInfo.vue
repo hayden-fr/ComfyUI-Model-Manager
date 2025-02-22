@@ -84,7 +84,17 @@
           <td class="border-r bg-gray-300 px-4 dark:bg-gray-800">
             {{ $t(`info.${item.key}`) }}
           </td>
-          <td class="overflow-hidden text-ellipsis break-all px-4">
+          <td
+            class="overflow-hidden text-ellipsis break-all px-4"
+            v-tooltip.top="{
+              value: item.display,
+              disabled: !['pathIndex', 'basename'].includes(item.key),
+              autoHide: false,
+              showDelay: 800,
+              hideDelay: 300,
+              pt: { root: { style: { zIndex: 2100, maxWidth: '32rem' } } },
+            }"
+          >
             {{ item.display }}
           </td>
         </tr>
