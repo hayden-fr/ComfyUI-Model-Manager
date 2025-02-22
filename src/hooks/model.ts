@@ -50,10 +50,12 @@ export const useModels = defineStore('models', (store) => {
   const loading = useLoading()
 
   const folders = ref<ModelFolder>({})
+  const initialized = ref(false)
 
   const refreshFolders = async () => {
     return request('/models').then((resData) => {
       folders.value = resData
+      initialized.value = true
     })
   }
 
@@ -233,6 +235,7 @@ export const useModels = defineStore('models', (store) => {
   }
 
   return {
+    initialized: initialized,
     folders: folders,
     data: models,
     refresh: refreshAllModels,

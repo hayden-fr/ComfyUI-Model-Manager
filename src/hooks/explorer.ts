@@ -1,7 +1,7 @@
 import { genModelFullName, useModels } from 'hooks/model'
 import { cloneDeep, filter, find } from 'lodash'
 import { BaseModel, Model, SelectOptions } from 'types/typings'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export interface FolderPathItem {
   name: string
@@ -26,7 +26,7 @@ export type TreeItemNode = ModelTreeNode & {
 }
 
 export const useModelExplorer = () => {
-  const { data, folders, ...modelRest } = useModels()
+  const { data, folders, initialized, ...modelRest } = useModels()
 
   const folderPaths = ref<FolderPathItem[]>([])
 
@@ -143,6 +143,12 @@ export const useModelExplorer = () => {
 
     folderPaths.value = folderItems
   }
+
+  watch(initialized, (val) => {
+    if (val) {
+      openFolder(dataTreeList.value[0])
+    }
+  })
 
   return {
     folders,
