@@ -446,7 +446,7 @@ export const useModelFolder = (
     }
 
     const folderItems = cloneDeep(models.value[type]) ?? []
-    const pureFolders = folderItems.filter((item) => item.type === 'folder')
+    const pureFolders = folderItems.filter((item) => item.isFolder)
     pureFolders.sort((a, b) => a.basename.localeCompare(b.basename))
 
     const folders = modelFolders.value[type] ?? []
