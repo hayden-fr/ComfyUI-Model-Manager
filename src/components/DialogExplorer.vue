@@ -20,7 +20,6 @@
           v-show="!showToolbar"
           class="h-10 flex-1"
           :items="folderPaths"
-          @item-click="(item, index) => openFolder(index, item.name, item.icon)"
         ></ResponseBreadcrumb>
       </div>
 
@@ -211,7 +210,7 @@ const currentDataList = computed(() => {
     const modelItems: ModelTreeNode[] = []
 
     for (const item of renderedList) {
-      if (item.type === 'folder') {
+      if (item.isFolder) {
         folderItems.push(item)
       } else {
         modelItems.push(item)
@@ -281,8 +280,9 @@ const confirmName = ref('')
 
 const openItem = (item: ModelTreeNode, e: Event) => {
   menu.value.hide(e)
-  if (item.type === 'folder') {
-    openFolder(folderPaths.value.length, item.basename)
+  if (item.isFolder) {
+    searchContent.value = undefined
+    openFolder(item)
   } else {
     openModelDetail(item)
   }

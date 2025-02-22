@@ -5,7 +5,7 @@
   >
     <div data-card-main class="flex h-full w-full flex-col">
       <div data-card-preview class="flex-1 overflow-hidden">
-        <div v-if="model.type === 'folder'" class="h-full w-full">
+        <div v-if="model.isFolder" class="h-full w-full">
           <svg
             class="icon"
             viewBox="0 0 1024 1024"
@@ -39,7 +39,7 @@
     </div>
 
     <div
-      v-if="model.type !== 'folder'"
+      v-if="!model.isFolder"
       data-draggable-overlay
       class="absolute left-0 top-0 h-full w-full"
       draggable="true"
@@ -47,7 +47,7 @@
     ></div>
 
     <div
-      v-if="model.type !== 'folder'"
+      v-if="!model.isFolder"
       data-mode-type
       class="pointer-events-none absolute left-2 top-2"
       :style="{

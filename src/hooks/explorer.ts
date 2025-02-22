@@ -1,7 +1,7 @@
 import { genModelFullName, useModels } from 'hooks/model'
 import { cloneDeep, filter, find } from 'lodash'
 import { BaseModel, Model, SelectOptions } from 'types/typings'
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref } from 'vue'
 
 export interface FolderPathItem {
   name: string
@@ -11,7 +11,6 @@ export interface FolderPathItem {
 }
 
 export type ModelFolder = BaseModel & {
-  type: 'folder'
   children: ModelTreeNode[]
 }
 
@@ -31,18 +30,23 @@ export const useModelExplorer = () => {
 
   const folderPaths = ref<FolderPathItem[]>([])
 
-  const genFolderItem = (basename: string, subFolder: string): ModelFolder => {
+  const genFolderItem = (
+    basename: string,
+    folder?: string,
+    subFolder?: string,
+  ): ModelFolder => {
     return {
       id: basename,
       basename: basename,
-      subFolder: subFolder,
+      subFolder: subFolder ?? '',
       pathIndex: 0,
       sizeBytes: 0,
       extension: '',
       description: '',
       metadata: {},
       preview: '',
-      type: 'folder',
+      type: folder ?? '',
+      isFolder: true,
       children: [],
     }
   }
@@ -52,7 +56,7 @@ export const useModelExplorer = () => {
 
     for (const folder in folders.value) {
       if (Object.prototype.hasOwnProperty.call(folders.value, folder)) {
-        const folderItem = genFolderItem(folder, '')
+        const folderItem = genFolderItem(folder)
 
         const folderModels = cloneDeep(data.value[folder]) ?? []
 
@@ -82,58 +86,63 @@ export const useModelExplorer = () => {
       }
     }
 
-    const root: ModelTreeNode = genFolderItem('root', '')
+    const root: ModelTreeNode = genFolderItem('root')
     root.children = rootChildren
     return [root]
   })
 
   function findFolder(list: ModelTreeNode[], name: string) {
-    return find(list, { type: 'folder', basename: name }) as
+    return find(list, { isFolder: true, basename: name }) as
       | ModelFolder
       | undefined
   }
 
   function findFolders(list: ModelTreeNode[]) {
-    return filter(list, { type: 'folder' }) as ModelFolder[]
+    return filter(list, { isFolder: true }) as ModelFolder[]
   }
 
-  async function openFolder(level: number, name: string, icon?: string) {
-    if (folderPaths.value.length >= level) {
-      folderPaths.value.splice(level)
+  async function openFolder(item: BaseModel) {
+    const folderItems: FolderPathItem[] = []
+
+    const folder = item.type
+    const subFolderParts = item.subFolder.split('/').filter(Boolean)
+
+    const pathParts: string[] = []
+    if (folder) {
+      pathParts.push(folder, ...subFolderParts)
+    }
+    pathParts.push(item.basename)
+    if (pathParts[0] !== 'root') {
+      pathParts.unshift('root')
     }
 
-    let currentLevel = dataTreeList.value
-    for (const folderItem of folderPaths.value) {
-      const found = findFolder(currentLevel, folderItem.name)
-      currentLevel = found?.children || []
+    let levelFolders = findFolders(dataTreeList.value)
+    for (const [index, part] of pathParts.entries()) {
+      const currentFolder = findFolder(levelFolders, part)
+      if (!currentFolder) {
+        break
+      }
+
+      levelFolders = findFolders(currentFolder.children ?? [])
+      folderItems.push({
+        name: currentFolder.basename,
+        icon: index === 0 ? 'pi pi-desktop' : '',
+        onClick: () => {
+          openFolder(currentFolder)
+        },
+        children: levelFolders.map((child) => {
+          const name = child.basename
+          return {
+            value: name,
+            label: name,
+            command: () => openFolder(child),
+          }
+        }),
+      })
     }
 
-    const folderItem = findFolder(currentLevel, name)
-    const folderItemChildren = folderItem?.children ?? []
-    const subFolders = findFolders(folderItemChildren)
-
-    folderPaths.value.push({
-      name,
-      icon,
-      onClick: () => {
-        openFolder(level, name, icon)
-      },
-      children: subFolders.map((item) => {
-        const name = item.basename
-        return {
-          value: name,
-          label: name,
-          command: () => openFolder(level + 1, name),
-        }
-      }),
-    })
+    folderPaths.value = folderItems
   }
-
-  watchEffect(() => {
-    if (Object.keys(folders.value).length > 0 && folderPaths.value.length < 2) {
-      openFolder(0, 'root', 'pi pi-desktop')
-    }
-  }, {})
 
   return {
     folders,

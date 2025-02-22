@@ -9,6 +9,7 @@ export interface BaseModel {
   type: string
   subFolder: string
   pathIndex: number
+  isFolder: boolean
   preview: string | string[]
   description: string
   metadata: Record<string, string>

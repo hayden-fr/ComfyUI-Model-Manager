@@ -216,7 +216,7 @@ const cols = computed(() => {
 const list = computed(() => {
   const mergedList = Object.values(data.value).flat()
   const pureModels = mergedList.filter((item) => {
-    return item.type !== 'folder'
+    return !item.isFolder
   })
 
   const filterList = pureModels.filter((model) => {

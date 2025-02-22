@@ -138,8 +138,9 @@ class ModelManager:
 
             stat = entry.stat()
             return {
-                "type": folder if is_file else "folder",
+                "type": folder,
                 "subFolder": sub_folder,
+                "isFolder": not is_file,
                 "basename": basename,
                 "extension": extension,
                 "pathIndex": path_index,
