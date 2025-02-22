@@ -226,6 +226,12 @@ export const useModels = defineStore('models', (store) => {
     })
   }
 
+  function getFullPath(model: BaseModel) {
+    const fullname = genModelFullName(model)
+    const prefixPath = folders.value[model.type]?.[model.pathIndex]
+    return [prefixPath, fullname].filter(Boolean).join('/')
+  }
+
   return {
     folders: folders,
     data: models,
@@ -233,6 +239,7 @@ export const useModels = defineStore('models', (store) => {
     remove: deleteModel,
     update: updateModel,
     openModelDetail: openModelDetail,
+    getFullPath: getFullPath,
   }
 })
 

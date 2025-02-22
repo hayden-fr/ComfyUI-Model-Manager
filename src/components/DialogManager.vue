@@ -55,7 +55,13 @@
             }"
             class="group/card cursor-pointer !p-0"
             @click="openModelDetail(model)"
-            v-tooltip.top="{ value: model.basename, disabled: showModelName }"
+            v-tooltip.top="{
+              value: getFullPath(model),
+              autoHide: false,
+              showDelay: 800,
+              hideDelay: 300,
+              pt: { root: { style: { zIndex: 2100, maxWidth: '32rem' } } },
+            }"
           >
             <template #name>
               <div
@@ -139,7 +145,7 @@ const {
   dialog: settings,
 } = useConfig()
 
-const { data, folders, openModelDetail } = useModels()
+const { data, folders, openModelDetail, getFullPath } = useModels()
 const { t } = useI18n()
 
 const toolbarContainer = ref<HTMLElement | null>(null)
