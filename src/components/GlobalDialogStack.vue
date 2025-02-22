@@ -12,7 +12,7 @@
     :min-height="item.minHeight"
     :max-height="item.maxHeight"
     :auto-z-index="false"
-    :pt:mask:style="{ zIndex: baseZIndex - 100 + index + 1 }"
+    :pt:mask:style="{ zIndex: baseZIndex + index + 1 }"
     :pt:root:onMousedown="() => rise(item)"
     @hide="() => close(item)"
   >
@@ -37,6 +37,7 @@
       <component :is="item.content" v-bind="item.contentProps"></component>
     </template>
   </ResponseDialog>
+  <Dialog :visible="true" :pt:mask:style="{ display: 'none' }"></Dialog>
 </template>
 
 <script setup lang="ts">
@@ -44,6 +45,7 @@ import ResponseDialog from 'components/ResponseDialog.vue'
 import { useDialog } from 'hooks/dialog'
 import Button from 'primevue/button'
 import { usePrimeVue } from 'primevue/config'
+import Dialog from 'primevue/dialog'
 import { computed } from 'vue'
 
 const { stack, rise, close } = useDialog()
