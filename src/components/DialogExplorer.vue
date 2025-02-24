@@ -193,7 +193,10 @@ const sortOrderOptions = ref(
 const currentDataList = computed(() => {
   let renderedList = dataTreeList.value
   for (const folderItem of folderPaths.value) {
-    const found = findFolder(renderedList, folderItem.name)
+    const found = findFolder(renderedList, {
+      basename: folderItem.name,
+      pathIndex: folderItem.pathIndex,
+    })
     renderedList = found?.children || []
   }
 

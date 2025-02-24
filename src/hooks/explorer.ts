@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue'
 
 export interface FolderPathItem {
   name: string
+  pathIndex: number
   icon?: string
   onClick: () => void
   children: SelectOptions[]
@@ -91,10 +92,11 @@ export const useModelExplorer = () => {
     return [root]
   })
 
-  function findFolder(list: ModelTreeNode[], name: string) {
-    return find(list, { isFolder: true, basename: name }) as
-      | ModelFolder
-      | undefined
+  function findFolder(
+    list: ModelTreeNode[],
+    feature: { basename: string; pathIndex: number },
+  ) {
+    return find(list, { ...feature, isFolder: true }) as ModelFolder | undefined
   }
 
   function findFolders(list: ModelTreeNode[]) {
@@ -118,7 +120,12 @@ export const useModelExplorer = () => {
 
     let levelFolders = findFolders(dataTreeList.value)
     for (const [index, part] of pathParts.entries()) {
-      const currentFolder = findFolder(levelFolders, part)
+      const pathIndex = index < 2 ? 0 : item.pathIndex
+
+      const currentFolder = findFolder(levelFolders, {
+        basename: part,
+        pathIndex: pathIndex,
+      })
       if (!currentFolder) {
         break
       }
@@ -126,6 +133,7 @@ export const useModelExplorer = () => {
       levelFolders = findFolders(currentFolder.children ?? [])
       folderItems.push({
         name: currentFolder.basename,
+        pathIndex: pathIndex,
         icon: index === 0 ? 'pi pi-desktop' : '',
         onClick: () => {
           openFolder(currentFolder)
