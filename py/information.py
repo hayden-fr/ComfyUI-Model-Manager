@@ -5,10 +5,16 @@ import requests
 import markdownify
 
 
+import folder_paths
+
+
+from aiohttp import web
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse, parse_qs
 
+
 from . import utils
+from . import config
 
 
 class ModelSearcher(ABC):
@@ -282,25 +288,6 @@ class HuggingfaceModelSearcher(ModelSearcher):
         return _filter_tree_files
 
 
-def get_model_searcher_by_url(url: str) -> ModelSearcher:
-    parsed_url = urlparse(url)
-    host_name = parsed_url.hostname
-    if host_name == "civitai.com":
-        return CivitaiModelSearcher()
-    elif host_name == "huggingface.co":
-        return HuggingfaceModelSearcher()
-    return UnknownWebsiteSearcher()
-
-
-import folder_paths
-
-
-from . import config
-
-
-from aiohttp import web
-
-
 class Information:
     def add_routes(self, routes):
 
@@ -377,7 +364,7 @@ class Information:
         if not model_page:
             return []
 
-        model_searcher = get_model_searcher_by_url(model_page)
+        model_searcher = self.get_model_searcher_by_url(model_page)
         result = model_searcher.search_by_url(model_page)
         return result
 
@@ -435,3 +422,12 @@ class Information:
                         utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
 
         utils.print_debug("Completed scan model information.")
+
+    def get_model_searcher_by_url(self, url: str) -> ModelSearcher:
+        parsed_url = urlparse(url)
+        host_name = parsed_url.hostname
+        if host_name == "civitai.com":
+            return CivitaiModelSearcher()
+        elif host_name == "huggingface.co":
+            return HuggingfaceModelSearcher()
+        return UnknownWebsiteSearcher()
