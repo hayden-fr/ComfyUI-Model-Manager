@@ -24,6 +24,21 @@
             ></path>
           </svg>
         </div>
+        <div
+          v-else-if="model.previewType === 'video'"
+          class="h-full w-full p-1 hover:p-0"
+        >
+          <video
+            class="h-full w-full object-cover"
+            playsinline
+            autoplay
+            loop
+            disablepictureinpicture
+            preload="none"
+          >
+            <source :src="preview" />
+          </video>
+        </div>
         <div v-else class="h-full w-full p-1 hover:p-0">
           <img class="h-full w-full rounded-lg object-cover" :src="preview" />
         </div>

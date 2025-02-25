@@ -134,7 +134,19 @@ class ModelManager:
             if is_file and extension not in folder_paths.supported_pt_extensions:
                 return None
 
-            model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, '.webp')}"
+            preview_type = "image"
+            preview_ext = ".webp"
+            preview_images = utils.get_model_all_images(entry.path)
+            if len(preview_images) > 0:
+                preview_type = "image"
+                preview_ext = ".webp"
+            else:
+                preview_videos = utils.get_model_all_videos(entry.path)
+                if len(preview_videos) > 0:
+                    preview_type = "video"
+                    preview_ext = f".{preview_videos[0].split(".")[-1]}"
+
+            model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
 
             stat = entry.stat()
             return {
@@ -146,6 +158,7 @@ class ModelManager:
                 "pathIndex": path_index,
                 "sizeBytes": stat.st_size if is_file else 0,
                 "preview": model_preview if is_file else None,
+                "previewType": preview_type,
                 "createdAt": round(stat.st_ctime_ns / 1000000),
                 "updatedAt": round(stat.st_mtime_ns / 1000000),
             }
