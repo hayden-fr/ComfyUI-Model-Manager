@@ -579,6 +579,10 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
     return content
   })
 
+  const previewType = computed(() => {
+    return model.value.previewType
+  })
+
   onMounted(() => {
     registerReset(() => {
       currentType.value = 'default'
@@ -594,6 +598,7 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
 
   const result = {
     preview,
+    previewType,
     typeOptions,
     currentType,
     // default value

@@ -336,6 +336,12 @@ class Information:
             index = int(request.match_info.get("index", None))
             filename = request.match_info.get("filename", None)
 
+            content_type = utils.resolve_file_content_type(filename)
+
+            if content_type == "video":
+                abs_path = utils.get_full_path(model_type, index, filename)
+                return web.FileResponse(abs_path)
+
             extension_uri = config.extension_uri
 
             try:

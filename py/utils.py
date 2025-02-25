@@ -8,6 +8,7 @@ import requests
 import traceback
 import configparser
 import functools
+import mimetypes
 
 import comfy.utils
 import folder_paths
@@ -149,6 +150,20 @@ def resolve_model_base_paths() -> dict[str, list[str]]:
     return model_base_paths
 
 
+def resolve_file_content_type(filename: str):
+    extension_mimetypes_cache = folder_paths.extension_mimetypes_cache
+    extension = filename.split(".")[-1]
+    if extension not in extension_mimetypes_cache:
+        mime_type, _ = mimetypes.guess_type(filename, strict=False)
+        if not mime_type:
+            return None
+        content_type = mime_type.split("/")[0]
+        extension_mimetypes_cache[extension] = content_type
+    else:
+        content_type = extension_mimetypes_cache[extension]
+    return content_type
+
+
 def get_full_path(model_type: str, path_index: int, filename: str):
     """
     Get the absolute path in the model type through string concatenation.
@@ -264,6 +279,22 @@ def get_model_preview_name(model_path: str):
             return image
 
     return images[0] if len(images) > 0 else "no-preview.png"
+
+
+def get_model_all_videos(model_path: str):
+    base_dirname = os.path.dirname(model_path)
+    files = search_files(base_dirname)
+    files = folder_paths.filter_files_content_types(files, ["video"])
+
+    basename = os.path.splitext(os.path.basename(model_path))[0]
+    output: list[str] = []
+    for file in files:
+        file_basename = os.path.splitext(file)[0]
+        if file_basename == basename:
+            output.append(file)
+        if file_basename == f"{basename}.preview":
+            output.append(file)
+    return output
 
 
 from PIL import Image
