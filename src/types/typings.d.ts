@@ -11,6 +11,7 @@ export interface BaseModel {
   pathIndex: number
   isFolder: boolean
   preview: string | string[]
+  previewType: string
   description: string
   metadata: Record<string, string>
 }

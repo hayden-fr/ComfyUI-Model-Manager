@@ -1,14 +1,22 @@
 import os
 import re
+import math
 import yaml
 import requests
 import markdownify
 
+import folder_paths
 
+
+from aiohttp import web
 from abc import ABC, abstractmethod
 from urllib.parse import urlparse, parse_qs
+from PIL import Image
+from io import BytesIO
+
 
 from . import utils
+from . import config
 
 
 class ModelSearcher(ABC):
@@ -282,25 +290,6 @@ class HuggingfaceModelSearcher(ModelSearcher):
         return _filter_tree_files
 
 
-def get_model_searcher_by_url(url: str) -> ModelSearcher:
-    parsed_url = urlparse(url)
-    host_name = parsed_url.hostname
-    if host_name == "civitai.com":
-        return CivitaiModelSearcher()
-    elif host_name == "huggingface.co":
-        return HuggingfaceModelSearcher()
-    return UnknownWebsiteSearcher()
-
-
-import folder_paths
-
-
-from . import config
-
-
-from aiohttp import web
-
-
 class Information:
     def add_routes(self, routes):
 
@@ -347,18 +336,30 @@ class Information:
             index = int(request.match_info.get("index", None))
             filename = request.match_info.get("filename", None)
 
+            content_type = utils.resolve_file_content_type(filename)
+
+            if content_type == "video":
+                abs_path = utils.get_full_path(model_type, index, filename)
+                return web.FileResponse(abs_path)
+
             extension_uri = config.extension_uri
 
             try:
                 folders = folder_paths.get_folder_paths(model_type)
                 base_path = folders[index]
                 abs_path = utils.join_path(base_path, filename)
+                preview_name = utils.get_model_preview_name(abs_path)
+                if preview_name:
+                    dir_name = os.path.dirname(abs_path)
+                    abs_path = utils.join_path(dir_name, preview_name)
             except:
                 abs_path = extension_uri
 
             if not os.path.isfile(abs_path):
                 abs_path = utils.join_path(extension_uri, "assets", "no-preview.png")
-            return web.FileResponse(abs_path)
+
+            image_data = self.get_image_preview_data(abs_path)
+            return web.Response(body=image_data.getvalue(), content_type="image/webp")
 
         @routes.get("/model-manager/preview/download/{filename}")
         async def read_download_preview(request):
@@ -373,11 +374,69 @@ class Information:
 
             return web.FileResponse(preview_path)
 
+    def get_image_preview_data(self, filename: str):
+        with Image.open(filename) as img:
+            max_size = 1024
+            original_format = img.format
+
+            exif_data = img.info.get("exif")
+            icc_profile = img.info.get("icc_profile")
+
+            if getattr(img, "is_animated", False) and img.n_frames > 1:
+                total_frames = img.n_frames
+                step = max(1, math.ceil(total_frames / 30))
+
+                frames, durations = [], []
+
+                for frame_idx in range(0, total_frames, step):
+                    img.seek(frame_idx)
+                    frame = img.copy()
+                    frame.thumbnail((max_size, max_size), Image.Resampling.NEAREST)
+
+                    frames.append(frame)
+                    durations.append(img.info.get("duration", 100) * step)
+
+                save_args = {
+                    "format": "WEBP",
+                    "save_all": True,
+                    "append_images": frames[1:],
+                    "duration": durations,
+                    "loop": 0,
+                    "quality": 80,
+                    "method": 0,
+                    "allow_mixed": False,
+                }
+
+                if exif_data:
+                    save_args["exif"] = exif_data
+
+                if icc_profile:
+                    save_args["icc_profile"] = icc_profile
+
+                img_byte_arr = BytesIO()
+                frames[0].save(img_byte_arr, **save_args)
+                img_byte_arr.seek(0)
+                return img_byte_arr
+
+            img.thumbnail((max_size, max_size), Image.Resampling.BICUBIC)
+
+            img_byte_arr = BytesIO()
+            save_args = {"format": "WEBP", "quality": 80}
+
+            if exif_data:
+                save_args["exif"] = exif_data
+            if icc_profile:
+                save_args["icc_profile"] = icc_profile
+
+            img.save(img_byte_arr, **save_args)
+            img_byte_arr.seek(0)
+            return img_byte_arr
+
     def fetch_model_info(self, model_page: str):
         if not model_page:
             return []
 
-        model_searcher = get_model_searcher_by_url(model_page)
+        model_searcher = self.get_model_searcher_by_url(model_page)
         result = model_searcher.search_by_url(model_page)
         return result
 
@@ -435,3 +494,12 @@ class Information:
                         utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
 
         utils.print_debug("Completed scan model information.")
+
+    def get_model_searcher_by_url(self, url: str) -> ModelSearcher:
+        parsed_url = urlparse(url)
+        host_name = parsed_url.hostname
+        if host_name == "civitai.com":
+            return CivitaiModelSearcher()
+        elif host_name == "huggingface.co":
+            return HuggingfaceModelSearcher()
+        return UnknownWebsiteSearcher()

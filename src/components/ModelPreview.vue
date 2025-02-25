@@ -5,7 +5,24 @@
         class="relative mx-auto w-full overflow-hidden rounded-lg preview-aspect"
         :style="$sm({ width: `${cardWidth}px` })"
       >
-        <ResponseImage :src="preview" :error="noPreviewContent"></ResponseImage>
+        <div v-if="previewType === 'video'" class="h-full w-full p-1 hover:p-0">
+          <video
+            class="h-full w-full object-cover"
+            playsinline
+            autoplay
+            loop
+            disablepictureinpicture
+            preload="none"
+          >
+            <source :src="preview" />
+          </video>
+        </div>
+
+        <ResponseImage
+          v-else
+          :src="preview"
+          :error="noPreviewContent"
+        ></ResponseImage>
 
         <Carousel
           v-if="defaultContent.length > 1"
@@ -95,6 +112,7 @@ const { cardWidth } = useConfig()
 
 const {
   preview,
+  previewType,
   typeOptions,
   currentType,
   defaultContent,
