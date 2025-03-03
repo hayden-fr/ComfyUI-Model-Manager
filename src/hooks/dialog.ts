@@ -8,7 +8,7 @@ interface HeaderButton {
   command: () => void
 }
 
-interface DialogItem {
+export interface DialogItem {
   key: string
   title: string
   content: Component
@@ -22,6 +22,7 @@ interface DialogItem {
   maxWidth?: number
   minHeight?: number
   maxHeight?: number
+  modal?: boolean
 }
 
 export const useDialog = defineStore('dialog', () => {

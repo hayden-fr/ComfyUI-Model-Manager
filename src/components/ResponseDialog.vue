@@ -3,6 +3,7 @@
     ref="dialogRef"
     :visible="true"
     @update:visible="updateVisible"
+    :modal="modal"
     :close-on-escape="false"
     :maximizable="!isMobile"
     maximizeIcon="pi pi-arrow-up-right-and-arrow-down-left-from-center"
@@ -91,6 +92,7 @@ interface Props {
   minHeight?: number
   maxHeight?: number
   zIndex?: number
+  modal?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
