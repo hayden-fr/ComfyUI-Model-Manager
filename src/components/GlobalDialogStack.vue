@@ -1,16 +1,9 @@
 <template>
   <ResponseDialog
     v-for="(item, index) in stack"
-    v-model:visible="item.visible"
     :key="item.key"
-    :keep-alive="item.keepAlive"
-    :default-size="item.defaultSize"
-    :default-mobile-size="item.defaultMobileSize"
-    :resize-allow="item.resizeAllow"
-    :min-width="item.minWidth"
-    :max-width="item.maxWidth"
-    :min-height="item.minHeight"
-    :max-height="item.maxHeight"
+    v-model:visible="item.visible"
+    v-bind="omitProps(item)"
     :auto-z-index="false"
     :pt:mask:style="{ zIndex: baseZIndex + index + 1 }"
     :pt:root:onMousedown="() => rise(item)"
@@ -42,7 +35,8 @@
 
 <script setup lang="ts">
 import ResponseDialog from 'components/ResponseDialog.vue'
-import { useDialog } from 'hooks/dialog'
+import { type DialogItem, useDialog } from 'hooks/dialog'
+import { omit } from 'lodash'
 import Button from 'primevue/button'
 import { usePrimeVue } from 'primevue/config'
 import Dialog from 'primevue/dialog'
@@ -55,4 +49,15 @@ const { config } = usePrimeVue()
 const baseZIndex = computed(() => {
   return config.zIndex?.modal ?? 1100
 })
+
+const omitProps = (item: DialogItem) => {
+  return omit(item, [
+    'key',
+    'visible',
+    'title',
+    'headerButtons',
+    'content',
+    'contentProps',
+  ])
+}
 </script>
