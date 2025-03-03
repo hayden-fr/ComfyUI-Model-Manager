@@ -124,13 +124,13 @@ class ModelManager:
             if not prefix_path.endswith("/"):
                 prefix_path = f"{prefix_path}/"
 
+            is_file = entry.is_file()
             relative_path = utils.normalize_path(entry.path).replace(prefix_path, "")
             sub_folder = os.path.dirname(relative_path)
             filename = os.path.basename(relative_path)
-            basename = os.path.splitext(filename)[0]
-            extension = os.path.splitext(filename)[1]
+            basename = os.path.splitext(filename)[0] if is_file else filename
+            extension = os.path.splitext(filename)[1] if is_file else ""
 
-            is_file = entry.is_file()
             if is_file and extension not in folder_paths.supported_pt_extensions:
                 return None
 
