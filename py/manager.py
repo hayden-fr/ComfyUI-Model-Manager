@@ -144,7 +144,7 @@ class ModelManager:
                 preview_videos = utils.get_model_all_videos(entry.path)
                 if len(preview_videos) > 0:
                     preview_type = "video"
-                    preview_ext = f".{preview_videos[0].split(".")[-1]}"
+                    preview_ext = f".{preview_videos[0].split('.')[-1]}"
 
             model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
 
