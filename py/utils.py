@@ -14,7 +14,7 @@ import comfy.utils
 import folder_paths
 
 from aiohttp import web
-from typing import Any
+from typing import Any, Optional
 from . import config
 
 
@@ -308,7 +308,7 @@ def remove_model_preview_image(model_path: str):
         os.remove(preview_path)
 
 
-def save_model_preview_image(model_path: str, image_file_or_url: Any, platform: str | None = None):
+def save_model_preview_image(model_path: str, image_file_or_url: Any, platform: Optional[str] = None):
     basename = os.path.splitext(model_path)[0]
     preview_path = f"{basename}.webp"
     # Download image file if it is url
