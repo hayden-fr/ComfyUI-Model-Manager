@@ -457,8 +457,10 @@ class ModelDownload:
 
         # When parsing model information from HuggingFace API,
         # the file size was not found and needs to be obtained from the response header.
-        if total_size == 0:
-            total_size = float(response.headers.get("content-length", 0))
+        # Fixed issue #169. Some model information from Civitai, providing the wrong file size
+        response_total_size = float(response.headers.get("content-length", 0))
+        if total_size == 0 or total_size != response_total_size:
+            total_size = response_total_size
             task_content.sizeBytes = total_size
             task_status.totalSize = total_size
             self.set_task_content(task_id, task_content)
