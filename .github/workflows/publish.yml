@@ -68,9 +68,8 @@ jobs:
 
       - name: Create release draft
         uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
+          token: ${{ secrets.GITHUBTOKEN }}
           files: |
             dist.tar.gz
           name: ${{ steps.current_version.outputs.version }}
