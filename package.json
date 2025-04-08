@@ -39,8 +39,8 @@
     "markdown-it": "^14.1.0",
     "markdown-it-metadata-block": "^1.0.6",
     "primevue": "^4.0.7",
-    "vue": "^3.4.31",
-    "vue-i18n": "^9.13.1",
+    "vue": "^3.5.6",
+    "vue-i18n": "^9.14.0",
     "yaml": "^2.6.0"
   },
   "lint-staged": {
