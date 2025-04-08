@@ -443,7 +443,7 @@ export const useModelBaseInfo = () => {
 
 export const useModelFolder = (
   option: {
-    type?: MaybeRefOrGetter<string>
+    type?: MaybeRefOrGetter<string | undefined>
   } = {},
 ) => {
   const { data: models, folders: modelFolders } = useModels()
