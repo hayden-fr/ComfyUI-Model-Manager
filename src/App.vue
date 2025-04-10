@@ -9,6 +9,7 @@
 import DialogDownload from 'components/DialogDownload.vue'
 import DialogExplorer from 'components/DialogExplorer.vue'
 import DialogManager from 'components/DialogManager.vue'
+import DialogScanning from 'components/DialogScanning.vue'
 import GlobalDialogStack from 'components/GlobalDialogStack.vue'
 import GlobalLoading from 'components/GlobalLoading.vue'
 import GlobalToast from 'components/GlobalToast.vue'
@@ -32,6 +33,19 @@ onMounted(() => {
       severity: 'success',
       summary: 'Refreshed Models',
       life: 2000,
+    })
+  }
+
+  const openModelScanning = () => {
+    dialog.open({
+      key: 'model-information-scanning',
+      title: t('batchScanModelInformation'),
+      content: DialogScanning,
+      modal: true,
+      defaultSize: {
+        width: 680,
+        height: 490,
+      },
     })
   }
 
@@ -64,6 +78,11 @@ onMounted(() => {
       content: flat.value ? DialogManager : DialogExplorer,
       keepAlive: true,
       headerButtons: [
+        {
+          key: 'scanning',
+          icon: 'mdi mdi-folder-search-outline text-lg',
+          command: openModelScanning,
+        },
         {
           key: 'refresh',
           icon: 'pi pi-refresh',
