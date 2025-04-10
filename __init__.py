@@ -1,3 +1,11 @@
+import folder_paths
+
+
+# NOTE: This is an experiment
+# Add .gguf extension to supported_pt_extensions
+folder_paths.supported_pt_extensions.add(".gguf")
+
+
 import os
 from .py import config
 from .py import utils
