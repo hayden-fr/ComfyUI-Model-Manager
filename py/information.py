@@ -1,9 +1,11 @@
 import os
 import re
+import uuid
 import math
 import yaml
 import requests
 import markdownify
+
 
 import folder_paths
 
@@ -17,6 +19,7 @@ from io import BytesIO
 
 from . import utils
 from . import config
+from . import thread
 
 
 class ModelSearcher(ABC):
@@ -307,16 +310,38 @@ class Information:
                 utils.print_error(error_msg)
                 return web.json_response({"success": False, "error": error_msg})
 
+        @routes.get("/model-manager/model-info/scan")
+        async def get_model_info_download_task(request):
+            """
+            Get model information download task list.
+            """
+            try:
+                result = self.get_scan_model_info_task_list()
+                if result is not None:
+                    await self.download_model_info(request)
+                return web.json_response({"success": True, "data": result})
+            except Exception as e:
+                error_msg = f"Get model info download task list failed: {str(e)}"
+                utils.print_error(error_msg)
+                return web.json_response({"success": False, "error": error_msg})
+
         @routes.post("/model-manager/model-info/scan")
-        async def download_model_info(request):
+        async def create_model_info_download_task(request):
             """
             Create a task to download model information.
+
+            - scanMode: The alternatives are diff and full.
+            - mode: The alternatives are diff and full.
+            - path: Scanning root path.
             """
             post = await utils.get_request_body(request)
             try:
+                # TODO scanMode is deprecated, use mode instead.
                 scan_mode = post.get("scanMode", "diff")
-                await self.download_model_info(scan_mode, request)
-                return web.json_response({"success": True})
+                scan_mode = post.get("mode", scan_mode)
+                scan_path = post.get("path", None)
+                result = await self.create_scan_model_info_task(scan_mode, scan_path, request)
+                return web.json_response({"success": True, "data": result})
             except Exception as e:
                 error_msg = f"Download model info failed: {str(e)}"
                 utils.print_error(error_msg)
@@ -440,42 +465,76 @@ class Information:
         result = model_searcher.search_by_url(model_page)
         return result
 
-    async def download_model_info(self, scan_mode: str, request):
-        utils.print_info(f"Download model info for {scan_mode}")
-        model_base_paths = utils.resolve_model_base_paths()
-        for model_type in model_base_paths:
+    def get_scan_information_task_filepath(self):
+        download_dir = utils.get_download_path()
+        return utils.join_path(download_dir, "scan_information.task")
 
-            folders, *others = folder_paths.folder_names_and_paths[model_type]
-            for path_index, base_path in enumerate(folders):
-                files = utils.recursive_search_files(base_path, request)
+    def get_scan_model_info_task_list(self):
+        scan_info_task_file = self.get_scan_information_task_filepath()
+        if os.path.isfile(scan_info_task_file):
+            return utils.load_dict_pickle_file(scan_info_task_file)
+        return None
 
-                models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
+    async def create_scan_model_info_task(self, scan_mode: str, scan_path: str | None, request):
+        scan_info_task_file = self.get_scan_information_task_filepath()
+        scan_info_task_content = {"mode": scan_mode}
+        scan_models: dict[str, bool] = {}
 
-                for fullname in models:
-                    fullname = utils.normalize_path(fullname)
-                    basename = os.path.splitext(fullname)[0]
+        scan_paths: list[str] = []
+        if scan_path is None:
+            model_base_paths = utils.resolve_model_base_paths()
+            for model_type in model_base_paths:
+                folders, *others = folder_paths.folder_names_and_paths[model_type]
+                for path_index, base_path in enumerate(folders):
+                    scan_paths.append(base_path)
+        else:
+            scan_paths = [scan_path]
 
-                    abs_model_path = utils.join_path(base_path, fullname)
+        for base_path in scan_paths:
+            files = utils.recursive_search_files(base_path, request)
+            models = folder_paths.filter_files_extensions(files, folder_paths.supported_pt_extensions)
+            for fullname in models:
+                fullname = utils.normalize_path(fullname)
+                abs_model_path = utils.join_path(base_path, fullname)
+                utils.print_debug(f"Found model: {abs_model_path}")
+                scan_models[abs_model_path] = False
 
-                    image_name = utils.get_model_preview_name(abs_model_path)
-                    abs_image_path = utils.join_path(base_path, image_name)
+        scan_info_task_content["models"] = scan_models
+        utils.save_dict_pickle_file(scan_info_task_file, scan_info_task_content)
+        await self.download_model_info(request)
+        return scan_info_task_content
 
-                    has_preview = os.path.isfile(abs_image_path)
+    download_thread_pool = thread.DownloadThreadPool()
 
-                    description_name = utils.get_model_description_name(abs_model_path)
-                    abs_description_path = utils.join_path(base_path, description_name) if description_name else None
-                    has_description = os.path.isfile(abs_description_path) if abs_description_path else False
+    async def download_model_info(self, request):
+        async def download_information_task(task_id: str):
+            scan_info_task_file = self.get_scan_information_task_filepath()
+            scan_info_task_content = utils.load_dict_pickle_file(scan_info_task_file)
+            scan_mode = scan_info_task_content.get("mode", "diff")
+            scan_models: dict[str, bool] = scan_info_task_content.get("models", {})
+            for key, value in scan_models.items():
+                if value is True:
+                    continue
 
-                    try:
+                abs_model_path = key
+                base_path = os.path.dirname(abs_model_path)
 
-                        utils.print_info(f"Checking model {abs_model_path}")
-                        utils.print_debug(f"Scan mode: {scan_mode}")
-                        utils.print_debug(f"Has preview: {has_preview}")
-                        utils.print_debug(f"Has description: {has_description}")
+                image_name = utils.get_model_preview_name(abs_model_path)
+                abs_image_path = utils.join_path(base_path, image_name)
 
-                        if scan_mode != "full" and (has_preview and has_description):
-                            continue
+                has_preview = os.path.isfile(abs_image_path)
 
+                description_name = utils.get_model_description_name(abs_model_path)
+                abs_description_path = utils.join_path(base_path, description_name) if description_name else None
+                has_description = os.path.isfile(abs_description_path) if abs_description_path else False
+
+                try:
+                    utils.print_info(f"Checking model {abs_model_path}")
+                    utils.print_debug(f"Scan mode: {scan_mode}")
+                    utils.print_debug(f"Has preview: {has_preview}")
+                    utils.print_debug(f"Has description: {has_description}")
+
+                    if scan_mode == "full" or not has_preview or not has_description:
                         utils.print_debug(f"Calculate sha256 for {abs_model_path}")
                         hash_value = utils.calculate_sha256(abs_model_path)
                         utils.print_info(f"Searching model info by hash {hash_value}")
@@ -490,10 +549,23 @@ class Information:
                         description = model_info.get("description", None)
                         if description:
                             utils.save_model_description(abs_model_path, description)
-                    except Exception as e:
-                        utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
 
-        utils.print_debug("Completed scan model information.")
+                    scan_models[abs_model_path] = True
+                    scan_info_task_content["models"] = scan_models
+                    utils.save_dict_pickle_file(scan_info_task_file, scan_info_task_content)
+                    utils.print_debug(f"Send update scan information task to frontend.")
+                    await utils.send_json("update_scan_information_task", scan_info_task_content)
+                except Exception as e:
+                    utils.print_error(f"Failed to download model info for {abs_model_path}: {e}")
+
+            os.remove(scan_info_task_file)
+            utils.print_info("Completed scan model information.")
+
+        try:
+            task_id = uuid.uuid4().hex
+            self.download_thread_pool.submit(download_information_task, task_id)
+        except Exception as e:
+            utils.print_debug(str(e))
 
     def get_model_searcher_by_url(self, url: str) -> ModelSearcher:
         parsed_url = urlparse(url)

@@ -1,5 +1,4 @@
 import SettingCardSize from 'components/SettingCardSize.vue'
-import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
 import { computed, onMounted, onUnmounted, readonly, ref, watch } from 'vue'
@@ -184,101 +183,6 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       onChange(value) {
         store.dialog.closeAll()
         store.config.flat.value = value
-      },
-    })
-
-    // Scan information
-    app.ui?.settings.addSetting({
-      id: 'ModelManager.ScanFiles.Full',
-      category: [t('modelManager'), t('setting.scan'), 'Full'],
-      name: t('setting.scanAll'),
-      defaultValue: '',
-      type: () => {
-        return $el('button.p-button.p-component.p-button-secondary', {
-          textContent: 'Full Scan',
-          onclick: () => {
-            confirm({
-              message: [
-                'This operation will override current files.',
-                'This may take a while and generate MANY server requests!',
-                'USE AT YOUR OWN RISK! Continue?',
-              ].join('\n'),
-              accept: () => {
-                store.loading.loading.value = true
-                request('/model-info/scan', {
-                  method: 'POST',
-                  body: JSON.stringify({ scanMode: 'full' }),
-                })
-                  .then(() => {
-                    toast.add({
-                      severity: 'success',
-                      summary: 'Complete download information',
-                      life: 2000,
-                    })
-                    store.models.refresh()
-                  })
-                  .catch((err) => {
-                    toast.add({
-                      severity: 'error',
-                      summary: 'Error',
-                      detail: err.message ?? 'Failed to download information',
-                      life: 15000,
-                    })
-                  })
-                  .finally(() => {
-                    store.loading.loading.value = false
-                  })
-              },
-            })
-          },
-        })
-      },
-    })
-
-    app.ui?.settings.addSetting({
-      id: 'ModelManager.ScanFiles.Incremental',
-      category: [t('modelManager'), t('setting.scan'), 'Incremental'],
-      name: t('setting.scanMissing'),
-      defaultValue: '',
-      type: () => {
-        return $el('button.p-button.p-component.p-button-secondary', {
-          textContent: 'Diff Scan',
-          onclick: () => {
-            confirm({
-              message: [
-                'Download missing information or preview.',
-                'This may take a while and generate MANY server requests!',
-                'USE AT YOUR OWN RISK! Continue?',
-              ].join('\n'),
-              accept: () => {
-                store.loading.loading.value = true
-                request('/model-info/scan', {
-                  method: 'POST',
-                  body: JSON.stringify({ scanMode: 'diff' }),
-                })
-                  .then(() => {
-                    toast.add({
-                      severity: 'success',
-                      summary: 'Complete download information',
-                      life: 2000,
-                    })
-                    store.models.refresh()
-                  })
-                  .catch((err) => {
-                    toast.add({
-                      severity: 'error',
-                      summary: 'Error',
-                      detail: err.message ?? 'Failed to download information',
-                      life: 15000,
-                    })
-                  })
-                  .finally(() => {
-                    store.loading.loading.value = false
-                  })
-              },
-            })
-          },
-        })
       },
     })
 

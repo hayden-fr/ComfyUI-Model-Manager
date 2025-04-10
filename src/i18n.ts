@@ -36,10 +36,11 @@ const messages = {
     selectModelType: 'Select model type',
     selectSubdirectory: 'Select subdirectory',
     scanModelInformation: 'Scan model information',
-    selectedAllPaths: 'You select all model paths',
-    selectedPaths: 'You select path',
+    selectedAllPaths: 'Selected all model paths',
+    selectedSpecialPath: 'Selected special path',
     scanMissInformation: 'Download missing information',
     scanFullInformation: 'Override full information',
+    noModelsInCurrentPath: 'There are no models available in the current path',
     sort: {
       name: 'Name',
       size: 'Largest',
