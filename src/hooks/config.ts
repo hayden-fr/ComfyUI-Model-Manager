@@ -1,9 +1,8 @@
 import SettingCardSize from 'components/SettingCardSize.vue'
 import { defineStore } from 'hooks/store'
-import { $el, app, ComfyDialog } from 'scripts/comfyAPI'
+import { app } from 'scripts/comfyAPI'
 import { computed, onMounted, onUnmounted, readonly, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useToast } from './toast'
 
 export const useConfig = defineStore('config', (store) => {
   const { t } = useI18n()
@@ -97,40 +96,7 @@ export const configSetting = {
 }
 
 function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
-  const { toast } = useToast()
   const { t } = useI18n()
-
-  const confirm = (opts: {
-    message?: string
-    accept?: () => void
-    reject?: () => void
-  }) => {
-    const dialog = new ComfyDialog('div', [])
-
-    dialog.show(
-      $el('div', [
-        $el('p', { textContent: opts.message }),
-        $el('div.flex.gap-4', [
-          $el('button.flex-1', {
-            textContent: 'Cancel',
-            onclick: () => {
-              opts.reject?.()
-              dialog.close()
-              document.body.removeChild(dialog.element)
-            },
-          }),
-          $el('button.flex-1', {
-            textContent: 'Continue',
-            onclick: () => {
-              opts.accept?.()
-              dialog.close()
-              document.body.removeChild(dialog.element)
-            },
-          }),
-        ]),
-      ]),
-    )
-  }
 
   onMounted(() => {
     // API keys

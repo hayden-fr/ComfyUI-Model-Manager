@@ -227,7 +227,7 @@ const handleScanModelInformation = async function () {
     })
     scanModelsList.value = result?.models ?? {}
     batchScanningStep.value = 2
-  } catch (error) {
+  } catch {
     batchScanningStep.value = 1
   }
 }
