@@ -4,7 +4,3 @@
   @tailwind components;
   @tailwind utilities;
 }
-
-.comfy-modal {
-  z-index: 3000;
-}
