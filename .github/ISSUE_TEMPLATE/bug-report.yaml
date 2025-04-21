@@ -20,10 +20,10 @@ body:
       value: |
         [Operating System]:
         [Python Version]:
-        [Is Electron]:
         [ComfyUI Version]:
         [ComfyUI Frontend Version]:
         [ComfyUI-Model-Manager Version]:
+        [Browser Version]:
     validations:
       required: true
 
