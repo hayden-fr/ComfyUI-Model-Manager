@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 import requests
+import base64
 
 
 import folder_paths
@@ -113,6 +114,13 @@ class ApiKey:
             utils.set_setting_value(request, "api_key.civitai", None)
             utils.set_setting_value(request, "api_key.huggingface", None)
         self.__store = utils.load_dict_pickle_file(self.__cache_file)
+        # Desensitization returns
+        result: dict[str, str] = {}
+        for key in self.__store:
+            v = self.__store[key]
+            if v is not None:
+                result[key] = v[:4] + "****" + v[-4:]
+        return result
 
     def get_value(self, key: str):
         return self.__store.get(key, None)
@@ -135,7 +143,19 @@ class ModelDownload:
             """
             Init download setting.
             """
-            self.api_key.init(request)
+            result = self.api_key.init(request)
+            return web.json_response({"success": True, "data": result})
+
+        @routes.post("/model-manager/download/setting")
+        async def set_download_setting(request):
+            """
+            Set download setting.
+            """
+            json_data = await request.json()
+            key = json_data.get("key", None)
+            value = json_data.get("value", None)
+            value = base64.b64decode(value).decode("utf-8") if value is not None else None
+            self.api_key.set_value(key, value)
             return web.json_response({"success": True})
 
         @routes.get("/model-manager/download/task")
@@ -372,12 +392,12 @@ class ModelDownload:
 
                 download_platform = task_status.platform
                 if download_platform == "civitai":
-                    api_key = utils.get_setting_value(request, "api_key.civitai")
+                    api_key = self.api_key.get_value("civitai")
                     if api_key:
                         headers["Authorization"] = f"Bearer {api_key}"
 
                 elif download_platform == "huggingface":
-                    api_key = utils.get_setting_value(request, "api_key.huggingface")
+                    api_key = self.api_key.get_value("huggingface")
                     if api_key:
                         headers["Authorization"] = f"Bearer {api_key}"
 
