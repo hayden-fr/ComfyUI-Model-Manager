@@ -197,3 +197,6 @@ web/
 
 # config
 config/
+
+# private info
+private.key
