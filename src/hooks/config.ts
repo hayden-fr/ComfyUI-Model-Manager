@@ -1,6 +1,9 @@
+import SettingApiKey from 'components/SettingApiKey.vue'
 import SettingCardSize from 'components/SettingCardSize.vue'
+import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
-import { app } from 'scripts/comfyAPI'
+import { useToast } from 'hooks/toast'
+import { $el, app } from 'scripts/comfyAPI'
 import { computed, onMounted, onUnmounted, readonly, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -65,6 +68,7 @@ export const useConfig = defineStore('config', (store) => {
       },
     },
     flat: flatLayout,
+    apiKeyInfo: ref<Record<string, string>>({}),
   }
 
   watch(cardSizeFlag, (val) => {
@@ -97,6 +101,84 @@ export const configSetting = {
 
 function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
   const { t } = useI18n()
+  const { confirm } = useToast()
+
+  const iconButton = (opt: {
+    icon: string
+    onClick: () => void | Promise<void>
+  }) => {
+    return $el(
+      'span.h-4.cursor-pointer',
+      { onclick: opt.onClick },
+      $el(`i.${opt.icon.replace(/\s/g, '.')}`),
+    )
+  }
+
+  const setApiKey = async (key: string, setter: (val: string) => void) => {
+    store.dialog.open({
+      key: `setting.api_key.${key}`,
+      title: t(`setting.api_key.${key}`),
+      content: SettingApiKey,
+      modal: true,
+      defaultSize: {
+        width: 500,
+        height: 200,
+      },
+      contentProps: {
+        keyField: key,
+        setter: setter,
+      },
+    })
+  }
+
+  const removeApiKey = async (key: string) => {
+    await new Promise((resolve, reject) => {
+      confirm.require({
+        message: t('deleteAsk'),
+        header: 'Danger',
+        icon: 'pi pi-info-circle',
+        accept: () => resolve(true),
+        reject: reject,
+      })
+    })
+    await request('/download/setting', {
+      method: 'POST',
+      body: JSON.stringify({ key, value: null }),
+    })
+  }
+
+  const renderApiKey = (key: string) => {
+    return () => {
+      const apiKey = store.config.apiKeyInfo.value[key] || 'None'
+      const apiKeyDisplayEl = $el('div.text-sm.text-gray-500.flex-1', {
+        textContent: apiKey,
+      })
+
+      const setter = (val: string) => {
+        store.config.apiKeyInfo.value[key] = val
+        apiKeyDisplayEl.textContent = val || 'None'
+      }
+      return $el('div.flex.gap-4', [
+        apiKeyDisplayEl,
+        iconButton({
+          icon: 'pi pi-pencil text-blue-400',
+          onClick: () => {
+            setApiKey(key, setter)
+          },
+        }),
+        iconButton({
+          icon: 'pi pi-trash text-red-400',
+          onClick: async () => {
+            const value = store.config.apiKeyInfo.value[key]
+            if (value) {
+              await removeApiKey(key)
+              setter('')
+            }
+          },
+        }),
+      ])
+    }
+  }
 
   onMounted(() => {
     // API keys
@@ -104,16 +186,16 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       id: 'ModelManager.APIKey.HuggingFace',
       category: [t('modelManager'), t('setting.apiKey'), 'HuggingFace'],
       name: 'HuggingFace API Key',
-      type: 'text',
       defaultValue: undefined,
+      type: renderApiKey('huggingface'),
     })
 
     app.ui?.settings.addSetting({
       id: 'ModelManager.APIKey.Civitai',
       category: [t('modelManager'), t('setting.apiKey'), 'Civitai'],
       name: 'Civitai API Key',
-      type: 'text',
       defaultValue: undefined,
+      type: renderApiKey('civitai'),
     })
 
     const defaultCardSize = store.config.defaultCardSizeMap

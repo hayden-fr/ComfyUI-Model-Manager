@@ -84,7 +84,16 @@ export const useDownload = defineStore('download', (store) => {
     })
   })
 
+  // Initial download settings
+  // Migrate API keys from user settings to private key
+  const init = async () => {
+    const res = await request('/download/init', { method: 'POST' })
+    store.config.apiKeyInfo.value = res
+  }
+
   onBeforeMount(() => {
+    init()
+
     api.addEventListener('reconnected', () => {
       refresh()
     })
