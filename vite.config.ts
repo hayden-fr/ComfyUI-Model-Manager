@@ -2,6 +2,7 @@ import vue from '@vitejs/plugin-vue'
 import fs from 'node:fs'
 import path from 'node:path'
 import { defineConfig, Plugin } from 'vite'
+import transformImports from './vite-plugin-transform-imports'
 
 function css(): Plugin {
   return {
@@ -108,7 +109,7 @@ function createWebVersion(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [vue(), css(), output(), dev(), createWebVersion()],
+  plugins: [vue(), css(), output(), dev(), createWebVersion(), transformImports()],
 
   build: {
     outDir: 'web',
@@ -119,12 +120,12 @@ export default defineConfig({
       // Disabling tree-shaking
       // Prevent vite remove unused exports
       treeshake: true,
+      external: [
+          'vue',
+          /^primevue($|\/)/,
+          "vue-i18n"
+      ],
       output: {
-        manualChunks(id) {
-          if (id.includes('primevue')) {
-            return 'primevue'
-          }
-        },
       },
     },
     chunkSizeWarningLimit: 1024,
