@@ -1,233 +1,106 @@
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+
+const parsePrimeVueMap = () => {
+  const root = process.cwd()
+  const primevueFilePath = resolve(root, 'node_modules/primevue/index.mjs')
+  const primevue = readFileSync(primevueFilePath, 'utf-8')
+  const nameExportRegex =
+    /export\s*{\s*default\s*as\s*(?<name>\w+)\s*}\s*from\s*['"](?<subpackage>primevue\/\S*)['"];?/g
+  const matches = primevue.matchAll(nameExportRegex)
+  const map = {}
+  for (const match of matches) {
+    map[match.groups.subpackage] = match.groups.name
+  }
+  return map
+}
+
+/**
+ *
+ * @returns {import('vite').Plugin}
+ */
 export default function customTransformImports() {
-  const primeVueMap = {
-    'config': 'Config',
-
-    'button': 'Button',
-    'dialog': 'Dialog',
-    'dropdown': 'Dropdown',
-    'datatable': 'DataTable',
-    'inputtext': 'InputText',
-    'calendar': 'Calendar',
-    'checkbox': 'Checkbox',
-    'radiobutton': 'RadioButton',
-    'textarea': 'Textarea',
-    'toast': 'Toast',
-    'panel': 'Panel',
-    'menu': 'Menu',
-    'tabview': 'TabView',
-    'tabpanel': 'TabPanel',
-    'accordion': 'Accordion',
-    'accordiontab': 'AccordionTab',
-    'card': 'Card',
-    'chart': 'Chart',
-    'confirmdialog': 'ConfirmDialog',
-    'toolbar': 'Toolbar',
-    'paginator': 'Paginator',
-    'fieldset': 'Fieldset',
-    'splitter': 'Splitter',
-    'splitterpanel': 'SplitterPanel',
-    'slider': 'Slider',
-    'message': 'Message',
-    'avatar': 'Avatar',
-    'badge': 'Badge',
-    'chip': 'Chip',
-    'divider': 'Divider',
-    'progressbar': 'ProgressBar',
-    'progressspinner': 'ProgressSpinner',
-    'tag': 'Tag',
-    'skeleton': 'Skeleton',
-    'contextmenu': 'ContextMenu',
-
-    'toastservice': 'ToastService',
-    'confirmationservice': 'ConfirmationService',
-    'dialogservice': 'DialogService',
-
-    'styleclass': 'StyleClass',
-    'ripple': 'Ripple',
-    'tooltip': 'Tooltip',
-  };
-
-  function capitalize(str) {
-    if (!str) return '';
-    return str.charAt(0).toUpperCase() + str.slice(1);
-  }
-
-  function parseNamedImportItems(importItemsStr) {
-    if (!importItemsStr) return '';
-    return importItemsStr
-      .split(',')
-      .map(item => {
-        item = item.trim();
-        if (item.includes(' as ')) {
-          const [original, alias] = item.split(' as ').map(s => s.trim());
-          return `${original}: ${alias}`;
-        }
-        return item;
-      })
-      .join(', ');
-  }
+  const externals = [
+    {
+      pattern: 'vue',
+      global: 'Vue',
+      subpackageMap: {},
+    },
+    {
+      pattern: /^primevue\/?.*$/,
+      global: 'PrimeVue',
+      subpackageMap: parsePrimeVueMap(),
+    },
+    {
+      pattern: 'vue-i18n',
+      global: 'VueI18n',
+      subpackageMap: {},
+    },
+  ]
 
   return {
     name: 'custom-transform-imports',
     enforce: 'post',
+    config() {
+      return {
+        build: {
+          rollupOptions: {
+            external: externals.map((o) => o.pattern),
+          },
+        },
+      }
+    },
     renderChunk(code) {
-      let transformedCode = code;
+      let transformedCode = code
 
-      transformedCode = transformedCode.replace(
-        /import\s*{\s*([\s\S]*?)\s*}\s*from\s*["']vue["'];?/g,
-        (match, importItems) => {
-          const processedItems = parseNamedImportItems(importItems);
-          return `const { ${processedItems} } = window.Vue;`;
+      const toString = (value) => {
+        if (value instanceof RegExp) {
+          return value.source.replace(/^\^|\$$/g, '')
         }
-      );
+        return value
+      }
 
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s+from\s*["']vue["'];?/g,
-        (match, defaultImportName) => {
-          if (match.includes('{') && match.indexOf('{') < match.indexOf('from')) return match;
-          return `const ${defaultImportName} = window.Vue;`;
-        }
-      );
+      for (const external of externals) {
+        const { pattern, global, subpackageMap } = external
 
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s*,\s*{\s*([\s\S]*?)\s*}\s*from\s*["']primevue\/config["'];?/g,
-        (match, defaultConfigImport, namedConfigImports) => {
-          const itemsStr = parseNamedImportItems(namedConfigImports);
-          const itemsArray = itemsStr.split(',').map(s => s.trim());
+        const importRegexp = new RegExp(
+          `import\\s+([^;]*?)\\s+from\\s+["'](${toString(pattern)})["'];?`,
+          'gi',
+        )
+        transformedCode = transformedCode.replace(
+          importRegexp,
+          (_, importedContent, packageName) => {
+            const result = []
 
-          const fromConfig = [];
-          const fromRoot = [];
-
-          itemsArray.forEach(item => {
-            const originalName = item.includes(':') ? item.split(':')[0].trim() : item;
-            if (originalName === 'usePrimeVue') {
-              fromRoot.push(item);
-            } else {
-              fromConfig.push(item);
+            const namedImportRegexp = /,?\s*(?<named>{[^;]*?})/g
+            const namedImports = importedContent.matchAll(namedImportRegexp)
+            for (const m of namedImports) {
+              const named = m.groups.named
+              const aliasNamed = named.replace(/\s+as\s+/g, ': ')
+              result.push(`const ${aliasNamed} = window.${global};`)
             }
-          });
 
-          let result = '';
-          if (fromRoot.length > 0) {
-            result += `const { ${fromRoot.join(', ')} } = window.PrimeVue;\n`;
-          }
-          if (fromConfig.length > 0) {
-            result += `const { ${fromConfig.join(', ')} } = window.PrimeVue.Config;\n`;
-          }
-          result += `const ${defaultConfigImport} = window.PrimeVue.Config;`;
-          return result;
-        }
-      );
+            const defaultImport = importedContent
+              .replace(namedImportRegexp, '')
+              .trim()
 
-      transformedCode = transformedCode.replace(
-        /import\s*{\s*([\s\S]*?)\s*}\s*from\s*["']primevue\/config["'];?/g,
-        (match, importItems) => {
-          if (match.trim().startsWith('import PrimeVue,')) return match;
-
-          const itemsStr = parseNamedImportItems(importItems);
-          const itemsArray = itemsStr.split(',').map(s => s.trim());
-
-          const fromConfig = [];
-          const fromRoot = [];
-
-          itemsArray.forEach(item => {
-            const originalName = item.includes(':') ? item.split(':')[0].trim() : item;
-            if (originalName === 'usePrimeVue') {
-              fromRoot.push(item);
-            } else {
-              fromConfig.push(item);
+            if (defaultImport) {
+              const subpackageName = subpackageMap[packageName]
+              if (subpackageName) {
+                result.push(
+                  `const ${defaultImport} = window.${global}.${subpackageName};`,
+                )
+              } else {
+                result.push(`const ${defaultImport} = window.${global};`)
+              }
             }
-          });
 
-          let result = '';
-          if (fromRoot.length > 0) {
-            result += `const { ${fromRoot.join(', ')} } = window.PrimeVue;\n`;
-          }
-          if (fromConfig.length > 0) {
-            result += `const { ${fromConfig.join(', ')} } = window.PrimeVue.Config;\n`;
-          }
-          return result.trim();
-        }
-      );
+            return result.join('\n')
+          },
+        )
+      }
 
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s+from\s*["']primevue\/config["'];?/g,
-        (match, defaultImportName) => {
-          if (match.includes('{') && match.indexOf('{') < match.indexOf('from')) return match;
-          return `const ${defaultImportName} = window.PrimeVue.Config;`;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s+(?:{\s*([\s\S]*?)\s*}|([A-Za-z0-9$_]+))\s+from\s*["']primevue\/([^"']+)["'];?/g,
-        (match, namedImportItems, defaultImportName, path) => {
-          const pathKey = path.toLowerCase();
-
-          if (pathKey === 'config') return match;
-
-          if (namedImportItems) {
-            const processedItems = parseNamedImportItems(namedImportItems);
-
-            if (pathKey.startsWith('use')) {
-              return `const { ${processedItems} } = window.PrimeVue;`;
-            }
-            else {
-              const globalNameSuffix = primeVueMap[pathKey] || capitalize(pathKey);
-              return `const { ${processedItems} } = window.PrimeVue.${globalNameSuffix};`;
-            }
-          }
-          else if (defaultImportName) {
-            const globalNameSuffix = primeVueMap[pathKey] || capitalize(pathKey);
-
-            return `const ${defaultImportName} = window.PrimeVue.${globalNameSuffix};`;
-          }
-          return match;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s*,\s*{\s*([\s\S]*?)\s*}\s*from\s*["']primevue["'];?/g,
-        (match, defaultImport, namedImports) => {
-          const processedNamed = parseNamedImportItems(namedImports);
-
-          return `const { ${processedNamed} } = window.PrimeVue;\nconst ${defaultImport} = window.PrimeVue;`;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s*{\s*([\s\S]*?)\s*}\s*from\s*["']primevue["'](?!.*\/);?/g,
-        (match, importItems) => {
-          const processedItems = parseNamedImportItems(importItems);
-          return `const { ${processedItems} } = window.PrimeVue;`;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s+from\s*["']primevue["'](?!.*\/);?/g,
-        (match, defaultImportName) => {
-          if (match.includes('{') && match.indexOf('{') < match.indexOf('from')) return match;
-
-          return `const ${defaultImportName} = window.PrimeVue;`;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s*{\s*([\s\S]*?)\s*}\s*from\s*["']vue-i18n["'];?/g,
-        (match, importItems) => {
-          const processedItems = parseNamedImportItems(importItems);
-          return `const { ${processedItems} } = window.VueI18n;`;
-        }
-      );
-
-      transformedCode = transformedCode.replace(
-        /import\s+([A-Za-z0-9$_]+)\s+from\s*["']vue-i18n["'];?/g,
-        (match, defaultImportName) => {
-          if (match.includes('{') && match.indexOf('{') < match.indexOf('from')) return match;
-          return `const ${defaultImportName} = window.VueI18n;`;
-        }
-      );
-
-      return transformedCode;
-    }
-  };
+      return transformedCode
+    },
+  }
 }
