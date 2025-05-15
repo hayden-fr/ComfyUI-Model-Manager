@@ -109,7 +109,14 @@ function createWebVersion(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [vue(), css(), output(), dev(), createWebVersion(), transformImports()],
+  plugins: [
+    vue(),
+    css(),
+    output(),
+    dev(),
+    createWebVersion(),
+    transformImports(),
+  ],
 
   build: {
     outDir: 'web',
@@ -120,13 +127,6 @@ export default defineConfig({
       // Disabling tree-shaking
       // Prevent vite remove unused exports
       treeshake: true,
-      external: [
-          'vue',
-          /^primevue($|\/)/,
-          "vue-i18n"
-      ],
-      output: {
-      },
     },
     chunkSizeWarningLimit: 1024,
   },
