@@ -119,13 +119,12 @@ export default defineConfig({
       // Disabling tree-shaking
       // Prevent vite remove unused exports
       treeshake: true,
-      output: {
-        manualChunks(id) {
-          if (id.includes('primevue')) {
-            return 'primevue'
-          }
-        },
-      },
+      external: [
+        'vue',
+        'vue-i18n',
+        /^primevue\/?.*/,
+        /^@primevue\/themes\/?.*/,
+      ],
     },
     chunkSizeWarningLimit: 1024,
   },
