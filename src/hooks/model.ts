@@ -6,7 +6,7 @@ import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
 import { castArray, cloneDeep } from 'lodash'
 import { TreeNode } from 'primevue/treenode'
-import { app } from 'scripts/comfyAPI'
+import { api, app } from 'scripts/comfyAPI'
 import { BaseModel, Model, SelectEvent, WithResolved } from 'types/typings'
 import { bytesToSize, formatDate, previewUrlToFile } from 'utils/common'
 import { ModelGrid } from 'utils/legacy'
@@ -27,6 +27,8 @@ import {
 import { useI18n } from 'vue-i18n'
 import { configSetting } from './config'
 
+const systemStat = ref()
+
 type ModelFolder = Record<string, string[]>
 
 const modelFolderProvideKey = Symbol('modelFolder') as InjectionKey<
@@ -34,9 +36,10 @@ const modelFolderProvideKey = Symbol('modelFolder') as InjectionKey<
 >
 
 export const genModelFullName = (model: BaseModel) => {
+  const splitter = systemStat.value?.system.os === 'nt' ? '\\' : '/'
   return [model.subFolder, `${model.basename}${model.extension}`]
     .filter(Boolean)
-    .join('/')
+    .join(splitter)
 }
 
 export const genModelUrl = (model: BaseModel) => {
@@ -233,6 +236,12 @@ export const useModels = defineStore('models', (store) => {
     const prefixPath = folders.value[model.type]?.[model.pathIndex]
     return [prefixPath, fullname].filter(Boolean).join('/')
   }
+
+  onMounted(() => {
+    api.getSystemStats().then((res) => {
+      systemStat.value = res
+    })
+  })
 
   return {
     initialized: initialized,
