@@ -8,6 +8,11 @@ declare namespace ComfyAPI {
         callback: (event: CustomEvent) => void,
         options?: AddEventListenerOptions,
       ) => void
+      removeEventListener: (
+        type: string,
+        callback: (event: CustomEvent) => void,
+        options?: AddEventListenerOptions,
+      ) => void
     }
 
     const api: ComfyApi

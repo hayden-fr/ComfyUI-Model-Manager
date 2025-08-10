@@ -41,12 +41,14 @@ utils.download_web_distribution(version)
 from .py import manager
 from .py import download
 from .py import information
+from .py import upload
 
 routes = config.routes
 
 manager.ModelManager().add_routes(routes)
 download.ModelDownload().add_routes(routes)
 information.Information().add_routes(routes)
+upload.ModelUploader().add_routes(routes)
 
 
 WEB_DIRECTORY = "web"

@@ -10,6 +10,7 @@ import DialogDownload from 'components/DialogDownload.vue'
 import DialogExplorer from 'components/DialogExplorer.vue'
 import DialogManager from 'components/DialogManager.vue'
 import DialogScanning from 'components/DialogScanning.vue'
+import DialogUpload from 'components/DialogUpload.vue'
 import GlobalDialogStack from 'components/GlobalDialogStack.vue'
 import GlobalLoading from 'components/GlobalLoading.vue'
 import GlobalToast from 'components/GlobalToast.vue'
@@ -64,6 +65,21 @@ onMounted(() => {
     })
   }
 
+  const openUploadDialog = () => {
+    dialog.open({
+      key: 'model-manager-upload',
+      title: t('uploadModel'),
+      content: DialogUpload,
+      headerButtons: [
+        {
+          key: 'refresh',
+          icon: 'pi pi-refresh',
+          command: refreshModelsAndConfig,
+        },
+      ],
+    })
+  }
+
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect, flat } = config
 
@@ -92,6 +108,11 @@ onMounted(() => {
           key: 'download',
           icon: 'pi pi-download',
           command: openDownloadDialog,
+        },
+        {
+          key: 'upload',
+          icon: 'pi pi-upload',
+          command: openUploadDialog,
         },
       ],
       minWidth: cardWidth * 2 + gutter + 42,
