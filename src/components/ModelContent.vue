@@ -17,7 +17,7 @@
         ></ModelPreview>
 
         <div class="flex flex-col gap-4 overflow-hidden">
-          <div class="flex items-center justify-end gap-4">
+          <div class="flex h-10 items-center justify-end gap-4">
             <slot name="action" :metadata="formInstance.metadata.value"></slot>
           </div>
 

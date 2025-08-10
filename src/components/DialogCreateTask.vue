@@ -31,12 +31,20 @@
         <KeepAlive>
           <ModelContent
             v-if="currentModel"
-            :key="currentModel.id"
+            :key="`${currentModel.id}-${currentModel.currentFileId}`"
             :model="currentModel"
             :editable="true"
             @submit="createDownTask"
           >
             <template #action>
+              <div v-if="currentModel.files" class="flex-1">
+                <ResponseSelect
+                  :model-value="currentModel.currentFileId"
+                  :items="currentModel.selectionFiles"
+                  :type="isMobile ? 'drop' : 'button'"
+                >
+                </ResponseSelect>
+              </div>
               <Button
                 icon="pi pi-download"
                 :label="$t('download')"
