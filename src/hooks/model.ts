@@ -35,8 +35,7 @@ const modelFolderProvideKey = Symbol('modelFolder') as InjectionKey<
   Ref<ModelFolder>
 >
 
-export const genModelFullName = (model: BaseModel) => {
-  const splitter = systemStat.value?.system.os === 'nt' ? '\\' : '/'
+export const genModelFullName = (model: BaseModel, splitter = '/') => {
   return [model.subFolder, `${model.basename}${model.extension}`]
     .filter(Boolean)
     .join(splitter)
@@ -726,11 +725,12 @@ export const useModelNodeAction = () => {
       // Use the legacy method instead
       const removeEmbeddingExtension = true
       const strictDragToAdd = false
+      const splitter = systemStat.value?.system.os === 'nt' ? '\\' : '/'
 
       ModelGrid.dragAddModel(
         event,
         model.type,
-        genModelFullName(model),
+        genModelFullName(model, splitter),
         removeEmbeddingExtension,
         strictDragToAdd,
       )
