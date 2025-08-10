@@ -326,7 +326,7 @@ class ModelDownload:
 
         try:
             preview_file = task_data.pop("previewFile", None)
-            utils.save_model_preview_image(task_path, preview_file, download_platform)
+            utils.save_model_preview(task_path, preview_file, download_platform)
             self.set_task_content(task_id, task_data)
             task_status = TaskStatus(
                 taskId=task_id,

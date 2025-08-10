@@ -5,17 +5,11 @@
         class="relative mx-auto w-full overflow-hidden rounded-lg preview-aspect"
         :style="$sm({ width: `${cardWidth}px` })"
       >
-        <div v-if="previewType === 'video'" class="h-full w-full p-1 hover:p-0">
-          <video
-            class="h-full w-full object-cover"
-            playsinline
-            autoplay
-            loop
-            disablepictureinpicture
-            preload="none"
-          >
-            <source :src="preview" />
-          </video>
+        <div
+          v-if="preview && isVideoUrl(preview)"
+          class="h-full w-full p-1 hover:p-0"
+        >
+          <PreviewVideo :src="preview" />
         </div>
 
         <ResponseImage
@@ -48,7 +42,14 @@
           }"
         >
           <template #item="slotProps">
+            <div
+              v-if="isVideoUrl(slotProps.data)"
+              class="h-full w-full p-1 hover:p-0"
+            >
+              <PreviewVideo :src="slotProps.data" />
+            </div>
             <ResponseImage
+              v-else
               :src="slotProps.data"
               :error="noPreviewContent"
             ></ResponseImage>
@@ -98,6 +99,7 @@
 </template>
 
 <script setup lang="ts">
+import PreviewVideo from 'components/PreviewVideo.vue'
 import ResponseFileUpload from 'components/ResponseFileUpload.vue'
 import ResponseImage from 'components/ResponseImage.vue'
 import ResponseInput from 'components/ResponseInput.vue'
@@ -106,13 +108,13 @@ import { useContainerQueries } from 'hooks/container'
 import { useModelPreview } from 'hooks/model'
 import Button from 'primevue/button'
 import Carousel from 'primevue/carousel'
+import { isVideoUrl } from 'utils/media'
 
 const editable = defineModel<boolean>('editable')
 const { cardWidth } = useConfig()
 
 const {
   preview,
-  previewType,
   typeOptions,
   currentType,
   defaultContent,
