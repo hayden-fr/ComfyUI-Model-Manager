@@ -41,6 +41,8 @@ const messages = {
     scanMissInformation: 'Download missing information',
     scanFullInformation: 'Override full information',
     noModelsInCurrentPath: 'There are no models available in the current path',
+    uploadModel: 'Upload Model',
+    chooseFile: 'Choose File',
     sort: {
       name: 'Name',
       size: 'Largest',
@@ -116,6 +118,8 @@ const messages = {
     scanMissInformation: '下载缺失信息',
     scanFullInformation: '覆盖所有信息',
     noModelsInCurrentPath: '当前路径中没有可用的模型',
+    uploadModel: '上传模型',
+    chooseFile: '选择文件',
     sort: {
       name: '名称',
       size: '最大',
