@@ -43,5 +43,10 @@
   "editor.quickSuggestions": {
     "strings": "on"
   },
-  "css.lint.unknownAtRules": "ignore"
+  "css.lint.unknownAtRules": "ignore",
+  "i18n-ally.localesPaths": [
+    "src/locales"
+  ],
+  "i18n-ally.sourceLanguage": "en",
+  "i18n-ally.keystyle": "nested"
 }
