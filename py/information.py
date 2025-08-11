@@ -69,8 +69,8 @@ class CivitaiModelSearcher(ModelSearcher):
         models: list[dict] = []
 
         for version in model_versions:
-            model_files: list[dict] = version.get("files", [])
-            model_files = utils.filter_with(model_files, {"type": "Model"})
+            version_files: list[dict] = version.get("files", [])
+            model_files = utils.filter_with(version_files, {"type": "Model"})
 
             shortname = version.get("name", None) if len(model_files) > 0 else None
 
@@ -108,7 +108,7 @@ class CivitaiModelSearcher(ModelSearcher):
                 description_parts.append("")
 
                 model = {
-                    "id": file.get("id"),
+                    "id": version.get("id"),
                     "shortname": shortname or basename,
                     "basename": basename,
                     "extension": extension,
@@ -122,6 +122,7 @@ class CivitaiModelSearcher(ModelSearcher):
                     "downloadPlatform": "civitai",
                     "downloadUrl": file.get("downloadUrl"),
                     "hashes": file.get("hashes"),
+                    "files": version_files if len(version_files) > 1 else None,
                 }
                 models.append(model)
 

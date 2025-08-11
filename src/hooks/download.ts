@@ -2,17 +2,19 @@ import { useLoading } from 'hooks/loading'
 import { request } from 'hooks/request'
 import { defineStore } from 'hooks/store'
 import { useToast } from 'hooks/toast'
+import { upperFirst } from 'lodash'
 import { api } from 'scripts/comfyAPI'
 import {
-  BaseModel,
   DownloadTask,
   DownloadTaskOptions,
   SelectOptions,
   VersionModel,
+  VersionModelFile,
 } from 'types/typings'
 import { bytesToSize } from 'utils/common'
 import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import yaml from 'yaml'
 
 export const useDownload = defineStore('download', (store) => {
   const { toast, confirm, wrapperToastError } = useToast()
@@ -162,12 +164,60 @@ declare module 'hooks/store' {
   }
 }
 
+type WithSelection<T> = SelectOptions & { item: T }
+
+type FileSelectionVersionModel = VersionModel & {
+  currentFileId?: number
+  selectionFiles?: WithSelection<VersionModelFile>[]
+}
+
 export const useModelSearch = () => {
   const loading = useLoading()
   const { toast } = useToast()
-  const data = ref<(SelectOptions & { item: VersionModel })[]>([])
+  const data = ref<WithSelection<FileSelectionVersionModel>[]>([])
   const current = ref<string | number>()
-  const currentModel = ref<BaseModel>()
+  const currentModel = ref<FileSelectionVersionModel>()
+
+  const genFileSelectionItem = (
+    item: VersionModel,
+  ): FileSelectionVersionModel => {
+    const fileSelectionItem: FileSelectionVersionModel = { ...item }
+    fileSelectionItem.selectionFiles = fileSelectionItem.files
+      ?.sort((file) => (file.type === 'Model' ? -1 : 1))
+      .map((file) => {
+        const parts = file.name.split('.')
+        const extension = `.${parts.pop()}`
+        const basename = parts.join('.')
+
+        const regexp = /---\n([\s\S]*?)\n---/
+        const yamlMetadataMatch = item.description.match(regexp)
+        const yamlMetadata = yaml.parse(yamlMetadataMatch?.[1] || '')
+        yamlMetadata.hashes = file.hashes
+        yamlMetadata.metadata = file.metadata
+        const yamlContent = `---\n${yaml.stringify(yamlMetadata)}---`
+        const description = item.description.replace(regexp, yamlContent)
+
+        return {
+          label: file.type === 'Model' ? upperFirst(item.type) : file.type,
+          value: file.id,
+          item: file,
+          command() {
+            if (currentModel.value) {
+              currentModel.value.basename = basename
+              currentModel.value.extension = extension
+              currentModel.value.sizeBytes = file.sizeKB * 1024
+              currentModel.value.metadata = file.metadata
+              currentModel.value.downloadUrl = file.downloadUrl
+              currentModel.value.hashes = file.hashes
+              currentModel.value.description = description
+              currentModel.value.currentFileId = file.id
+            }
+          },
+        }
+      })
+    fileSelectionItem.currentFileId = item.files?.[0]?.id
+    return fileSelectionItem
+  }
 
   const handleSearchByUrl = async (url: string) => {
     if (!url) {
@@ -177,14 +227,17 @@ export const useModelSearch = () => {
     loading.show()
     return request(`/model-info?model-page=${encodeURIComponent(url)}`, {})
       .then((resData: VersionModel[]) => {
-        data.value = resData.map((item) => ({
-          label: item.shortname,
-          value: item.id,
-          item,
-          command() {
-            current.value = item.id
-          },
-        }))
+        data.value = resData.map((item) => {
+          const resolvedItem = genFileSelectionItem(item)
+          return {
+            label: item.shortname,
+            value: item.id,
+            item: resolvedItem,
+            command() {
+              current.value = item.id
+            },
+          }
+        })
         current.value = data.value[0]?.value
         currentModel.value = data.value[0]?.item
 
