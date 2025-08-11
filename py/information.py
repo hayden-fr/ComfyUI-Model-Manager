@@ -71,6 +71,10 @@ class CivitaiModelSearcher(ModelSearcher):
         for version in model_versions:
             version_files: list[dict] = version.get("files", [])
             model_files = utils.filter_with(version_files, {"type": "Model"})
+            # issue: https://github.com/hayden-fr/ComfyUI-Model-Manager/issues/188
+            # Some Embeddings do not have Model file, but Negative
+            # Make sure there are at least downloadable files
+            model_files = version_files if len(model_files) == 0 else model_files
 
             shortname = version.get("name", None) if len(model_files) > 0 else None
 
