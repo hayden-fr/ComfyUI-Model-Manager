@@ -25,7 +25,7 @@
           </svg>
         </div>
         <div
-          v-else-if="preview && isVideoUrl(preview)"
+          v-else-if="isVideoUrl(preview)"
           class="h-full w-full p-1 hover:p-0"
         >
           <PreviewVideo :src="preview" />

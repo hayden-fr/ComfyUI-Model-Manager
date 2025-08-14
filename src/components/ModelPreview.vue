@@ -6,7 +6,13 @@
         :style="$sm({ width: `${cardWidth}px` })"
       >
         <div
-          v-if="preview && isVideoUrl(preview)"
+          v-if="
+            preview &&
+            isVideoUrl(
+              preview,
+              currentType === 'local' ? localContentType : undefined,
+            )
+          "
           class="h-full w-full p-1 hover:p-0"
         >
           <PreviewVideo :src="preview" />
@@ -122,6 +128,7 @@ const {
   networkContent,
   updateLocalContent,
   noPreviewContent,
+  localContentType,
 } = useModelPreview()
 
 const { $sm, $xl } = useContainerQueries()
