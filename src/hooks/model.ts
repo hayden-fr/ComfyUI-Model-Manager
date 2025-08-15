@@ -553,9 +553,11 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
    * Local file url
    */
   const localContent = ref<string>()
+  const localContentType = ref<string>()
   const updateLocalContent = async (event: SelectEvent) => {
     const { files } = event
     localContent.value = files[0].objectURL
+    localContentType.value = files[0].type
   }
 
   /**
@@ -587,16 +589,13 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
     return content
   })
 
-  const previewType = computed(() => {
-    return model.value.previewType
-  })
-
   onMounted(() => {
     registerReset(() => {
       currentType.value = 'default'
       defaultContentPage.value = 0
       networkContent.value = undefined
       localContent.value = undefined
+      localContentType.value = undefined
     })
 
     registerSubmit((data) => {
@@ -606,7 +605,6 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
 
   const result = {
     preview,
-    previewType,
     typeOptions,
     currentType,
     // default value
@@ -616,6 +614,7 @@ export const useModelPreviewEditor = (formInstance: ModelFormInstance) => {
     networkContent,
     // local file
     localContent,
+    localContentType,
     updateLocalContent,
     // no preview
     noPreviewContent,

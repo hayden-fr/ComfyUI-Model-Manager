@@ -46,7 +46,6 @@ export const useModelExplorer = () => {
       description: '',
       metadata: {},
       preview: '',
-      previewType: 'image',
       type: folder ?? '',
       isFolder: true,
       children: [],

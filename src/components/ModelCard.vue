@@ -25,19 +25,10 @@
           </svg>
         </div>
         <div
-          v-else-if="model.previewType === 'video'"
+          v-else-if="isVideoUrl(preview)"
           class="h-full w-full p-1 hover:p-0"
         >
-          <video
-            class="h-full w-full object-cover"
-            playsinline
-            autoplay
-            loop
-            disablepictureinpicture
-            preload="none"
-          >
-            <source :src="preview" />
-          </video>
+          <PreviewVideo :src="preview" />
         </div>
         <div v-else class="h-full w-full p-1 hover:p-0">
           <img class="h-full w-full rounded-lg object-cover" :src="preview" />
@@ -81,8 +72,10 @@
 
 <script setup lang="ts">
 import { useElementSize } from '@vueuse/core'
+import PreviewVideo from 'components/PreviewVideo.vue'
 import { useModelNodeAction } from 'hooks/model'
 import { BaseModel } from 'types/typings'
+import { isVideoUrl } from 'utils/media'
 import { computed, ref } from 'vue'
 
 interface Props {

@@ -20,7 +20,10 @@
           >
             <div class="flex gap-4 overflow-hidden whitespace-nowrap">
               <div class="h-18 preview-aspect">
-                <img :src="item.preview" />
+                <div v-if="isVideoUrl(item.preview)" class="h-full w-full">
+                  <PreviewVideo :src="item.preview" />
+                </div>
+                <img v-else :src="item.preview" />
               </div>
 
               <div class="flex flex-1 flex-col gap-3 overflow-hidden">
@@ -72,11 +75,13 @@
 
 <script setup lang="ts">
 import DialogCreateTask from 'components/DialogCreateTask.vue'
+import PreviewVideo from 'components/PreviewVideo.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
 import { useContainerQueries } from 'hooks/container'
 import { useDialog } from 'hooks/dialog'
 import { useDownload } from 'hooks/download'
 import Button from 'primevue/button'
+import { isVideoUrl } from 'utils/media'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 

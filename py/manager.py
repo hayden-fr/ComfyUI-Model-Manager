@@ -134,18 +134,8 @@ class ModelManager:
             if is_file and extension not in folder_paths.supported_pt_extensions:
                 return None
 
-            preview_type = "image"
-            preview_ext = ".webp"
-            preview_images = utils.get_model_all_images(entry.path)
-            if len(preview_images) > 0:
-                preview_type = "image"
-                preview_ext = ".webp"
-            else:
-                preview_videos = utils.get_model_all_videos(entry.path)
-                if len(preview_videos) > 0:
-                    preview_type = "video"
-                    preview_ext = f".{preview_videos[0].split('.')[-1]}"
-
+            preview_name = utils.get_model_preview_name(entry.path)
+            preview_ext = f".{preview_name.split('.')[-1]}"
             model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
 
             stat = entry.stat()
@@ -158,7 +148,6 @@ class ModelManager:
                 "pathIndex": path_index,
                 "sizeBytes": stat.st_size if is_file else 0,
                 "preview": model_preview if is_file else None,
-                "previewType": preview_type,
                 "createdAt": round(stat.st_ctime_ns / 1000000),
                 "updatedAt": round(stat.st_mtime_ns / 1000000),
             }
@@ -211,10 +200,11 @@ class ModelManager:
 
         if "previewFile" in model_data:
             previewFile = model_data["previewFile"]
-            if type(previewFile) is str and previewFile == "undefined":
-                utils.remove_model_preview_image(model_path)
-            else:
-                utils.save_model_preview_image(model_path, previewFile)
+            # Always remove existing preview files first in case the file extension has changed
+            utils.remove_model_preview(model_path)
+            # Nothing else to do if the preview file was being removed
+            if not (type(previewFile) is str and previewFile == "undefined"):
+                utils.save_model_preview(model_path, previewFile)
 
         if "description" in model_data:
             description = model_data["description"]
@@ -236,7 +226,7 @@ class ModelManager:
         model_dirname = os.path.dirname(model_path)
         os.remove(model_path)
 
-        model_previews = utils.get_model_all_images(model_path)
+        model_previews = utils.get_model_all_previews(model_path)
         for preview in model_previews:
             os.remove(utils.join_path(model_dirname, preview))
 
