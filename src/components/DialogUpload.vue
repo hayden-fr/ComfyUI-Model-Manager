@@ -211,23 +211,28 @@ const uploadActions = ref([
       input.accept = supportedExtensions.value.join(',')
       input.onchange = async () => {
         const files = input.files
+        console.log('selected files:', files)
         const file = files?.item(0)
         if (!file) {
           return
         }
 
         try {
+          console.log('try to upload file:', file)
           uploadTotalSize.value = file.size
           uploadSize.value = 0
           const body = new FormData()
           body.append('folder', toValue(selectedModelFolder)!)
           body.append('file', file)
 
-          await request('/upload', {
+          const res = await request('/upload', {
             method: 'POST',
             body: body,
           })
+
+          console.log('upload done', res)
         } catch (error) {
+          console.error(error)
           toast.add({
             severity: 'error',
             summary: 'Error',
@@ -258,6 +263,7 @@ const fetchSupportedExtensions = async () => {
 }
 
 const update_process = (event: CustomEvent) => {
+  console.log('update_process:', event.detail)
   const detail = event.detail
   uploadSize.value = detail.uploaded_size
 }
