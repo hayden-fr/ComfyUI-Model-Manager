@@ -43,7 +43,7 @@ def print_warning(msg, *args, **kwargs):
 
 
 def print_error(msg, *args, **kwargs):
-    logging.error(f"[{config.extension_tag}] {msg}", *args, **kwargs)
+    logging.error(f"[{config.extension_tag}][ERROR] {msg}", *args, **kwargs)
     logging.debug(traceback.format_exc())
 
 
