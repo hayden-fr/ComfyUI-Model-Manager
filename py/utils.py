@@ -21,6 +21,9 @@ from . import config
 VIDEO_EXTENSIONS = ['.mp4', '.webm', '.mov', '.avi', '.mkv', '.flv', '.wmv', '.m4v', '.ogv']
 IMAGE_EXTENSIONS = ['.webp', '.png', '.jpg', '.jpeg', '.gif', '.bmp']
 
+# Preview extensions in priority order (videos first, then images)
+PREVIEW_EXTENSIONS = ['.webm', '.mp4', '.webp', '.png', '.jpg', '.jpeg', '.gif', '.bmp']
+
 # Content type mappings
 VIDEO_CONTENT_TYPE_MAP = {
     'video/mp4': '.mp4',
@@ -268,40 +271,52 @@ def get_model_metadata(filename: str):
         return {}
 
 
-def get_model_all_previews(model_path: str):
+def _check_preview_variants(base_dirname: str, basename: str, extensions: list[str]) -> list[str]:
+    """Check for preview files with given extensions and return found files"""
+    found = []
+    for ext in extensions:
+        # Direct match (basename.ext)
+        preview_file = f"{basename}{ext}"
+        if os.path.isfile(join_path(base_dirname, preview_file)):
+            found.append(preview_file)
+        
+        # Preview variant (basename.preview.ext)
+        preview_file = f"{basename}.preview{ext}"
+        if os.path.isfile(join_path(base_dirname, preview_file)):
+            found.append(preview_file)
+    return found
+
+
+def _get_preview_path(model_path: str, extension: str) -> str:
+    """Generate preview file path with given extension"""
+    basename = os.path.splitext(model_path)[0]
+    return f"{basename}{extension}"
+
+
+def get_model_all_previews(model_path: str) -> list[str]:
+    """Get all preview files for a model"""
     base_dirname = os.path.dirname(model_path)
-    files = search_files(base_dirname)
-    files = folder_paths.filter_files_content_types(files, ["video", "image"])
-
     basename = os.path.splitext(os.path.basename(model_path))[0]
-    output: list[str] = []
-    for file in files:
-        file_basename = os.path.splitext(file)[0]
-        if file_basename == basename:
-            output.append(file)
-        if file_basename == f"{basename}.preview":
-            output.append(file)
-    return output
+    return _check_preview_variants(base_dirname, basename, PREVIEW_EXTENSIONS)
 
 
-def get_model_preview_name(model_path: str):
-    """
-    Get the preview file name for a model. Checks for images and videos in all supported formats.
-    Returns the first available preview file or 'no-preview.png' if none found.
-    """
+def get_model_preview_name(model_path: str) -> str:
+    """Get the first available preview file or 'no-preview.png' if none found"""
     base_dirname = os.path.dirname(model_path)
     basename = os.path.splitext(os.path.basename(model_path))[0]
     
-    # Prefer previews with these extensions in this order
-    preview_extensions = ['.webm', '.mp4', '.webp']
-    for ext in preview_extensions:
+    for ext in PREVIEW_EXTENSIONS:
+        # Check direct match first
         preview_name = f"{basename}{ext}"
-        if os.path.exists(join_path(base_dirname, preview_name)):
+        if os.path.isfile(join_path(base_dirname, preview_name)):
+            return preview_name
+        
+        # Check preview variant
+        preview_name = f"{basename}.preview{ext}"
+        if os.path.isfile(join_path(base_dirname, preview_name)):
             return preview_name
     
-    # Fallback to any available preview files
-    all_previews = get_model_all_previews(model_path)
-    return all_previews[0] if len(all_previews) > 0 else "no-preview.png"
+    return "no-preview.png"
 
 
 from PIL import Image
@@ -309,34 +324,19 @@ from io import BytesIO
 
 
 def remove_model_preview(model_path: str):
-    """
-    Remove preview files for a model.
-    """
-    basename = os.path.splitext(model_path)[0]
+    """Remove all preview files for a model"""
     base_dirname = os.path.dirname(model_path)
+    basename = os.path.splitext(os.path.basename(model_path))[0]
     
-    # Remove all preview files
-    for ext in VIDEO_EXTENSIONS + IMAGE_EXTENSIONS:
-        preview_path = f"{basename}{ext}"
+    previews = _check_preview_variants(base_dirname, basename, PREVIEW_EXTENSIONS)
+    for preview in previews:
+        preview_path = join_path(base_dirname, preview)
         if os.path.exists(preview_path):
             os.remove(preview_path)
-    
-    # Also check for .preview variants
-    files = search_files(base_dirname)
-    model_name = os.path.splitext(os.path.basename(model_path))[0]
-    for file in files:
-        if file.startswith(f"{model_name}.preview"):
-            file_path = join_path(base_dirname, file)
-            if os.path.exists(file_path):
-                os.remove(file_path)
 
 
 def save_model_preview(model_path: str, file_or_url: Any, platform: Optional[str] = None):
-    """
-    Save a preview file for a model.
-    Images are converted to WebP, videos are saved in their original format.
-    """
-    basename = os.path.splitext(model_path)[0]
+    """Save a preview file for a model. Images -> WebP, videos -> original format"""
     
     # Download file if it is a URL
     if type(file_or_url) is str:
@@ -357,15 +357,13 @@ def save_model_preview(model_path: str, file_or_url: Any, platform: Optional[str
             if content_type.startswith("video/"):
                 # Save video in original format
                 # Try to get extension from URL or content-type
-                ext = _get_video_extension_from_url(url) or _get_extension_from_content_type(content_type)
-                if not ext:
-                    ext = '.mp4'  # Default fallback
-                preview_path = f"{basename}{ext}"
+                ext = _get_video_extension_from_url(url) or _get_extension_from_content_type(content_type) or '.mp4'
+                preview_path = _get_preview_path(model_path, ext)
                 with open(preview_path, 'wb') as f:
                     f.write(content)
             else:
                 # Default to image processing for unknown or image types
-                preview_path = f"{basename}.webp"
+                preview_path = _get_preview_path(model_path, ".webp")
                 image = Image.open(BytesIO(content))
                 image.save(preview_path, "WEBP")
 
@@ -384,17 +382,15 @@ def save_model_preview(model_path: str, file_or_url: Any, platform: Optional[str
         
         if content_type.startswith("video/"):
             # Save video in original format for now, consider transcoding to webm to follow the pattern for images converting to webp
-            ext = os.path.splitext(filename.lower())[1]
-            if not ext:
-                ext = '.mp4'  # Default fallback
-            preview_path = f"{basename}{ext}"
+            ext = os.path.splitext(filename.lower())[1] or '.mp4'
+            preview_path = _get_preview_path(model_path, ext)
             file_obj.file.seek(0)
             content = file_obj.file.read()
             with open(preview_path, 'wb') as f:
                 f.write(content)
         elif content_type.startswith("image/"):
             # Convert image to webp
-            preview_path = f"{basename}.webp"
+            preview_path = _get_preview_path(model_path, ".webp")
             image = Image.open(file_obj.file)
             image.save(preview_path, "WEBP")
         else:
