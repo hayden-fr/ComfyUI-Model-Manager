@@ -138,6 +138,10 @@ class ModelManager:
             preview_ext = f".{preview_name.split('.')[-1]}"
             model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
 
+            if not os.path.exists(entry.path):
+                utils.print_error(f"{entry.path} is not file or directory.")
+                return None
+
             stat = entry.stat()
             return {
                 "type": folder,
