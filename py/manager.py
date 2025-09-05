@@ -131,12 +131,11 @@ class ModelManager:
             basename = os.path.splitext(filename)[0] if is_file else filename
             extension = os.path.splitext(filename)[1] if is_file else ""
 
-            if is_file and extension not in folder_paths.supported_pt_extensions:
-                return None
-
-            preview_name = utils.get_model_preview_name(entry.path)
-            preview_ext = f".{preview_name.split('.')[-1]}"
-            model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
+            model_preview = None
+            if is_file:
+                preview_name = utils.get_model_preview_name(entry.path)
+                preview_ext = f".{preview_name.split('.')[-1]}"
+                model_preview = f"/model-manager/preview/{folder}/{path_index}/{relative_path.replace(extension, preview_ext)}"
 
             if not os.path.exists(entry.path):
                 utils.print_error(f"{entry.path} is not file or directory.")
@@ -151,7 +150,7 @@ class ModelManager:
                 "extension": extension,
                 "pathIndex": path_index,
                 "sizeBytes": stat.st_size if is_file else 0,
-                "preview": model_preview if is_file else None,
+                "preview": model_preview,
                 "createdAt": round(stat.st_ctime_ns / 1000000),
                 "updatedAt": round(stat.st_mtime_ns / 1000000),
             }
@@ -160,26 +159,34 @@ class ModelManager:
             entries: list[os.DirEntry[str]] = []
             with os.scandir(directory) as it:
                 for entry in it:
-                    # Skip hidden files
-                    if not include_hidden_files:
-                        if entry.name.startswith("."):
-                            continue
-                    entries.append(entry)
-                    if entry.is_dir():
+                    if not include_hidden_files and entry.name.startswith("."):
+                        continue
+                    
+                    if entry.is_file():
+                        extension = os.path.splitext(entry.name)[1]
+                        if extension in folder_paths.supported_pt_extensions:
+                            entries.append(entry)
+                    else:
+                        entries.append(entry)
                         entries.extend(get_all_files_entry(entry.path))
             return entries
 
+        BATCH_SIZE = 200
+        MAX_WORKERS = min(4, os.cpu_count() or 1)
+        
         for path_index, base_path in enumerate(folders):
             if not os.path.exists(base_path):
                 continue
             file_entries = get_all_files_entry(base_path)
-            with ThreadPoolExecutor() as executor:
-                futures = {executor.submit(get_file_info, entry, base_path, path_index): entry for entry in file_entries}
-                for future in as_completed(futures):
-                    file_info = future.result()
-                    if file_info is None:
-                        continue
-                    result.append(file_info)
+            
+            for i in range(0, len(file_entries), BATCH_SIZE):
+                batch = file_entries[i:i + BATCH_SIZE]
+                with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+                    futures = {executor.submit(get_file_info, entry, base_path, path_index): entry for entry in batch}
+                    for future in as_completed(futures):
+                        file_info = future.result()
+                        if file_info is not None:
+                            result.append(file_info)
 
         return result
 
