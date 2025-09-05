@@ -157,6 +157,8 @@ class ModelManager:
 
         def get_all_files_entry(directory: str):
             entries: list[os.DirEntry[str]] = []
+            if not os.path.exists(directory):
+                return []
             with os.scandir(directory) as it:
                 for entry in it:
                     if not include_hidden_files and entry.name.startswith("."):
