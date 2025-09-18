@@ -73,5 +73,9 @@
     "ui": "外观",
     "cardSize": "卡片尺寸",
     "useFlatUI": "展平布局"
-  }
+  },
+  "switchToFolderView": "切换到文件夹视图",
+  "switchToFlatView": "切换到平铺视图",
+  "hideHiddenFiles": "隐藏隐藏文件",
+  "showHiddenFiles": "显示隐藏文件"
 }

@@ -80,8 +80,51 @@ onMounted(() => {
     })
   }
 
+  const toggleLayout = () => {
+    // flip the flat setting
+    const newValue = !config.flat.value
+    config.flat.value = newValue
+
+    // persist so it survives reloads
+    app.ui?.settings.setSettingValue('ModelManager.UI.Flat', newValue)
+
+    // close the current dialog (because it is keepAlive)
+    dialog.closeAll()
+
+    // reopen with the new layout
+    openManagerDialog()
+  }
+
+    const toggleHiddenFiles = () => {
+    // read current setting, default false if unset
+    const current =
+      app.ui?.settings.getSettingValue('ModelManager.Scan.IncludeHiddenFiles') ??
+      false
+    const newVal = !current
+
+    // persist setting
+    app.ui?.settings.setSettingValue('ModelManager.Scan.IncludeHiddenFiles', newVal)
+
+    // refresh models so the toggle takes effect
+    refreshModelsAndConfig()
+
+    // close and reopen manager to redraw content
+    dialog.closeAll()
+    openManagerDialog()
+  }
+
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect, flat } = config
+    // choose icon depending on current layout
+    const layoutIcon = flat.value ? 'pi pi-folder-open' : 'pi pi-th-large'
+    // determine hidden files setting
+    const includeHidden =
+      app.ui?.settings.getSettingValue('ModelManager.Scan.IncludeHiddenFiles') ??
+      false
+    const hiddenIcon = includeHidden ? 'pi pi-eye' : 'pi pi-eye-slash'
+    const hiddenTooltip = includeHidden
+      ? t('hideHiddenFiles')
+      : t('showHiddenFiles')
 
     if (firstOpenManager.value) {
       models.refresh(true)
@@ -98,6 +141,20 @@ onMounted(() => {
           key: 'scanning',
           icon: 'mdi mdi-folder-search-outline text-lg',
           command: openModelScanning,
+        },
+        {
+          key: 'toggle-hidden',
+          icon: hiddenIcon,
+          command: toggleHiddenFiles,
+          tooltip: hiddenTooltip,
+        },
+        {
+          key: 'toggle-layout',
+          icon: layoutIcon,
+          command: toggleLayout,
+          tooltip: flat.value
+            ? t('switchToFolderView')
+            : t('switchToFlatView'),
         },
         {
           key: 'refresh',
