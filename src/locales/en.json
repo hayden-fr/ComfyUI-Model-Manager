@@ -73,5 +73,9 @@
     "ui": "UI",
     "cardSize": "Card Size",
     "useFlatUI": "Flat Layout"
-  }
+  },
+  "switchToFolderView": "Switch to Folder View",
+  "switchToFlatView": "Switch to Flat View",
+  "hideHiddenFiles": "Hide hidden files",
+  "showHiddenFiles": "Show hidden files"
 }
