@@ -80,8 +80,25 @@ onMounted(() => {
     })
   }
 
+  const toggleLayout = () => {
+    // flip the flat setting
+    const newValue = !config.flat.value
+    config.flat.value = newValue
+
+    // persist so it survives reloads
+    app.ui?.settings.setSettingValue('ModelManager.UI.Flat', newValue)
+
+    // close the current dialog (because it is keepAlive)
+    dialog.closeAll()
+
+    // reopen with the new layout
+    openManagerDialog()
+  }
+
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect, flat } = config
+    // choose icon depending on current layout
+    const layoutIcon = flat.value ? 'pi pi-folder-open' : 'pi pi-th-large'
 
     if (firstOpenManager.value) {
       models.refresh(true)
@@ -98,6 +115,14 @@ onMounted(() => {
           key: 'scanning',
           icon: 'mdi mdi-folder-search-outline text-lg',
           command: openModelScanning,
+        },
+        {
+          key: 'toggle-layout',
+          icon: layoutIcon,
+          command: toggleLayout,
+          tooltip: flat.value
+            ? t('switchToFolderView')
+            : t('switchToFlatView'),
         },
         {
           key: 'refresh',
