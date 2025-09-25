@@ -225,33 +225,33 @@ const list = computed(() => {
     return !item.isFolder
   })
 
-function buildRegex(raw: string): RegExp {
-  try {
-    // Escape regex specials, then restore * wildcards as .*
-    const escaped = raw
-      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-      .replace(/\\\*/g, '.*')
-    return new RegExp(escaped, 'i') // case-insensitive
-  } catch (e) {
-    return new RegExp(raw, 'i')
+  function buildRegex(raw: string): RegExp {
+    try {
+      // Escape regex specials, then restore * wildcards as .*
+      const escaped = raw
+        .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\*/g, '.*')
+      return new RegExp(escaped, 'i') // case-insensitive
+    } catch {
+      return new RegExp(raw, 'i')
+    }
   }
-}
 
-const filterList = pureModels.filter((model) => {
-  const showAllModel = currentType.value === allType
-  const matchType = showAllModel || model.type === currentType.value
+  const filterList = pureModels.filter((model) => {
+    const showAllModel = currentType.value === allType
+    const matchType = showAllModel || model.type === currentType.value
 
-  const rawFilter = searchContent.value ?? ''
-  const tokens = rawFilter.split(/\s+/).filter(Boolean)
-  const regexes = tokens.map(buildRegex)
+    const rawFilter = searchContent.value ?? ''
+    const tokens = rawFilter.split(/\s+/).filter(Boolean)
+    const regexes = tokens.map(buildRegex)
 
-  // Require every token to match either the folder or the name
-  const matchesAll = regexes.every((re) =>
-    re.test(model.subFolder) || re.test(model.basename)
-  )
-  
-  return matchType && matchesAll
-})
+    // Require every token to match either the folder or the name
+    const matchesAll = regexes.every(
+      (re) => re.test(model.subFolder) || re.test(model.basename),
+    )
+
+    return matchType && matchesAll
+  })
 
   let sortStrategy: (a: Model, b: Model) => number = () => 0
   switch (sortOrder.value) {
@@ -277,7 +277,6 @@ const filterList = pureModels.filter((model) => {
     return { key: row.map(genModelKey).join(','), row }
   })
 })
-
 
 const contentStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fit, ${cardSize.value.width}px)`,
