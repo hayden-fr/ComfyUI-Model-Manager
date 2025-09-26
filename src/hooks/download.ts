@@ -11,7 +11,12 @@ import {
   VersionModel,
   VersionModelFile,
 } from 'types/typings'
-import { bytesToSize } from 'utils/common'
+import {
+  bytesToSize,
+  getFilenameFromUrl,
+  getModelTypeFromFilename,
+  isDirectFileUrl,
+} from 'utils/common'
 import { onBeforeMount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import yaml from 'yaml'
@@ -191,7 +196,13 @@ export const useModelSearch = () => {
 
         const regexp = /---\n([\s\S]*?)\n---/
         const yamlMetadataMatch = item.description.match(regexp)
-        const yamlMetadata = yaml.parse(yamlMetadataMatch?.[1] || '')
+        let yamlMetadata: any = {}
+        try {
+          yamlMetadata = yaml.parse(yamlMetadataMatch?.[1] || '') || {}
+        } catch (e) {
+          console.warn('Failed to parse YAML metadata:', e)
+          yamlMetadata = {}
+        }
         yamlMetadata.hashes = file.hashes
         yamlMetadata.metadata = file.metadata
         const yamlContent = `---\n${yaml.stringify(yamlMetadata)}---`
@@ -219,12 +230,169 @@ export const useModelSearch = () => {
     return fileSelectionItem
   }
 
-  const handleSearchByUrl = async (url: string) => {
+  const createDirectFileModel = (
+    url: string,
+    modelType?: string,
+  ): VersionModel => {
+    try {
+      const filename = getFilenameFromUrl(url)
+      const parts = filename.split('.')
+      const extension = `.${parts.pop()}`
+      const basename = parts.join('.') || 'model'
+      const detectedModelType = modelType || getModelTypeFromFilename(filename)
+
+      // Create a proper YAML metadata structure for direct files
+      const yamlMetadata = {
+        source: 'direct-link',
+        original_url: url,
+        filename: filename,
+        modelType: detectedModelType,
+        downloadPlatform: 'Direct Link',
+      }
+
+      const description = `---
+${Object.entries(yamlMetadata)
+  .map(([key, value]) => `${key}: ${value}`)
+  .join('\n')}
+---
+
+# Direct File Download
+
+This is a direct download link to a model file. The file size will be determined during download.
+
+**Source:** ${url}
+**Filename:** ${filename}
+**Type:** ${detectedModelType}`
+
+      return {
+        id: `direct-${Date.now()}`,
+        basename,
+        extension,
+        sizeBytes: 0, // Will be determined during download
+        type: detectedModelType,
+        subFolder: '',
+        pathIndex: 0,
+        isFolder: false,
+        preview: '',
+        description,
+        metadata: {
+          source: 'direct-link',
+          original_url: url,
+        },
+        shortname: basename,
+        downloadPlatform: 'Direct Link',
+        downloadUrl: url,
+        hashes: {},
+        files: [
+          {
+            id: 1,
+            sizeKB: 0, // Unknown until download starts
+            name: filename,
+            type: 'Model',
+            metadata: {
+              source: 'direct-link',
+              original_url: url,
+            },
+            hashes: {},
+            downloadUrl: url,
+          },
+        ],
+      }
+    } catch (error) {
+      console.error('Error creating direct file model:', error)
+      // Return a fallback model
+      const fallbackType = modelType || 'checkpoints'
+      return {
+        id: `direct-${Date.now()}`,
+        basename: 'model',
+        extension: '.bin',
+        sizeBytes: 0,
+        type: fallbackType,
+        subFolder: '',
+        pathIndex: 0,
+        isFolder: false,
+        preview: '',
+        description: `---
+source: direct-link
+original_url: ${url}
+filename: model.bin
+modelType: ${fallbackType}
+downloadPlatform: Direct Link
+---
+
+# Direct File Download
+
+This is a direct download link to a model file.`,
+        metadata: {
+          source: 'direct-link',
+          original_url: url,
+        },
+        shortname: 'model',
+        downloadPlatform: 'Direct Link',
+        downloadUrl: url,
+        hashes: {},
+        files: [
+          {
+            id: 1,
+            sizeKB: 0,
+            name: 'model.bin',
+            type: 'Model',
+            metadata: {
+              source: 'direct-link',
+              original_url: url,
+            },
+            hashes: {},
+            downloadUrl: url,
+          },
+        ],
+      }
+    }
+  }
+
+  const handleSearchByUrl = async (url: string, modelType?: string) => {
     if (!url) {
       return Promise.resolve([])
     }
 
     loading.show()
+
+    // Check if this is a direct file URL
+    if (isDirectFileUrl(url)) {
+      try {
+        // Create a mock model for direct file download
+        const directModel = createDirectFileModel(url, modelType)
+        const resolvedItem = genFileSelectionItem(directModel)
+
+        data.value = [
+          {
+            label: directModel.shortname,
+            value: directModel.id,
+            item: resolvedItem,
+            command() {
+              current.value = directModel.id
+            },
+          },
+        ]
+
+        current.value = data.value[0]?.value
+        currentModel.value = data.value[0]?.item
+
+        loading.hide()
+        return [directModel]
+      } catch (error) {
+        console.error('Error processing direct file URL:', error)
+        loading.hide()
+        toast.add({
+          severity: 'error',
+          summary: 'Error',
+          detail: `Failed to process direct file URL: ${error instanceof Error ? error.message : 'Unknown error'}`,
+          life: 5000,
+        })
+        return []
+      }
+    }
+
+    // Original logic for model page URLs
     return request(`/model-info?model-page=${encodeURIComponent(url)}`, {})
       .then((resData: VersionModel[]) => {
         data.value = resData.map((item) => {
