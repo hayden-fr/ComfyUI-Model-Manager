@@ -7,12 +7,6 @@
           :label="$t('createDownloadTask')"
           @click="openCreateTask"
         ></Button>
-        <Button
-          icon="pi pi-cog"
-          :class="[$sm('w-auto', 'w-full')]"
-          severity="secondary"
-          @click="openSettings"
-        ></Button>
       </div>
     </div>
 
@@ -81,7 +75,6 @@
 
 <script setup lang="ts">
 import DialogCreateTask from 'components/DialogCreateTask.vue'
-import DialogDownloadSetting from 'components/DialogDownloadSetting.vue'
 import PreviewVideo from 'components/PreviewVideo.vue'
 import ResponseScroll from 'components/ResponseScroll.vue'
 import { useContainerQueries } from 'hooks/container'
@@ -102,15 +95,6 @@ const openCreateTask = () => {
     key: `model-manager-create-task-${Date.now()}`,
     title: t('parseModelUrl'),
     content: DialogCreateTask,
-  })
-}
-
-const openSettings = () => {
-  dialog.open({
-    key: `model-manager-download-setting-${Date.now()}`,
-    title: t('settings'),
-    content: DialogDownloadSetting,
-    modal: true,
   })
 }
 
