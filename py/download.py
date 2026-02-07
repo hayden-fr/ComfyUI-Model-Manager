@@ -373,8 +373,8 @@ class ModelDownload:
         await utils.send_json("delete_download_task", task_id)
 
     async def download_model(self, task_id: str, request):
-        enable_multithread = utils.get_setting_value(request, "ModelManager.Download.MultiThreadEnabled", True)
-        thread_count = utils.get_setting_value(request, "ModelManager.Download.ThreadCount", 4)
+        enable_multithread = utils.get_setting_value(request, "download.multi_thread_enabled", True)
+        thread_count = utils.get_setting_value(request, "download.thread_count", 4)
 
         async def download_task(task_id: str):
             async def report_progress(task_status: TaskStatus):

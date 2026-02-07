@@ -10,6 +10,8 @@ setting_key = {
     },
     "download": {
         "max_task_count": "ModelManager.Download.MaxTaskCount",
+        "multi_thread_enabled": "ModelManager.Download.MultiThreadEnabled",
+        "thread_count": "ModelManager.Download.ThreadCount",
     },
     "scan": {
         "include_hidden_files": "ModelManager.Scan.IncludeHiddenFiles"
