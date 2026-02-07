@@ -24,7 +24,7 @@ function css(): Plugin {
       for (const key in bundle) {
         if (Object.prototype.hasOwnProperty.call(bundle, key)) {
           const chunk = bundle[key]
-          if (chunk.type === 'chunk' && /index-.*\.js$/.test(chunk.fileName)) {
+          if (chunk.type === 'chunk' && chunk.isEntry) {
             const originalCode = chunk.code
             chunk.code = '(function(){var s=document.createElement("style");'
             chunk.code += 's.type="text/css",s.dataset.styleId="model-manager",'
