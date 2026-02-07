@@ -10,8 +10,6 @@
   "createDownloadTask": "Create Download Task",
   "parseModelUrl": "Parse Model URL",
   "pleaseInputModelUrl": "Input a URL from civitai.com or huggingface.co",
-  "multiThreadDownload": "Multi-thread Download",
-  "threadCount": "Thread Count",
   "settings": "Settings",
   "cancel": "Cancel",
   "save": "Save",
@@ -75,6 +73,9 @@
     "excludeScanTypes": "Exclude scan types (separate with commas)",
     "ui": "UI",
     "cardSize": "Card Size",
-    "useFlatUI": "Flat Layout"
+    "useFlatUI": "Flat Layout",
+    "download": "Download",
+    "multiThreadDownload": "Multi-thread Download",
+    "threadCount": "Thread Count"
   }
 }
