@@ -3,7 +3,9 @@ import uuid
 import time
 import requests
 import base64
-
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 import folder_paths
 
@@ -371,6 +373,9 @@ class ModelDownload:
         await utils.send_json("delete_download_task", task_id)
 
     async def download_model(self, task_id: str, request):
+        enable_multithread = utils.get_setting_value(request, "ModelManager.Download.MultiThreadEnabled", True)
+        thread_count = utils.get_setting_value(request, "ModelManager.Download.ThreadCount", 4)
+
         async def download_task(task_id: str):
             async def report_progress(task_status: TaskStatus):
                 await utils.send_json("update_download_task", task_status.to_dict())
@@ -407,6 +412,8 @@ class ModelDownload:
                     headers=headers,
                     progress_callback=report_progress,
                     interval=progress_interval,
+                    enable_multithread=enable_multithread,
+                    thread_count=thread_count,
                 )
             except Exception as e:
                 task_status.status = "pause"
@@ -434,6 +441,8 @@ class ModelDownload:
         headers: dict,
         progress_callback: Callable[[TaskStatus], Awaitable[Any]],
         interval: float = 1.0,
+        enable_multithread: bool = True,
+        thread_count: int = 4,
     ):
 
         async def download_complete():
@@ -456,6 +465,9 @@ class ModelDownload:
 
             time.sleep(1)
             task_file = utils.join_path(download_path, f"{task_id}.task")
+            parts_file = utils.join_path(download_path, f"{task_id}.parts")
+            if os.path.exists(parts_file):
+                os.remove(parts_file)
             os.remove(task_file)
             await utils.send_json("complete_download_task", task_id)
 
@@ -480,6 +492,118 @@ class ModelDownload:
 
         download_path = utils.get_download_path()
         download_tmp_file = utils.join_path(download_path, f"{task_id}.download")
+        parts_file = utils.join_path(download_path, f"{task_id}.parts")
+
+        total_size = task_content.sizeBytes
+        support_multi_thread = False
+
+        try:
+            if enable_multithread and (total_size == 0 or total_size > 10 * 1024 * 1024):
+                head_resp = requests.head(model_url, headers=headers, allow_redirects=True, timeout=10)
+                if head_resp.status_code == 200:
+                    remote_size = float(head_resp.headers.get("Content-Length", 0))
+                    if remote_size > 0:
+                        total_size = remote_size
+                        if task_content.sizeBytes != total_size:
+                            task_content.sizeBytes = total_size
+                            task_status.totalSize = total_size
+                            self.set_task_content(task_id, task_content)
+                            await utils.send_json("update_download_task", task_content.to_dict())
+                    
+                    if head_resp.headers.get("Accept-Ranges") == "bytes" and total_size > 10 * 1024 * 1024:
+                        support_multi_thread = True
+        except:
+            pass
+
+        if os.path.exists(download_tmp_file) and not os.path.exists(parts_file):
+            support_multi_thread = False
+
+        if support_multi_thread:
+            parts = []
+            if os.path.exists(parts_file):
+                try:
+                    parts = utils.load_dict_pickle_file(parts_file)
+                except:
+                    pass
+            
+            if not parts:
+                with open(download_tmp_file, "wb") as f:
+                    f.truncate(int(total_size))
+                
+                part_count = thread_count
+                chunk_size = int(total_size // part_count)
+                for i in range(part_count):
+                    start = i * chunk_size
+                    end = (i + 1) * chunk_size - 1 if i < part_count - 1 else int(total_size) - 1
+                    parts.append({"start": start, "end": end, "current": start})
+                utils.save_dict_pickle_file(parts_file, parts)
+
+            q = queue.Queue()
+            stop_event = threading.Event()
+            
+            def worker(part_idx, p_info):
+                p_end = p_info["end"]
+                p_curr = p_info["current"]
+                if p_curr > p_end: return
+
+                h = headers.copy()
+                h["Range"] = f"bytes={p_curr}-{p_end}"
+                try:
+                    with requests.get(model_url, headers=h, stream=True, timeout=30) as r:
+                        if r.status_code not in (200, 206): return
+                        with open(download_tmp_file, "r+b") as f:
+                            f.seek(p_curr)
+                            for chunk in r.iter_content(chunk_size=65536):
+                                if stop_event.is_set(): return
+                                if not chunk: break
+                                f.write(chunk)
+                                q.put((part_idx, len(chunk)))
+                except: pass
+            
+            executor = ThreadPoolExecutor(max_workers=len(parts))
+            futures = [executor.submit(worker, i, part) for i, part in enumerate(parts)]
+            
+            downloaded_size = sum(p["current"] - p["start"] for p in parts)
+            last_downloaded_size = downloaded_size
+            last_update_time = time.time()
+            
+            while any(not f.done() for f in futures):
+                if task_status.status == "pause":
+                    stop_event.set()
+                    break
+                try:
+                    while True:
+                        pidx, inc = q.get_nowait()
+                        parts[pidx]["current"] += inc
+                        downloaded_size += inc
+                except queue.Empty: pass
+                
+                if time.time() - last_update_time >= interval:
+                    task_status.downloadedSize = downloaded_size
+                    task_status.progress = (downloaded_size / total_size) * 100 if total_size else 0
+                    task_status.bps = downloaded_size - last_downloaded_size
+                    await progress_callback(task_status)
+                    utils.save_dict_pickle_file(parts_file, parts)
+                    last_update_time = time.time()
+                    last_downloaded_size = downloaded_size
+                await asyncio.sleep(0.1)
+            
+            executor.shutdown(wait=True)
+            try:
+                while True:
+                    pidx, inc = q.get_nowait()
+                    parts[pidx]["current"] += inc
+                    downloaded_size += inc
+            except queue.Empty: pass
+            utils.save_dict_pickle_file(parts_file, parts)
+            
+            if all(p["current"] > p["end"] for p in parts) and downloaded_size >= total_size:
+                await download_complete()
+            else:
+                if task_status.status != "pause":
+                    task_status.status = "pause"
+                    await utils.send_json("update_download_task", task_status.to_dict())
+            return
 
         downloaded_size = 0
         if os.path.isfile(download_tmp_file):
@@ -518,18 +642,39 @@ class ModelDownload:
             # Here we also need to consider how different websites are processed.
             raise RuntimeError(f"{task_content.fullname} needs to be logged in to download. Please set the API-Key first.")
 
-        # When parsing model information from HuggingFace API,
-        # the file size was not found and needs to be obtained from the response header.
-        # Fixed issue #169. Some model information from Civitai, providing the wrong file size
-        response_total_size = float(response.headers.get("content-length", 0))
-        if total_size == 0 or total_size != response_total_size:
+        # [fix-start]
+        # 确定文件写入模式和准确的总大小
+        file_mode = "ab"
+        response_total_size = 0.0
+
+        if response.status_code == 206:
+            # 206 Partial Content: 服务器支持续传
+            # Content-Range 格式通常为: bytes start-end/total
+            content_range = response.headers.get("content-range", "")
+            if "/" in content_range:
+                # 从 Content-Range 中提取总大小
+                response_total_size = float(content_range.split("/")[-1])
+            else:
+                # 如果没有 Content-Range (罕见)，则总大小 = 已下载 + 剩余部分(Content-Length)
+                response_total_size = downloaded_size + float(response.headers.get("content-length", 0))
+        else:
+            # 200 OK: 服务器不支持续传，重新下载整个文件
+            # 此时 Content-Length 是完整的总大小
+            response_total_size = float(response.headers.get("content-length", 0))
+            # 必须重置 downloaded_size 为 0，并覆盖写入 ("wb")
+            downloaded_size = 0
+            file_mode = "wb"
+
+        # Fixed issue #169. 更新总大小信息
+        if total_size == 0 or (response_total_size > 0 and total_size != response_total_size):
             total_size = response_total_size
             task_content.sizeBytes = total_size
             task_status.totalSize = total_size
             self.set_task_content(task_id, task_content)
             await utils.send_json("update_download_task", task_content.to_dict())
 
-        with open(download_tmp_file, "ab") as f:
+        # 使用正确的模式打开文件
+        with open(download_tmp_file, file_mode) as f:
             for chunk in response.iter_content(chunk_size=8192):
                 if task_status.status == "pause":
                     break
@@ -539,6 +684,7 @@ class ModelDownload:
 
                 if time.time() - last_update_time >= interval:
                     await update_progress()
+        # [fix-end]
 
         await update_progress()
 
