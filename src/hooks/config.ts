@@ -278,5 +278,18 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
         step: 1,
       },
     })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.DownloadSettings.Timeout',
+      category: [t('modelManager'), t('setting.downloadSettings'), 'Timeout'],
+      name: t('setting.timeout'),
+      defaultValue: 15,
+      type: 'number',
+      attrs: {
+        min: 1,
+        max: 120,
+        step: 1,
+      },
+    })
   })
 }

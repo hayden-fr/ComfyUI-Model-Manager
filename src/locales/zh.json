@@ -76,6 +76,7 @@
     "useFlatUI": "展平布局",
     "downloadSettings": "下载设置",
     "multiThreadDownload": "多线程下载",
-    "threadCount": "线程数"
+    "threadCount": "线程数",
+    "timeout": "连接超时时间(秒)"
   }
 }

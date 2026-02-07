@@ -76,6 +76,7 @@
     "useFlatUI": "Flat Layout",
     "downloadSettings": "Download Settings",
     "multiThreadDownload": "Multi-thread Download",
-    "threadCount": "Thread Count"
+    "threadCount": "Thread Count",
+    "timeout": "Connection Timeout (seconds)"
   }
 }

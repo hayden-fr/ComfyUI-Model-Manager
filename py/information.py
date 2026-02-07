@@ -28,24 +28,24 @@ class ModelSearcher(ABC):
     """
 
     @abstractmethod
-    def search_by_url(self, url: str) -> list[dict]:
+    def search_by_url(self, url: str, timeout: int = 15) -> list[dict]:
         pass
 
     @abstractmethod
-    def search_by_hash(self, hash: str) -> dict:
+    def search_by_hash(self, hash: str, timeout: int = 15) -> dict:
         pass
 
 
 class UnknownWebsiteSearcher(ModelSearcher):
-    def search_by_url(self, url: str):
+    def search_by_url(self, url: str, timeout: int = 15):
         raise RuntimeError(f"Unknown Website, please input a URL from huggingface.co or civitai.com.")
 
-    def search_by_hash(self, hash: str):
+    def search_by_hash(self, hash: str, timeout: int = 15):
         raise RuntimeError(f"Unknown Website, unable to search with hash value.")
 
 
 class CivitaiModelSearcher(ModelSearcher):
-    def search_by_url(self, url: str):
+    def search_by_url(self, url: str, timeout: int = 15):
         parsed_url = urlparse(url)
 
         pathname = parsed_url.path
@@ -58,7 +58,7 @@ class CivitaiModelSearcher(ModelSearcher):
         if not model_id:
             return []
 
-        response = requests.get(f"https://civitai.com/api/v1/models/{model_id}")
+        response = requests.get(f"https://civitai.com/api/v1/models/{model_id}",timeout=timeout)
         response.raise_for_status()
         res_data: dict = response.json()
 
@@ -132,11 +132,11 @@ class CivitaiModelSearcher(ModelSearcher):
 
         return models
 
-    def search_by_hash(self, hash: str):
+    def search_by_hash(self, hash: str, timeout: int = 15):
         if not hash:
             raise RuntimeError(f"Hash value is empty.")
 
-        response = requests.get(f"https://civitai.com/api/v1/model-versions/by-hash/{hash}")
+        response = requests.get(f"https://civitai.com/api/v1/model-versions/by-hash/{hash}", timeout=timeout)
         response.raise_for_status()
         version: dict = response.json()
 
@@ -168,7 +168,7 @@ class CivitaiModelSearcher(ModelSearcher):
 
 
 class HuggingfaceModelSearcher(ModelSearcher):
-    def search_by_url(self, url: str):
+    def search_by_url(self, url: str, timeout: int = 15):
         parsed_url = urlparse(url)
 
         pathname = parsed_url.path
@@ -178,7 +178,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
         model_id = f"{space}/{name}"
         rest_pathname = "/".join(rest_paths)
 
-        response = requests.get(f"https://huggingface.co/api/models/{model_id}")
+        response = requests.get(f"https://huggingface.co/api/models/{model_id}", timeout=timeout)
         response.raise_for_status()
         res_data: dict = response.json()
 
@@ -248,7 +248,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
 
         return models
 
-    def search_by_hash(self, hash: str):
+    def search_by_hash(self, hash: str, timeout: int = 15):
         raise RuntimeError("Hash search is not supported by Huggingface.")
 
     def _match_model_files(self):
@@ -308,7 +308,8 @@ class Information:
             """
             try:
                 model_page = request.query.get("model-page", None)
-                result = self.fetch_model_info(model_page)
+                timeout = utils.get_setting_value(request, "download.timeout", 15)
+                result = self.fetch_model_info(model_page, timeout)
                 return web.json_response({"success": True, "data": result})
             except Exception as e:
                 error_msg = f"Fetch model info failed: {str(e)}"
@@ -464,12 +465,12 @@ class Information:
             img_byte_arr.seek(0)
             return img_byte_arr
 
-    def fetch_model_info(self, model_page: str):
+    def fetch_model_info(self, model_page: str, timeout: int = 15):
         if not model_page:
             return []
 
         model_searcher = self.get_model_searcher_by_url(model_page)
-        result = model_searcher.search_by_url(model_page)
+        result = model_searcher.search_by_url(model_page, timeout)
         return result
 
     def get_scan_information_task_filepath(self):
