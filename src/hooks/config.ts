@@ -263,7 +263,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       category: [t('modelManager'), t('download'), 'ThreadCount'],
       name: t('threadCount'),
       defaultValue: 4,
-      type: 'number',
+      type: 'slider',
       attrs: {
         min: 1,
         max: 32,
