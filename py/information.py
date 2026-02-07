@@ -28,24 +28,24 @@ class ModelSearcher(ABC):
     """
 
     @abstractmethod
-    def search_by_url(self, url: str, timeout: int = 15) -> list[dict]:
+    def search_by_url(self, url: str, timeout: int) -> list[dict]:
         pass
 
     @abstractmethod
-    def search_by_hash(self, hash: str, timeout: int = 15) -> dict:
+    def search_by_hash(self, hash: str, timeout: int) -> dict:
         pass
 
 
 class UnknownWebsiteSearcher(ModelSearcher):
-    def search_by_url(self, url: str, timeout: int = 15):
+    def search_by_url(self, url: str, timeout: int):
         raise RuntimeError(f"Unknown Website, please input a URL from huggingface.co or civitai.com.")
 
-    def search_by_hash(self, hash: str, timeout: int = 15):
+    def search_by_hash(self, hash: str, timeout: int):
         raise RuntimeError(f"Unknown Website, unable to search with hash value.")
 
 
 class CivitaiModelSearcher(ModelSearcher):
-    def search_by_url(self, url: str, timeout: int = 15):
+    def search_by_url(self, url: str, timeout: int):
         parsed_url = urlparse(url)
 
         pathname = parsed_url.path
@@ -132,7 +132,7 @@ class CivitaiModelSearcher(ModelSearcher):
 
         return models
 
-    def search_by_hash(self, hash: str, timeout: int = 15):
+    def search_by_hash(self, hash: str, timeout: int):
         if not hash:
             raise RuntimeError(f"Hash value is empty.")
 
@@ -168,7 +168,7 @@ class CivitaiModelSearcher(ModelSearcher):
 
 
 class HuggingfaceModelSearcher(ModelSearcher):
-    def search_by_url(self, url: str, timeout: int = 15):
+    def search_by_url(self, url: str, timeout: int):
         parsed_url = urlparse(url)
 
         pathname = parsed_url.path
@@ -248,7 +248,7 @@ class HuggingfaceModelSearcher(ModelSearcher):
 
         return models
 
-    def search_by_hash(self, hash: str, timeout: int = 15):
+    def search_by_hash(self, hash: str, timeout: int):
         raise RuntimeError("Hash search is not supported by Huggingface.")
 
     def _match_model_files(self):
@@ -308,7 +308,7 @@ class Information:
             """
             try:
                 model_page = request.query.get("model-page", None)
-                timeout = utils.get_setting_value(request, "download.timeout", 15)
+                timeout = utils.get_setting_value(request, "download.timeout", 10)
                 result = self.fetch_model_info(model_page, timeout)
                 return web.json_response({"success": True, "data": result})
             except Exception as e:
@@ -465,7 +465,7 @@ class Information:
             img_byte_arr.seek(0)
             return img_byte_arr
 
-    def fetch_model_info(self, model_page: str, timeout: int = 15):
+    def fetch_model_info(self, model_page: str, timeout: int):
         if not model_page:
             return []
 
