@@ -74,7 +74,7 @@
     "ui": "UI",
     "cardSize": "Card Size",
     "useFlatUI": "Flat Layout",
-    "download": "Download",
+    "downloadSettings": "Download Settings",
     "multiThreadDownload": "Multi-thread Download",
     "threadCount": "Thread Count"
   }

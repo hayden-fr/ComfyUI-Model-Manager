@@ -74,7 +74,7 @@
     "ui": "外观",
     "cardSize": "卡片尺寸",
     "useFlatUI": "展平布局",
-    "download": "下载",
+    "downloadSettings": "下载设置",
     "multiThreadDownload": "多线程下载",
     "threadCount": "线程数"
   }

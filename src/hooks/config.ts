@@ -251,16 +251,24 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
     })
 
     app.ui?.settings.addSetting({
-      id: 'ModelManager.Download.MultiThreadEnabled',
-      category: [t('modelManager'), t('setting.download'), 'MultiThreadEnabled'],
+      id: 'ModelManager.DownloadSettings.MultiThreadEnabled',
+      category: [
+        t('modelManager'),
+        t('setting.downloadSettings'),
+        'MultiThreadEnabled',
+      ],
       name: t('setting.multiThreadDownload'),
       defaultValue: true,
       type: 'boolean',
     })
 
     app.ui?.settings.addSetting({
-      id: 'ModelManager.Download.ThreadCount',
-      category: [t('modelManager'), t('setting.download'), 'ThreadCount'],
+      id: 'ModelManager.DownloadSettings.ThreadCount',
+      category: [
+        t('modelManager'),
+        t('setting.downloadSettings'),
+        'ThreadCount',
+      ],
       name: t('setting.threadCount'),
       defaultValue: 4,
       type: 'number',
