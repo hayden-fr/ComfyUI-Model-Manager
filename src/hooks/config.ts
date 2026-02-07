@@ -267,6 +267,7 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       attrs: {
         min: 1,
         max: 32,
+        step: 1,
       },
     })
   })
