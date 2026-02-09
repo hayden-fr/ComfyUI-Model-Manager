@@ -5,6 +5,7 @@ import requests
 import base64
 import queue
 import threading
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 import folder_paths
