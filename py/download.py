@@ -7,6 +7,8 @@ import queue
 import threading
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 import folder_paths
 
@@ -486,6 +488,12 @@ class ModelDownload:
         task_status = self.get_task_status(task_id)
         task_content = self.get_task_content(task_id)
 
+        session = requests.Session()
+        retries = Retry(total=5, backoff_factor=1, status_forcelist=[500, 502, 503, 504])
+        adapter = HTTPAdapter(max_retries=retries)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+
         # Check download uri
         model_url = task_content.downloadUrl
         if not model_url:
@@ -500,7 +508,7 @@ class ModelDownload:
 
         try:
             if enable_multithread and (total_size == 0 or total_size > 10 * 1024 * 1024):
-                head_resp = requests.head(model_url, headers=headers, allow_redirects=True, timeout=10)
+                head_resp = session.head(model_url, headers=headers, allow_redirects=True, timeout=10)
                 if head_resp.status_code == 200:
                     remote_size = float(head_resp.headers.get("Content-Length", 0))
                     if remote_size > 0:
@@ -553,7 +561,7 @@ class ModelDownload:
                 h = headers.copy()
                 h["Range"] = f"bytes={p_curr}-{p_end}"
                 try:
-                    with requests.get(model_url, headers=h, stream=True, timeout=30) as r:
+                    with session.get(model_url, headers=h, stream=True, timeout=30) as r:
                         if r.status_code not in (200, 206): return
                         with open(download_tmp_file, "r+b") as f:
                             f.seek(p_curr)
@@ -623,11 +631,12 @@ class ModelDownload:
         last_update_time = time.time()
         last_downloaded_size = downloaded_size
 
-        response = requests.get(
+        response = session.get(
             url=model_url,
             headers=headers,
             stream=True,
             allow_redirects=True,
+            timeout=30,
         )
 
         if response.status_code not in (200, 206):
