@@ -527,6 +527,9 @@ class ModelDownload:
                 except:
                     pass
             
+            if parts and not os.path.exists(download_tmp_file):
+                parts = []
+
             if not parts:
                 with open(download_tmp_file, "wb") as f:
                     f.truncate(int(total_size))
