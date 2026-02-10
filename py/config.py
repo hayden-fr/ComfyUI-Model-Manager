@@ -9,7 +9,10 @@ setting_key = {
         "huggingface": "ModelManager.APIKey.HuggingFace",
     },
     "download": {
-        "max_task_count": "ModelManager.Download.MaxTaskCount",
+        "max_task_count": "ModelManager.DownloadSettings.MaxTaskCount",
+        "multi_thread_enabled": "ModelManager.DownloadSettings.MultiThreadEnabled",
+        "thread_count": "ModelManager.DownloadSettings.ThreadCount",
+        "timeout": "ModelManager.DownloadSettings.Timeout"
     },
     "scan": {
         "include_hidden_files": "ModelManager.Scan.IncludeHiddenFiles"

@@ -10,6 +10,7 @@
   "createDownloadTask": "创建下载任务",
   "parseModelUrl": "解析模型URL",
   "pleaseInputModelUrl": "输入 civitai.com 或 huggingface.co 的 URL",
+  "settings": "设置",
   "cancel": "取消",
   "save": "保存",
   "delete": "删除",
@@ -72,6 +73,10 @@
     "excludeScanTypes": "排除扫描类型(使用英文逗号隔开)",
     "ui": "外观",
     "cardSize": "卡片尺寸",
-    "useFlatUI": "展平布局"
+    "useFlatUI": "展平布局",
+    "downloadSettings": "下载设置",
+    "multiThreadDownload": "多线程下载",
+    "threadCount": "线程数",
+    "timeout": "连接超时时间(秒)"
   }
 }

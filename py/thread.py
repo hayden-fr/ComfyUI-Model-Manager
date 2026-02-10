@@ -41,17 +41,22 @@ class DownloadThreadPool:
         loop = asyncio.new_event_loop()
 
         while True:
-            if self.task_queue.empty():
-                break
-
-            task, task_id = self.task_queue.get()
+            try:
+                task, task_id = self.task_queue.get(timeout=5)
+            except queue.Empty:
+                with self._lock:
+                    if self.task_queue.empty():
+                        self.workers_count -= 1
+                        break
+                continue
 
             try:
                 loop.run_until_complete(task(task_id))
-                with self._lock:
-                    self.running_tasks.remove(task_id)
             except Exception as e:
                 utils.print_error(f"worker run error: {str(e)}")
+            finally:
+                with self._lock:
+                    if task_id in self.running_tasks:
+                        self.running_tasks.remove(task_id)
 
-        with self._lock:
-            self.workers_count -= 1
+        loop.close()

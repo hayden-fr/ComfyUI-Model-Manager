@@ -4,7 +4,7 @@ import plugin from 'tailwindcss/plugin'
 export default {
   content: ['index.html', './src/**/*.vue'],
 
-  darkMode: ['selector', '.dark-theme'],
+  darkMode: ['selector', '.model-manager-dark'],
 
   plugins: [
     plugin(({ addUtilities }) => {

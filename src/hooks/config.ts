@@ -249,5 +249,47 @@ function useAddConfigSettings(store: import('hooks/store').StoreProvider) {
       defaultValue: false,
       type: 'boolean',
     })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.DownloadSettings.MultiThreadEnabled',
+      category: [
+        t('modelManager'),
+        t('setting.downloadSettings'),
+        'MultiThreadEnabled',
+      ],
+      name: t('setting.multiThreadDownload'),
+      defaultValue: true,
+      type: 'boolean',
+    })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.DownloadSettings.ThreadCount',
+      category: [
+        t('modelManager'),
+        t('setting.downloadSettings'),
+        'ThreadCount',
+      ],
+      name: t('setting.threadCount'),
+      defaultValue: 4,
+      type: 'number',
+      attrs: {
+        min: 1,
+        max: 32,
+        step: 1,
+      },
+    })
+
+    app.ui?.settings.addSetting({
+      id: 'ModelManager.DownloadSettings.Timeout',
+      category: [t('modelManager'), t('setting.downloadSettings'), 'Timeout'],
+      name: t('setting.timeout'),
+      defaultValue: 10,
+      type: 'number',
+      attrs: {
+        min: 1,
+        max: 120,
+        step: 1,
+      },
+    })
   })
 }
