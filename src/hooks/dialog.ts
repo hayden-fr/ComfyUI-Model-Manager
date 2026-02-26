@@ -6,6 +6,7 @@ interface HeaderButton {
   key: string
   icon: string
   command: () => void
+  tooltip?: string
 }
 
 export interface DialogItem {

@@ -16,6 +16,7 @@
           <Button
             v-for="action in item.headerButtons"
             :key="action.key"
+            v-tooltip.top="action.tooltip"
             severity="secondary"
             :text="true"
             :rounded="true"
