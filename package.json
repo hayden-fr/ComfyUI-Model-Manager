@@ -35,6 +35,7 @@
     "@primevue/themes": "^4.0.7",
     "@vueuse/core": "^11.3.0",
     "dayjs": "^1.11.13",
+    "js-yaml": "^4.1.0",
     "lodash": "^4.17.21",
     "markdown-it": "^14.1.0",
     "markdown-it-metadata-block": "^1.0.6",
