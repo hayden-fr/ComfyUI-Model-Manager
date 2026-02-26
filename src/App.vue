@@ -81,24 +81,28 @@ onMounted(() => {
   }
 
   const toggleLayout = () => {
-    // flip the flat setting
     const newValue = !config.flat.value
     config.flat.value = newValue
 
-    // persist so it survives reloads
     app.ui?.settings.setSettingValue('ModelManager.UI.Flat', newValue)
 
-    // close the current dialog (because it is keepAlive)
     dialog.closeAll()
-
-    // reopen with the new layout
     openManagerDialog()
   }
 
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect, flat } = config
-    // choose icon depending on current layout
-    const layoutIcon = flat.value ? 'pi pi-folder-open' : 'pi pi-th-large'
+
+    const layoutIcon = flat.value ? 'pi pi-th-large' : 'pi pi-folder-open'
+
+    const includeHidden =
+      app.ui?.settings.getSettingValue(
+        'ModelManager.Scan.IncludeHiddenFiles',
+      ) ?? false
+    const hiddenIcon = includeHidden ? 'pi pi-eye' : 'pi pi-eye-slash'
+    const hiddenTooltip = includeHidden
+      ? t('hideHiddenFiles')
+      : t('showHiddenFiles')
 
     if (firstOpenManager.value) {
       models.refresh(true)
@@ -120,9 +124,22 @@ onMounted(() => {
           key: 'toggle-layout',
           icon: layoutIcon,
           command: toggleLayout,
-          tooltip: flat.value
-            ? t('switchToFolderView')
-            : t('switchToFlatView'),
+          tooltip: flat.value ? t('switchToFolderView') : t('switchToFlatView'),
+        },
+        {
+          key: 'toggle-hidden',
+          icon: hiddenIcon,
+          command: async () => {
+            const newValue = !includeHidden
+            app.ui?.settings.setSettingValue(
+              'ModelManager.Scan.IncludeHiddenFiles',
+              newValue,
+            )
+            await refreshModelsAndConfig() // ensure updated model list
+            dialog.closeAll()
+            openManagerDialog()
+          },
+          tooltip: hiddenTooltip,
         },
         {
           key: 'refresh',
