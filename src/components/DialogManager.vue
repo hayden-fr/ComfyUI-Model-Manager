@@ -278,6 +278,7 @@ const list = computed(() => {
   })
 })
 
+
 const contentStyle = computed(() => ({
   gridTemplateColumns: `repeat(auto-fit, ${cardSize.value.width}px)`,
   gap: `${gutter}px`,
