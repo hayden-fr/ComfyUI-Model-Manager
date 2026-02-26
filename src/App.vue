@@ -92,16 +92,6 @@ onMounted(() => {
 
   const openManagerDialog = () => {
     const { cardWidth, gutter, aspect, flat } = config
-    // choose icon depending on current layout
-    const layoutIcon = flat.value ? 'pi pi-folder-open' : 'pi pi-th-large'
-    // determine hidden files setting
-    const includeHidden =
-      app.ui?.settings.getSettingValue('ModelManager.Scan.IncludeHiddenFiles') ??
-      false
-    const hiddenIcon = includeHidden ? 'pi pi-eye' : 'pi pi-eye-slash'
-    const hiddenTooltip = includeHidden
-      ? t('hideHiddenFiles')
-      : t('showHiddenFiles')
 
     const layoutIcon = flat.value ? 'pi pi-th-large' : 'pi pi-folder-open'
 
