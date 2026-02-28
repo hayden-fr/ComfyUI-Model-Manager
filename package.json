@@ -9,6 +9,11 @@
     "lint": "eslint src",
     "prepare": "husky"
   },
+  "peerDependencies": {
+    "primevue": "^4.2.5",
+    "vue": "^3.5.13",
+    "vue-i18n": "^9.14.3"
+  },
   "devDependencies": {
     "@types/lodash": "^4.17.9",
     "@types/markdown-it": "^14.1.2",
@@ -39,9 +44,6 @@
     "lodash": "^4.17.21",
     "markdown-it": "^14.1.0",
     "markdown-it-metadata-block": "^1.0.6",
-    "primevue": "^4.0.7",
-    "vue": "^3.5.6",
-    "vue-i18n": "^9.14.0",
     "yaml": "^2.6.0"
   },
   "lint-staged": {

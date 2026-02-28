@@ -200,3 +200,5 @@ config/
 
 # private info
 private.key
+
+.idea/
